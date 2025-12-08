@@ -10,9 +10,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:image/image.dart' as img;
 import 'dart:typed_data';
+import 'dart:convert';
 import '../core/firebase_config.dart';
 
-// Top-level függvény a compute-hoz
+// Top-level függvény a compute-hoz - optimalizált verzió
 Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
   // Ha már 200 KB alatt van, visszaadja
   if (imageBytes.length <= 200 * 1024) {
@@ -26,20 +27,59 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
       throw Exception('Nem sikerült dekódolni a képet');
     }
     
-    // Kezdeti értékek
-    int targetWidth = decodedImage.width > 1200 ? 1200 : decodedImage.width;
-    int targetHeight = decodedImage.height > 1200 ? 1200 : decodedImage.height;
-    int quality = 80;
+    // Optimalizált kezdeti becslés az eredeti méret alapján
+    final originalSizeKB = imageBytes.length / 1024;
+    final targetSizeKB = 200.0;
+    final sizeRatio = originalSizeKB / targetSizeKB;
+    
+    // Kezdeti értékek jobb becsléssel
+    int targetWidth = decodedImage.width;
+    int targetHeight = decodedImage.height;
+    int quality = 85;
+    
+    // Ha a kép túl nagy, először csökkentjük a méretet
+    if (sizeRatio > 4) {
+      // Nagyon nagy kép: jelentősen csökkentjük a méretet
+      final scale = 0.6;
+      targetWidth = (decodedImage.width * scale).round();
+      targetHeight = (decodedImage.height * scale).round();
+      quality = 75;
+    } else if (sizeRatio > 2) {
+      // Nagy kép: mérsékelten csökkentjük a méretet
+      final scale = 0.75;
+      targetWidth = (decodedImage.width * scale).round();
+      targetHeight = (decodedImage.height * scale).round();
+      quality = 80;
+    } else if (sizeRatio > 1.5) {
+      // Közepes kép: kicsit csökkentjük a méretet
+      final scale = 0.85;
+      targetWidth = (decodedImage.width * scale).round();
+      targetHeight = (decodedImage.height * scale).round();
+      quality = 80;
+    }
+    
+    // Maximum méret korlátozás
+    if (targetWidth > 1200) {
+      final scale = 1200.0 / targetWidth;
+      targetWidth = 1200;
+      targetHeight = (targetHeight * scale).round();
+    }
+    if (targetHeight > 1200) {
+      final scale = 1200.0 / targetHeight;
+      targetHeight = 1200;
+      targetWidth = (targetWidth * scale).round();
+    }
+    
     Uint8List? compressed;
     
-    // Iteratív tömörítés, amíg nem lesz 200 KB alatt
-    int maxIterations = 8;
+    // Optimalizált iteratív tömörítés - max 3-4 iteráció
+    int maxIterations = 4;
     int iteration = 0;
     
     while (iteration < maxIterations && (compressed == null || compressed.length > 200 * 1024)) {
       iteration++;
       
-      // Kép átméretezése
+      // Kép átméretezése (ha szükséges)
       img.Image resizedImage;
       if (targetWidth != decodedImage.width || targetHeight != decodedImage.height) {
         resizedImage = img.copyResize(
@@ -57,16 +97,19 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
         img.encodeJpg(resizedImage, quality: quality),
       );
       
-      // Ha még mindig túl nagy, csökkentjük a minőséget vagy a méretet
+      // Ha még mindig túl nagy, finomhangoljuk
       if (compressed.length > 200 * 1024) {
-        if (quality > 50) {
-          // Először csökkentjük a minőséget
+        if (quality > 60) {
+          // Először csökkentjük a minőséget nagyobb lépésekben
+          quality -= 15;
+        } else if (quality > 45) {
+          // Közepes lépésekben
           quality -= 10;
         } else {
           // Ha a minőség már alacsony, csökkentjük a méretet
-          targetWidth = (targetWidth * 0.8).round();
-          targetHeight = (targetHeight * 0.8).round();
-          quality = 70; // Reset minőség
+          targetWidth = (targetWidth * 0.85).round();
+          targetHeight = (targetHeight * 0.85).round();
+          quality = 65; // Reset minőség
         }
       } else {
         break;
@@ -109,6 +152,10 @@ class _MemoriapalotaAllomasViewScreenState
   String? _currentImageUrl;
   bool _isUploadingImage = false;
   final ImagePicker _imagePicker = ImagePicker();
+  
+  // Progress dialog state változók
+  double _uploadProgress = 0.0;
+  String _uploadPhase = ''; // 'loading', 'compressing', 'uploading'
   
   // Tananyag megnyitás state
   bool _isContentOpen = false;
@@ -536,10 +583,6 @@ class _MemoriapalotaAllomasViewScreenState
                     
                     if (!mounted) return;
                     
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Kép betöltése...')),
-                    );
-                    
                     debugPrint('Reading file bytes...');
                     final bytes = await file.readAsBytes();
                     debugPrint('File bytes read: ${bytes.length} bytes');
@@ -558,8 +601,11 @@ class _MemoriapalotaAllomasViewScreenState
                     
                     if (!mounted) return;
                     
+                    // Lokális blob URL létrehozása az optimistic UI-hoz
+                    final localImageUrl = _createLocalImageUrl(bytes);
+                    
                     debugPrint('Starting image processing...');
-                    await _processAndUploadImage(bytes);
+                    await _processAndUploadImage(bytes, localImageUrl: localImageUrl);
                     debugPrint('Image processing completed');
                     
                   } catch (e, stackTrace) {
@@ -633,10 +679,6 @@ class _MemoriapalotaAllomasViewScreenState
         return;
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kép betöltése...')),
-      );
-      
       debugPrint('Reading file bytes...');
       final bytes = await file.readAsBytes();
       debugPrint('File bytes read: ${bytes.length} bytes');
@@ -655,8 +697,11 @@ class _MemoriapalotaAllomasViewScreenState
       
       if (!mounted) return;
       
+      // Lokális blob URL létrehozása az optimistic UI-hoz
+      final localImageUrl = _createLocalImageUrl(bytes);
+      
       debugPrint('Starting image processing...');
-      await _processAndUploadImage(bytes);
+      await _processAndUploadImage(bytes, localImageUrl: localImageUrl);
       debugPrint('Image processing completed');
       
     } catch (e, stackTrace) {
@@ -811,8 +856,87 @@ class _MemoriapalotaAllomasViewScreenState
     debugPrint('=== _pickImageFromFile END ===');
   }
   
-  // Kép tömörítése és feltöltése
-  Future<void> _processAndUploadImage(Uint8List imageBytes) async {
+  // Lokális data URL létrehozása web-en (optimistic UI)
+  String? _createLocalImageUrl(Uint8List imageBytes) {
+    if (!kIsWeb) return null;
+    
+    try {
+      // Base64 kódolás a data URL-hez
+      final base64 = base64Encode(imageBytes);
+      // MIME típus meghatározása az első bájtok alapján
+      String mimeType = 'image/jpeg';
+      if (imageBytes.length >= 4) {
+        if (imageBytes[0] == 0x89 && imageBytes[1] == 0x50 && imageBytes[2] == 0x4E && imageBytes[3] == 0x47) {
+          mimeType = 'image/png';
+        } else if (imageBytes[0] == 0x47 && imageBytes[1] == 0x49 && imageBytes[2] == 0x46) {
+          mimeType = 'image/gif';
+        } else if (imageBytes.length >= 12 && 
+                   imageBytes[0] == 0x52 && imageBytes[1] == 0x49 && 
+                   imageBytes[2] == 0x46 && imageBytes[3] == 0x46 &&
+                   imageBytes[8] == 0x57 && imageBytes[9] == 0x45 && 
+                   imageBytes[10] == 0x42 && imageBytes[11] == 0x50) {
+          mimeType = 'image/webp';
+        }
+      }
+      return 'data:$mimeType;base64,$base64';
+    } catch (e) {
+      debugPrint('Hiba a lokális kép URL létrehozásakor: $e');
+      return null;
+    }
+  }
+  
+  // Progress dialog megjelenítése
+  void _showUploadProgressDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false, // Nem lehet bezárni
+        child: AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                _uploadPhase == 'loading'
+                    ? 'Kép betöltése...'
+                    : _uploadPhase == 'compressing'
+                        ? 'Kép tömörítése...'
+                        : _uploadPhase == 'uploading'
+                            ? 'Kép feltöltése...'
+                            : 'Feldolgozás...',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: _uploadProgress,
+                minHeight: 4,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Progress dialog frissítése
+  void _updateUploadProgress(double progress, String phase) {
+    if (mounted) {
+      setState(() {
+        _uploadProgress = progress;
+        _uploadPhase = phase;
+      });
+    }
+  }
+  
+  // Kép tömörítése és feltöltése - optimalizált verzió optimistic UI-val
+  Future<void> _processAndUploadImage(Uint8List imageBytes, {String? localImageUrl}) async {
     debugPrint('_processAndUploadImage called, bytes length: ${imageBytes.length}');
     
     if (imageBytes.isEmpty) {
@@ -830,20 +954,28 @@ class _MemoriapalotaAllomasViewScreenState
       return;
     }
     
+    // Optimistic UI: azonnal megjelenítjük a képet lokálisan
+    String? tempUrl = localImageUrl ?? _createLocalImageUrl(imageBytes);
+    String? previousImageUrl = _currentImageUrl;
+    
     setState(() {
       _isUploadingImage = true;
+      if (tempUrl != null) {
+        _currentImageUrl = tempUrl; // Azonnal megjelenítjük (optimistic UI)
+      }
+      _uploadProgress = 0.0;
+      _uploadPhase = 'loading';
     });
     
+    // Progress dialog megjelenítése
+    _showUploadProgressDialog();
+    
     try {
+      _updateUploadProgress(0.1, 'loading');
       debugPrint('Starting compression, original size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kép tömörítése... (${(imageBytes.length / 1024).toStringAsFixed(1)} KB)')),
-        );
-      }
-      
       // Kép tömörítése 200 KB alá
+      _updateUploadProgress(0.33, 'compressing');
       final compressedBytes = await _compressImage(imageBytes);
       
       debugPrint('Compression done, compressed size: ${compressedBytes != null ? (compressedBytes.length / 1024).toStringAsFixed(1) : "null"} KB');
@@ -857,31 +989,51 @@ class _MemoriapalotaAllomasViewScreenState
         throw Exception('A kép mérete még tömörítés után is meghaladja a 200 KB-ot (${(compressedBytes.length / 1024).toStringAsFixed(1)} KB)');
       }
       
+      _updateUploadProgress(0.66, 'uploading');
       debugPrint('Starting upload to Firebase Storage');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kép feltöltése... (${(compressedBytes.length / 1024).toStringAsFixed(1)} KB)')),
-        );
-      }
       
       // Feltöltés
       await _uploadImageToStorage(compressedBytes);
       
+      _updateUploadProgress(1.0, 'uploading');
       debugPrint('Upload completed successfully');
       
+      // Progress dialog bezárása
       if (mounted) {
+        Navigator.of(context).pop(); // Progress dialog bezárása
+      }
+      
+      // Sikeres feltöltés után frissítjük a state-et
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+          // _currentImageUrl már frissítve van az _uploadImageToStorage-ban
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Kép sikeresen feltöltve!'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e, stackTrace) {
       debugPrint('Hiba a képfeltöltéskor: $e');
       debugPrint('Stack trace: $stackTrace');
+      
+      // Progress dialog bezárása
       if (mounted) {
+        Navigator.of(context).pop(); // Progress dialog bezárása
+      }
+      
+      // Hiba esetén visszaállítjuk az előző állapotot
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+          _currentImageUrl = previousImageUrl; // Visszaállítjuk az előző képet
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hiba a képfeltöltéskor: $e'),
@@ -889,12 +1041,6 @@ class _MemoriapalotaAllomasViewScreenState
             backgroundColor: Colors.red,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploadingImage = false;
-        });
       }
     }
   }
