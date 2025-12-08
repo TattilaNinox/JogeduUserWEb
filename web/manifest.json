@@ -1,11 +1,11 @@
 {
-    "name": "Lomedu - Egészségügyi Tananyagok",
-    "short_name": "Lomedu",
+    "name": "Jogedu - Jogi Tananyagok",
+    "short_name": "Jogedu",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1E3A8A",
     "theme_color": "#1E3A8A",
-    "description": "Lomedu - Online tanulási platform egészségügyi szakemberek számára",
+    "description": "Jogedu - Online tanulási platform jogi szakemberek számára",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
