@@ -25,6 +25,8 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
   DocumentSnapshot? _bundleSnapshot;
   String _bundleName = '';
   List<String> _noteIds = [];
+  bool _isLoadingNotes = true; // Flag, hogy ne jelenjen meg az üres üzenet betöltés közben
+  bool _isLoadingInProgress = false; // Flag, hogy ne töltse be többször az adatokat
   
   // Jegyzetek adatai
   Map<String, Map<String, dynamic>> _notesData = {};
@@ -72,18 +74,44 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
         .listen((snapshot) async {
       if (!mounted) return;
       
+      // Ha már betöltés folyamatban van, ne kezdjük el újra
+      if (_isLoadingInProgress) return;
+      
       if (snapshot.exists) {
         final data = snapshot.data() as Map<String, dynamic>;
         _bundleName = data['name'] ?? 'Névtelen köteg';
-        _noteIds = List<String>.from(data['noteIds'] ?? []);
+        final noteIds = List<String>.from(data['noteIds'] ?? []);
         
-        if (_noteIds.isNotEmpty) {
-          await _loadNotesData();
-          _loadCurrentNote();
-        }
+        // Betöltés közben ne jelenjen meg az üres üzenet - csak a loading flag-et állítjuk be
+        setState(() {
+          _isLoadingNotes = true;
+          _isLoadingInProgress = true;
+          // NE állítsuk be a _bundleSnapshot-ot még, amíg nem töltődtek be az adatok!
+        });
         
+        // Betöltjük a jegyzetek adatait
+        await _loadNotesData();
+        if (!mounted) return;
+        
+        // Beállítjuk a state-et, hogy betöltse az iframe-et
         setState(() {
           _bundleSnapshot = snapshot;
+          _noteIds = noteIds;
+          // Még nem állítjuk le a loading flag-et, várjuk meg az iframe betöltését
+        });
+        
+        // Betöltjük az aktuális jegyzet tartalmát
+        _loadCurrentNote();
+        
+        // Várunk egy kicsit, hogy az iframe betöltődhessen
+        // Az iframe betöltése aszinkron, ezért egy rövid késleltetést használunk
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (!mounted) return;
+        
+        // Most már beállíthatjuk, hogy a loading screen eltűnjön
+        setState(() {
+          _isLoadingNotes = false;
+          _isLoadingInProgress = false;
         });
       }
     });
@@ -169,7 +197,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
   
   @override
   Widget build(BuildContext context) {
-    if (_bundleSnapshot == null) {
+    if (_bundleSnapshot == null || _isLoadingNotes || _noteIds.isEmpty) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Betöltés...'),
@@ -179,24 +207,6 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
           ),
         ),
         body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-    
-    if (_noteIds.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(_bundleName),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/bundles'),
-          ),
-        ),
-        body: const Center(
-          child: Text(
-            'Ez a köteg nem tartalmaz jegyzeteket',
-            style: TextStyle(fontSize: 18),
-          ),
-        ),
       );
     }
     

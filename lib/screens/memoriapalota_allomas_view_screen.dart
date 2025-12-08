@@ -102,7 +102,6 @@ class _MemoriapalotaAllomasViewScreenState
   List<DocumentSnapshot> _allomasok = [];
   int _currentIndex = 0;
   bool _isLoading = true;
-  String? _errorMessage;
   String _currentHtmlContent = '';
   String _viewId = '';
   
@@ -347,56 +346,46 @@ class _MemoriapalotaAllomasViewScreenState
 
 
   Future<void> _loadAllomasok() async {
-    try {
-      // A widget.noteId az utvonalId (a fő útvonal dokumentum ID-ja)
-      final utvonalID = widget.noteId;
+    // A widget.noteId az utvonalId (a fő útvonal dokumentum ID-ja)
+    final utvonalID = widget.noteId;
 
-      if (utvonalID.isEmpty) {
-        setState(() {
-          _errorMessage = 'Az útvonal ID nem található.';
-          _isLoading = false;
-        });
-        return;
-      }
+    // Betöltjük az összes állomást a subcollection-ből
+    // A struktúra: memoriapalota_allomasok/{utvonalId}/allomasok/{allomasId}
+    final snapshot = await FirebaseConfig.firestore
+        .collection('memoriapalota_allomasok')
+        .doc(utvonalID)
+        .collection('allomasok')
+        .get();
 
-      // Betöltjük az összes állomást a subcollection-ből
-      // A struktúra: memoriapalota_allomasok/{utvonalId}/allomasok/{allomasId}
-      final snapshot = await FirebaseConfig.firestore
-          .collection('memoriapalota_allomasok')
-          .doc(utvonalID)
-          .collection('allomasok')
-          .get();
+    if (!mounted) return;
 
-      if (snapshot.docs.isEmpty) {
-        setState(() {
-          _errorMessage = 'Nem található állomás ezzel az utvonalID-vel.';
-          _isLoading = false;
-        });
-        return;
-      }
+    // Rendezzük az állomásokat allomasSorszam alapján
+    final allomasok = snapshot.docs.toList();
+    allomasok.sort((a, b) {
+      final sorszamA = a.data()['allomasSorszam'] as int? ?? 0;
+      final sorszamB = b.data()['allomasSorszam'] as int? ?? 0;
+      return sorszamA.compareTo(sorszamB);
+    });
 
-      // Rendezzük az állomásokat allomasSorszam alapján
-      final allomasok = snapshot.docs.toList();
-      allomasok.sort((a, b) {
-        final sorszamA = a.data()['allomasSorszam'] as int? ?? 0;
-        final sorszamB = b.data()['allomasSorszam'] as int? ?? 0;
-        return sorszamA.compareTo(sorszamB);
-      });
+    // Beállítjuk az állomásokat, de még nem állítjuk le a loading flag-et
+    setState(() {
+      _allomasok = allomasok;
+      _currentIndex = 0;
+      // Még nem állítjuk le a loading flag-et, várjuk meg az iframe betöltését
+    });
 
-      setState(() {
-        _allomasok = allomasok;
-        _currentIndex = 0;
-        _isLoading = false;
-      });
-
-      // Megjelenítjük az első állomást (ez már betölti a képet is)
-      await _displayCurrentAllomas();
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Hiba történt az állomások betöltésekor: $e';
-        _isLoading = false;
-      });
-    }
+    // Megjelenítjük az első állomást (ez már betölti a képet is)
+    await _displayCurrentAllomas();
+    
+    // Várunk egy kicsit, hogy az iframe betöltődhessen
+    // Az iframe betöltése aszinkron, ezért egy rövid késleltetést használunk
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    
+    // Most már beállíthatjuk, hogy a loading screen eltűnjön
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   Future<void> _displayCurrentAllomas() async {
@@ -1162,7 +1151,7 @@ class _MemoriapalotaAllomasViewScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading || _allomasok.isEmpty) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Memóriapalota Állomások'),
@@ -1172,52 +1161,6 @@ class _MemoriapalotaAllomasViewScreenState
           ),
         ),
         body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Memóriapalota Állomások'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/notes'),
-          ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => context.go('/notes'),
-                child: const Text('Vissza a jegyzetekhez'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_allomasok.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Memóriapalota Állomások'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/notes'),
-          ),
-        ),
-        body: const Center(
-          child: Text('Nincsenek állomások ebben a kötegben.'),
-        ),
       );
     }
 
