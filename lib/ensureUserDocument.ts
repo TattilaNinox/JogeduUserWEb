@@ -21,7 +21,7 @@ export async function ensureUserDocument(user: User, opts?: { firstName?: string
   const baseFields = {
     email: user.email ?? '',
     userType: 'normal',
-    science: 'Egészségügyi kártevőírtó',
+    science: 'Jogász',
     subscriptionStatus: 'free',
     isSubscriptionActive: false,
     subscriptionEndDate: null as NullableDate,

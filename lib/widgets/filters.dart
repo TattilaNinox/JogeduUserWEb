@@ -141,7 +141,7 @@ class _FiltersState extends State<Filters> {
       isExpanded: widget.vertical,
     ));
 
-    // Tudomány szűrő - jelenleg csak "Egészségügyi kártevőírtó" elérhető
+    // Tudomány szűrő - jelenleg csak "Jogász" elérhető
     add(_buildDropdown<String>(
       hint: 'Tudomány',
       value: _science,

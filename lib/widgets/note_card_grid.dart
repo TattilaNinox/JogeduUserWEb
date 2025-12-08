@@ -72,26 +72,44 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
         final userData = userSnapshot.data?.data() ?? {};
         final bool hasPremiumAccess = _checkPremiumAccess(userData);
+        
+        // Admin ellenőrzés - több módszerrel ellenőrizzük
+        final userType = (userData['userType'] as String? ?? '').toLowerCase();
+        final isAdminEmail = user.email != null && user.email == 'tattila.ninox@gmail.com';
+        final isAdminBool = userData['isAdmin'] == true;
+        final bool isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+        
+        // Debug: admin ellenőrzés eredménye
+        debugPrint('[NoteCardGrid] Admin check - email: ${user.email}, userType: $userType, isAdminBool: $isAdminBool, isAdminEmail: $isAdminEmail, final isAdmin: $isAdmin');
 
-        // FIX: Webalkalmazásban MINDIG csak "Egészségügyi kártevőírtó" tudományág
-        const userScience = 'Egészségügyi kártevőírtó';
+        // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
+        const userScience = 'Jogász';
 
         Query<Map<String, dynamic>> query =
             FirebaseConfig.firestore.collection('notes');
 
-        // KÖTELEZŐ: Csak "Egészségügyi kártevőírtó" tudományágú jegyzetek
+        // KÖTELEZŐ: Csak "Jogász" tudományágú jegyzetek
         query = query.where('science', isEqualTo: userScience);
-
-        // Alap szűrés a publikus jegyzetekre (Published VAGY Public)
-        query = query.where('status', isEqualTo: 'Published');
 
         // FREEMIUM MODEL: Minden jegyzet látszik, de a zártak nem nyithatók meg
         // Nem szűrünk isFree alapján, hogy a prémium jegyzetek is látszódjanak
 
-        // További felhasználói szűrők alkalmazása
+        // Státusz szűrés: admin esetén Draft jegyzeteket is mutatunk
         if (widget.selectedStatus != null &&
             widget.selectedStatus!.isNotEmpty) {
+          // Ha van kiválasztott státusz, azt használjuk
           query = query.where('status', isEqualTo: widget.selectedStatus);
+        } else {
+          // Ha nincs kiválasztott státusz, alapértelmezett szűrés
+          if (isAdmin) {
+            // Admin esetén Published és Draft jegyzeteket mutatunk
+            query = query.where('status', whereIn: ['Published', 'Draft']);
+            debugPrint('[NoteCardGrid] Admin query - showing Published and Draft notes');
+          } else {
+            // Nem admin csak Published jegyzeteket lát
+            query = query.where('status', isEqualTo: 'Published');
+            debugPrint('[NoteCardGrid] Non-admin query - showing only Published notes');
+          }
         }
         if (widget.selectedCategory != null &&
             widget.selectedCategory!.isNotEmpty) {

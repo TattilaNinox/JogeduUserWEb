@@ -132,7 +132,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'userType': 'normal',
-        'science': 'Egészségügyi kártevőírtó',
+        'science': 'Jogász',
         'subscriptionStatus': 'free',
         'isSubscriptionActive': false,
         'subscriptionEndDate': null,

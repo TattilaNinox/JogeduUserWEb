@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/firebase_config.dart';
 
 import '../utils/filter_storage.dart';
@@ -65,8 +66,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
   void initState() {
     super.initState();
     // AZONNAL beállítjuk a fix tudományágat
-    _selectedScience = 'Egészségügyi kártevőírtó';
-    _sciences = const ['Egészségügyi kártevőírtó'];
+    _selectedScience = 'Jogász';
+    _sciences = const ['Jogász'];
     // Ezután betöltjük a felhasználó adatait és a szűrőket
     _loadSciences();
     _loadSavedFilters();
@@ -117,7 +118,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   /// Betölti a kategóriákat a notes kollekcióból.
   /// Csak azokat a kategóriákat tölti be, amelyek science mezője megegyezik
-  /// a felhasználó tudományágával és Published státuszúak.
+  /// a felhasználó tudományágával és Published státuszúak (admin esetén Draft is).
   Future<void> _loadCategories() async {
     try {
       // Lekérjük a bejelentkezett felhasználó tudományágát
@@ -127,15 +128,39 @@ class _NoteListScreenState extends State<NoteListScreen> {
         return;
       }
 
-      // FIX: Webalkalmazásban MINDIG csak "Egészségügyi kártevőírtó" tudományág
-      const userScience = 'Egészségügyi kártevőírtó';
+      // Admin ellenőrzés
+      bool isAdmin = false;
+      try {
+        final userDoc = await FirebaseConfig.firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final userData = userDoc.data() ?? {};
+        final userType = (userData['userType'] as String? ?? '').toLowerCase();
+        final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
+        final isAdminBool = userData['isAdmin'] == true;
+        isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+      } catch (e) {
+        // Ha hiba van az admin ellenőrzésben, nem adminként kezeljük
+        isAdmin = false;
+      }
 
-      // Lekérjük a notes-okat, szűrve a felhasználó tudományágára és Published státuszra
-      final snapshot = await FirebaseConfig.firestore
+      // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
+      const userScience = 'Jogász';
+
+      // Lekérjük a notes-okat, szűrve a felhasználó tudományágára és státuszra
+      // Admin esetén Draft státuszú jegyzeteket is betöltjük
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
           .collection('notes')
-          .where('science', isEqualTo: userScience)
-          .where('status', isEqualTo: 'Published')
-          .get();
+          .where('science', isEqualTo: userScience);
+      
+      if (isAdmin) {
+        query = query.where('status', whereIn: ['Published', 'Draft']);
+      } else {
+        query = query.where('status', isEqualTo: 'Published');
+      }
+      
+      final snapshot = await query.get();
 
       // Kinyerjük az egyedi kategóriákat
       final categoriesSet = <String>{};
@@ -161,20 +186,58 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   /// Betölti a tudományágakat és automatikusan beállítja a felhasználó tudományágát.
-  /// A rendszer jelenleg fix tudományágra van korlátozva: 'Egészségügyi kártevőírtó'.
+  /// A rendszer jelenleg fix tudományágra van korlátozva: 'Jogász'.
   Future<void> _loadSciences() async {
-    // FIX: Webalkalmazásban MINDIG csak "Egészségügyi kártevőírtó" tudományág
+    // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
     setState(() {
-      _sciences = const ['Egészségügyi kártevőírtó'];
-      _selectedScience = 'Egészségügyi kártevőírtó';
+      _sciences = const ['Jogász'];
+      _selectedScience = 'Jogász';
     });
+    // Beállítjuk a FilterStorage-ban is, hogy más képernyőkön is elérhető legyen
+    FilterStorage.science = 'Jogász';
   }
 
   Future<void> _loadTags() async {
     try {
-      final notesSnapshot = await FirebaseConfig.firestore
+      // Lekérjük a bejelentkezett felhasználót
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => _tags = []);
+        return;
+      }
+
+      // Admin ellenőrzés
+      bool isAdmin = false;
+      try {
+        final userDoc = await FirebaseConfig.firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final userData = userDoc.data() ?? {};
+        final userType = (userData['userType'] as String? ?? '').toLowerCase();
+        final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
+        final isAdminBool = userData['isAdmin'] == true;
+        isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+      } catch (e) {
+        // Ha hiba van az admin ellenőrzésben, nem adminként kezeljük
+        isAdmin = false;
+      }
+
+      // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
+      const userScience = 'Jogász';
+
+      // Admin esetén Draft státuszú jegyzeteket is betöltjük
+      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
           .collection('notes')
-          .where('status', whereIn: ['Published', 'Public']).get();
+          .where('science', isEqualTo: userScience);
+      
+      if (isAdmin) {
+        query = query.where('status', whereIn: ['Published', 'Public', 'Draft']);
+      } else {
+        query = query.where('status', whereIn: ['Published', 'Public']);
+      }
+      
+      final notesSnapshot = await query.get();
       final allTags = <String>{};
 
       for (final doc in notesSnapshot.docs) {

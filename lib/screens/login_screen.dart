@@ -21,24 +21,25 @@ class LoginScreen extends StatefulWidget {
 }
 
 /// A `LoginScreen` widget állapotát kezelő osztály.
-class LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   // A beviteli mezők vezérlői (controller), amelyekkel elérhető és módosítható
   // a mezők tartalma.
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _passwordVisible = false;
   bool _isLoading = false;
-  
+
   // Focus nodes az input mezők animációihoz
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
-  
+
   // Animációk
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _backgroundOpacityAnimation;
   late Animation<Color?> _gradientAnimation;
-  
+
   // Input mezők border color animációihoz
   Color _emailBorderColor = const Color(0xFF6B7280);
   Color _passwordBorderColor = const Color(0xFF6B7280);
@@ -66,13 +67,13 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
   void initState() {
     super.initState();
     _packageInfoFuture = PackageInfo.fromPlatform();
-    
+
     // Animáció controller inicializálása
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     // Fade-in animáció a panelnek
     _fadeAnimation = Tween<double>(
       begin: 0.0,
@@ -81,7 +82,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
       parent: _animationController,
       curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
     ));
-    
+
     // Background opacity animáció
     _backgroundOpacityAnimation = Tween<double>(
       begin: 0.0,
@@ -90,7 +91,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
       parent: _animationController,
       curve: const Interval(0.0, 0.8, curve: Curves.easeIn),
     ));
-    
+
     // Gradient color animáció
     _gradientAnimation = ColorTween(
       begin: const Color(0xFFE3F2FD),
@@ -99,23 +100,23 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
+
     // Animáció indítása
     _animationController.forward();
-    
+
     // Focus listeners az input mezők animációihoz
     _emailFocusNode.addListener(() {
       setState(() {
-        _emailBorderColor = _emailFocusNode.hasFocus 
-            ? const Color(0xFF1E3A8A) 
+        _emailBorderColor = _emailFocusNode.hasFocus
+            ? const Color(0xFF1E3A8A)
             : const Color(0xFF6B7280);
       });
     });
-    
+
     _passwordFocusNode.addListener(() {
       setState(() {
-        _passwordBorderColor = _passwordFocusNode.hasFocus 
-            ? const Color(0xFF1E3A8A) 
+        _passwordBorderColor = _passwordFocusNode.hasFocus
+            ? const Color(0xFF1E3A8A)
             : const Color(0xFF6B7280);
       });
     });
@@ -146,17 +147,19 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
 
       // Sikeres bejelentkezés után a router automatikusan átirányít
       if (userCredential.user != null && mounted) {
-        debugPrint('Bejelentkezés sikeres, várakozás a SessionGuard inicializálására...');
-        
+        debugPrint(
+            'Bejelentkezés sikeres, várakozás a SessionGuard inicializálására...');
+
         // Várjuk meg, hogy a SessionGuard inicializálódjon
         await SessionGuard.instance.ensureInitialized();
-        
+
         // Kis várakozás, hogy a Firestore listener felálljon
         await Future.delayed(const Duration(milliseconds: 300));
-        
+
         if (!mounted) return;
-        
-        debugPrint('SessionGuard inicializálva, átirányítás a /guard képernyőre');
+
+        debugPrint(
+            'SessionGuard inicializálva, átirányítás a /guard képernyőre');
         context.go('/guard');
       }
     } on FirebaseAuthException catch (e) {
@@ -278,18 +281,18 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                         child: Transform.translate(
                           offset: Offset(0, 20 * (1 - _fadeAnimation.value)),
                           child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
                             // A `Column` widget a gyermekeit függőlegesen rendezi el.
                             child: Column(
                               // A `mainAxisSize: MainAxisSize.min` biztosítja, hogy a `Column`
@@ -308,7 +311,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                         offset: Offset(0, 20 * (1 - value)),
                                         child: Image.asset(
                                           'assets/images/login_LOGO.png',
-                                          height: 180,
+                                          height: 207,
                                           fit: BoxFit.contain,
                                         ),
                                       ),
@@ -326,7 +329,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                       child: Transform.translate(
                                         offset: Offset(0, 15 * (1 - value)),
                                         child: const Text(
-                                          'Lomedu Belépés',
+                                          'Jogedu belépés',
                                           style: TextStyle(
                                             fontFamily: 'Inter',
                                             fontSize: 24,
@@ -338,44 +341,45 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                     );
                                   },
                                 ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                      child: Center(
-                        child: InkWell(
-                          onTap: () async {
-                            final uri =
-                                Uri.parse('https://lomedu-public.web.app/');
-                            await launchUrl(
-                              uri,
-                              mode: LaunchMode.platformDefault,
-                              webOnlyWindowName: '_self',
-                            );
-                          },
-                          hoverColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
-                          splashColor: Colors.transparent,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Adatvédelmi irányelvek és felhasználási feltételek',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black54,
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      top: 8.0, bottom: 16.0),
+                                  child: Center(
+                                    child: InkWell(
+                                      onTap: () async {
+                                        final uri = Uri.parse(
+                                            'https://lomedu-public.web.app/');
+                                        await launchUrl(
+                                          uri,
+                                          mode: LaunchMode.platformDefault,
+                                          webOnlyWindowName: '_self',
+                                        );
+                                      },
+                                      hoverColor: Colors.transparent,
+                                      highlightColor: Colors.transparent,
+                                      splashColor: Colors.transparent,
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Adatvédelmi irányelvek és felhasználási feltételek',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          SizedBox(width: 6),
+                                          Icon(
+                                            Icons.open_in_new,
+                                            size: 14,
+                                            color: Colors.black38,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(width: 6),
-                              Icon(
-                                Icons.open_in_new,
-                                size: 14,
-                                color: Colors.black38,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                                 const SizedBox(height: 8),
                                 // E-mail beviteli mező
                                 TweenAnimationBuilder<double>(
@@ -388,31 +392,42 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                       child: Transform.translate(
                                         offset: Offset(0, 10 * (1 - value)),
                                         child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
+                                          duration:
+                                              const Duration(milliseconds: 200),
                                           child: TextField(
                                             controller: _emailController,
                                             focusNode: _emailFocusNode,
                                             decoration: InputDecoration(
                                               labelText: 'E-mail',
                                               border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(4),
-                                                borderSide: BorderSide(color: _emailBorderColor),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                borderSide: BorderSide(
+                                                    color: _emailBorderColor),
                                               ),
                                               enabledBorder: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(4),
-                                                borderSide: BorderSide(color: _emailBorderColor),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                borderSide: BorderSide(
+                                                    color: _emailBorderColor),
                                               ),
                                               focusedBorder: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(4),
-                                                borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                borderSide: const BorderSide(
+                                                    color: Color(0xFF1E3A8A),
+                                                    width: 2),
                                               ),
                                               prefixIcon: Icon(
                                                 Icons.email,
                                                 color: _emailBorderColor,
                                               ),
                                             ),
-                                            keyboardType: TextInputType.emailAddress,
-                                            autofillHints: const [AutofillHints.email],
+                                            keyboardType:
+                                                TextInputType.emailAddress,
+                                            autofillHints: const [
+                                              AutofillHints.email
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -431,7 +446,8 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                       child: Transform.translate(
                                         offset: Offset(0, 10 * (1 - value)),
                                         child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
+                                          duration:
+                                              const Duration(milliseconds: 200),
                                           child: TextField(
                                             controller: _passwordController,
                                             focusNode: _passwordFocusNode,
@@ -440,16 +456,25 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                             decoration: InputDecoration(
                                               labelText: 'Jelszó',
                                               border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(4),
-                                                borderSide: BorderSide(color: _passwordBorderColor),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                borderSide: BorderSide(
+                                                    color:
+                                                        _passwordBorderColor),
                                               ),
                                               enabledBorder: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(4),
-                                                borderSide: BorderSide(color: _passwordBorderColor),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                borderSide: BorderSide(
+                                                    color:
+                                                        _passwordBorderColor),
                                               ),
                                               focusedBorder: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(4),
-                                                borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                borderSide: const BorderSide(
+                                                    color: Color(0xFF1E3A8A),
+                                                    width: 2),
                                               ),
                                               prefixIcon: Icon(
                                                 Icons.lock,
@@ -464,44 +489,48 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                                 ),
                                                 onPressed: () {
                                                   setState(() {
-                                                    _passwordVisible = !_passwordVisible;
+                                                    _passwordVisible =
+                                                        !_passwordVisible;
                                                   });
                                                 },
                                               ),
                                             ),
-                                            autofillHints: const [AutofillHints.password],
+                                            autofillHints: const [
+                                              AutofillHints.password
+                                            ],
                                           ),
                                         ),
                                       ),
                                     );
                                   },
                                 ),
-                    // Hibaüzenet megjelenítése, ha van.
-                    // A feltételes `if` a collection-ön belül csak akkor adja hozzá
-                    // a `SizedBox`-ot és a `Text`-et a widget-listához, ha az
-                    // `_errorMessage` nem `null`.
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!, // A `!` jelzi, hogy biztosak vagyunk benne, itt már nem `null`.
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFFE74C3C),
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (_errorMessage!.contains('nincs regisztrálva')) ...[
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Ha új böngészőt használsz vagy törölted a sütiket, használd az Eszközváltás gombot.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Color(0xFFE74C3C),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ],
+                                // Hibaüzenet megjelenítése, ha van.
+                                // A feltételes `if` a collection-ön belül csak akkor adja hozzá
+                                // a `SizedBox`-ot és a `Text`-et a widget-listához, ha az
+                                // `_errorMessage` nem `null`.
+                                if (_errorMessage != null) ...[
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _errorMessage!, // A `!` jelzi, hogy biztosak vagyunk benne, itt már nem `null`.
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE74C3C),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (_errorMessage!
+                                      .contains('nincs regisztrálva')) ...[
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Ha új böngészőt használsz vagy törölted a sütiket, használd az Eszközváltás gombot.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Color(0xFFE74C3C),
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                                 const SizedBox(height: 24),
                                 // Bejelentkezés gomb
                                 TweenAnimationBuilder<double>(
@@ -514,17 +543,25 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                       child: Transform.translate(
                                         offset: Offset(0, 10 * (1 - value)),
                                         child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
+                                          duration:
+                                              const Duration(milliseconds: 200),
                                           child: ElevatedButton(
-                                            onPressed: _isLoading ? null : _signIn,
+                                            onPressed:
+                                                _isLoading ? null : _signIn,
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF1E3A8A),
+                                              backgroundColor:
+                                                  const Color(0xFF1E3A8A),
                                               foregroundColor: Colors.white,
-                                              disabledBackgroundColor: const Color(0xFF1E3A8A).withOpacity(0.6),
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 24, vertical: 12),
+                                              disabledBackgroundColor:
+                                                  const Color(0xFF1E3A8A)
+                                                      .withOpacity(0.6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 24,
+                                                      vertical: 12),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(4),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               elevation: _isLoading ? 2 : 4,
                                             ),
@@ -532,9 +569,13 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                                 ? const SizedBox(
                                                     height: 20,
                                                     width: 20,
-                                                    child: CircularProgressIndicator(
+                                                    child:
+                                                        CircularProgressIndicator(
                                                       strokeWidth: 2,
-                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                                  Color>(
+                                                              Colors.white),
                                                     ),
                                                   )
                                                 : const Text(
@@ -542,7 +583,8 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                                     style: TextStyle(
                                                       fontFamily: 'Inter',
                                                       fontSize: 14,
-                                                      fontWeight: FontWeight.w500,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
                                           ),
@@ -553,10 +595,12 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                 ),
                                 const SizedBox(height: 16),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     TextButton(
-                                      onPressed: () => context.go('/forgot-password'),
+                                      onPressed: () =>
+                                          context.go('/forgot-password'),
                                       child: const Text('Elfelejtett jelszó?'),
                                     ),
                                     TextButton(
@@ -589,8 +633,8 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                       Icon(
                                         Icons.info_outline,
                                         size: 13,
-                                        color:
-                                            const Color(0xFF1E3A8A).withValues(alpha: 0.5),
+                                        color: const Color(0xFF1E3A8A)
+                                            .withValues(alpha: 0.5),
                                       ),
                                       const SizedBox(width: 6),
                                       FutureBuilder<PackageInfo>(
@@ -598,7 +642,8 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                         builder: (context, snapshot) {
                                           // Ha van adat, azt használjuk, egyébként '...' töltésjelző, majd fallback
                                           if (snapshot.hasData) {
-                                            String versionText = 'v${snapshot.data!.version}';
+                                            String versionText =
+                                                'v${snapshot.data!.version}';
                                             // Build számot web-en ritkán használunk, de ha van, megjelenhet
                                             // if (snapshot.data!.buildNumber.isNotEmpty) {
                                             //   versionText += '+${snapshot.data!.buildNumber}';
@@ -609,12 +654,13 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                                 fontFamily: 'Inter',
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w400,
-                                                color: Colors.black.withValues(alpha: 0.4),
+                                                color: Colors.black
+                                                    .withValues(alpha: 0.4),
                                                 letterSpacing: 0.3,
                                               ),
                                             );
                                           }
-                                          
+
                                           // Töltés vagy hiba esetén egyelőre ne írjunk ki semmit (vagy a fallback-et)
                                           // De mivel a package_info_plus web-en néha lassú vagy nem ad vissza semmit dev módban,
                                           // érdemes lehet egy konstanst is beállítani, ha a pubspec nem elérhető.
@@ -624,7 +670,8 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                                               fontFamily: 'Inter',
                                               fontSize: 11,
                                               fontWeight: FontWeight.w400,
-                                              color: Colors.black.withValues(alpha: 0.4),
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.4),
                                               letterSpacing: 0.3,
                                             ),
                                           );
