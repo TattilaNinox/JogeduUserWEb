@@ -389,11 +389,8 @@ class _MemoriapalotaAllomasViewScreenState
         _isLoading = false;
       });
 
-      // Megjelenítjük az első állomást
-      _displayCurrentAllomas();
-      
-      // Betöltjük a felhasználó képét
-      _loadUserImage();
+      // Megjelenítjük az első állomást (ez már betölti a képet is)
+      await _displayCurrentAllomas();
     } catch (e) {
       setState(() {
         _errorMessage = 'Hiba történt az állomások betöltésekor: $e';
@@ -402,7 +399,7 @@ class _MemoriapalotaAllomasViewScreenState
     }
   }
 
-  void _displayCurrentAllomas() {
+  Future<void> _displayCurrentAllomas() async {
     if (_allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
       return;
     }
@@ -421,13 +418,15 @@ class _MemoriapalotaAllomasViewScreenState
     // Új iframe-et hozunk létre az új tartalommal (teljes HTML dokumentummal)
     _setupIframe(content);
     
-    // Betöltjük a felhasználó képét az aktuális állomáshoz
-    _loadUserImage();
+    // Betöltjük a felhasználó képét az aktuális állomáshoz és megvárjuk
+    await _loadUserImage();
     
     // Frissítjük a tartalmat és újraépítjük a view-t
-    setState(() {
-      _currentHtmlContent = content;
-    });
+    if (mounted) {
+      setState(() {
+        _currentHtmlContent = content;
+      });
+    }
   }
   
   // Felhasználó képének betöltése
@@ -1133,29 +1132,31 @@ class _MemoriapalotaAllomasViewScreenState
     );
   }
 
-  void _goToPrevious() {
+  Future<void> _goToPrevious() async {
     if (_currentIndex > 0) {
       setState(() {
         _currentIndex--;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
       });
-      _displayCurrentAllomas();
+      await _displayCurrentAllomas();
     }
   }
 
-  void _goToNext() {
+  Future<void> _goToNext() async {
     if (_currentIndex < _allomasok.length - 1) {
       setState(() {
         _currentIndex++;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
       });
-      _displayCurrentAllomas();
+      await _displayCurrentAllomas();
     }
   }
   
   void _toggleContent() {
+    debugPrint('_toggleContent called - current state: _isContentOpen=$_isContentOpen');
     setState(() {
       _isContentOpen = !_isContentOpen;
+      debugPrint('_toggleContent - new state: _isContentOpen=$_isContentOpen');
     });
   }
 
@@ -1263,6 +1264,16 @@ class _MemoriapalotaAllomasViewScreenState
           onPressed: () => context.go('/notes'),
         ),
         actions: [
+          // Bezárás gomb (csak ha van kép és a tananyag nyitva van)
+          if (_currentImageUrl != null && _isContentOpen)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                debugPrint('Close button in AppBar pressed');
+                _toggleContent();
+              },
+              tooltip: 'Tananyag bezárása',
+            ),
           // Foto ikon gomb (képfeltöltés)
           IconButton(
             icon: _isUploadingImage
@@ -1397,46 +1408,17 @@ class _MemoriapalotaAllomasViewScreenState
                         ? Colors.white.withOpacity(0.85) // Félig átlátszó fehér, ha van kép
                         : Colors.white, // Fehér háttér, ha nincs kép
                   ),
-                  child: Stack(
-                    children: [
-                      // Tananyag tartalom
-                      Positioned.fill(
-                        child: kIsWeb && _currentHtmlContent.isNotEmpty && _viewId.isNotEmpty
-                            ? HtmlElementView(
-                                key: ValueKey('iframe_$_viewId'),
-                                viewType: _viewId,
-                              )
-                            : const Center(
-                                child: Text(
-                                  'Nem sikerült betölteni a tartalmat',
-                                  style: TextStyle(color: Colors.red, fontSize: 16),
-                                ),
-                              ),
-                      ),
-                      // Bezárás gomb jobb felső sarokban (csak ha van kép)
-                      if (_currentImageUrl != null)
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          child: Material(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(20),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: _toggleContent,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
+                  child: kIsWeb && _currentHtmlContent.isNotEmpty && _viewId.isNotEmpty
+                      ? HtmlElementView(
+                          key: ValueKey('iframe_$_viewId'),
+                          viewType: _viewId,
+                        )
+                      : const Center(
+                          child: Text(
+                            'Nem sikerült betölteni a tartalmat',
+                            style: TextStyle(color: Colors.red, fontSize: 16),
                           ),
                         ),
-                    ],
-                  ),
                 ),
               ),
             )
