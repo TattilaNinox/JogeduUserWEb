@@ -1,12 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
-import 'package:html/dom.dart' as dom;
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:web/web.dart' as web;
+import 'dart:ui_web' as ui_web;
 import '../widgets/audio_preview_player.dart';
 import '../utils/filter_storage.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Felhasználói (csak olvasás) nézet szöveges jegyzetekhez.
 ///
@@ -24,11 +22,8 @@ class NoteReadScreen extends StatefulWidget {
 class _NoteReadScreenState extends State<NoteReadScreen> {
   DocumentSnapshot? _noteSnapshot;
   final int _currentPageIndex = 0;
-  WebViewController? _webViewController;
-
-  // Text size toggle state
-  bool _isTextScaled = false;
-  double _fontScale = 1.0;
+  String _viewId = '';
+  bool _hasContent = false;
 
   @override
   void initState() {
@@ -43,19 +38,52 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
         .get();
 
     if (!mounted) return;
-    setState(() => _noteSnapshot = snapshot);
-    _setupMedia(snapshot.data());
-  }
-
-  void _setupMedia(Map<String, dynamic>? data) {
-    if (data == null) return;
-    final pages = data['pages'] as List<dynamic>? ?? [];
-    if (pages.isNotEmpty) {
-      final currentPage = pages[_currentPageIndex] as String;
-      if (currentPage.contains('<script')) {
-        _webViewController = WebViewController()..loadHtmlString(currentPage);
+    
+    final data = snapshot.data();
+    String? htmlContent;
+    if (data != null) {
+      final pages = data['pages'] as List<dynamic>? ?? [];
+      if (pages.isNotEmpty) {
+        htmlContent = pages[_currentPageIndex] as String? ?? '';
       }
     }
+    
+    if (htmlContent != null && htmlContent.isNotEmpty) {
+      _setupIframe(htmlContent);
+    }
+    
+    setState(() {
+      _noteSnapshot = snapshot;
+      _hasContent = htmlContent != null && htmlContent.isNotEmpty;
+    });
+  }
+
+  void _setupIframe(String htmlContent) {
+    // Minden alkalommal új view ID-t generálunk, amikor a tartalom változik
+    _viewId = 'note-read-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Iframe elem létrehozása
+    final iframeElement = web.HTMLIFrameElement()
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.border = 'none';
+    
+    iframeElement.sandbox.add('allow-scripts');
+    iframeElement.sandbox.add('allow-same-origin');
+    iframeElement.sandbox.add('allow-forms');
+    iframeElement.sandbox.add('allow-popups');
+    
+    // Iframe src beállítása data URI-val
+    if (htmlContent.isNotEmpty) {
+      iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(htmlContent)}';
+    }
+    
+    // Platform view regisztrálása
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(
+      _viewId,
+      (int viewId) => iframeElement,
+    );
   }
 
   @override
@@ -68,144 +96,8 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
 
     final data = _noteSnapshot!.data() as Map<String, dynamic>;
     final title = data['title'] as String? ?? 'Cím nélkül';
-    final pages = data['pages'] as List<dynamic>? ?? [];
-    String currentPage = pages.isNotEmpty
-        ? pages[_currentPageIndex] as String
-        : 'Ez a jegyzet nem tartalmaz tartalmat.';
-
-    final bool isWebView = _webViewController != null;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-
-    Widget buildNoteBody({required bool limitWidth}) {
-      if (isWebView) {
-        return WebViewWidget(controller: _webViewController!);
-      }
-
-      Widget htmlWidget = Html(
-        data: currentPage,
-        style: {
-          "body": Style(
-            fontSize: FontSize((isMobile ? 14 : 18) * _fontScale),
-            lineHeight: const LineHeight(1.6),
-            color: const Color(0xFF2D3748),
-            fontFamily: 'Inter',
-          ),
-          "h1": Style(
-            fontSize: FontSize((isMobile ? 18 : 24) * _fontScale),
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF1A202C),
-            margin: Margins.only(bottom: 16),
-          ),
-          "h2": Style(
-            fontSize: FontSize((isMobile ? 16 : 22) * _fontScale),
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF2D3748),
-            margin: Margins.only(bottom: 12),
-          ),
-          "h3": Style(
-            fontSize: FontSize((isMobile ? 14 : 20) * _fontScale),
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF4A5568),
-            margin: Margins.only(bottom: 10),
-          ),
-          "p": Style(
-            fontSize: FontSize((isMobile ? 13 : 17) * _fontScale),
-            lineHeight: const LineHeight(1.6),
-            color: const Color(0xFF2D3748),
-            margin: Margins.only(bottom: 12),
-          ),
-          "ul": Style(
-            margin: Margins.only(bottom: 12),
-          ),
-          "ol": Style(
-            margin: Margins.only(bottom: 12),
-          ),
-          "li": Style(
-            fontSize: FontSize((isMobile ? 13 : 17) * _fontScale),
-            lineHeight: const LineHeight(1.5),
-            color: const Color(0xFF2D3748),
-            margin: Margins.only(bottom: 6),
-          ),
-          "blockquote": Style(
-            fontSize: FontSize((isMobile ? 13 : 17) * _fontScale),
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF4A5568),
-            backgroundColor: const Color(0xFFF7FAFC),
-            border: const Border(
-              left: BorderSide(
-                color: Color(0xFFE2E8F0),
-                width: 4,
-              ),
-            ),
-            padding:
-                HtmlPaddings.only(left: 16, top: 12, bottom: 12, right: 16),
-            margin: Margins.only(bottom: 16),
-          ),
-          "code": Style(
-            backgroundColor: const Color(0xFFF7FAFC),
-            color: const Color(0xFFE53E3E),
-            fontFamily: 'monospace',
-            fontSize: FontSize((isMobile ? 11 : 15) * _fontScale),
-            padding: HtmlPaddings.symmetric(horizontal: 4, vertical: 2),
-          ),
-          "pre": Style(
-            backgroundColor: const Color(0xFFF7FAFC),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            padding: HtmlPaddings.all(12),
-            margin: Margins.only(bottom: 16),
-          ),
-          // Képek és táblák igazítása a rendelkezésre álló szélességhez
-          "img": Style(width: Width(100, Unit.percent)),
-          "table": Style(width: Width(100, Unit.percent)),
-          // Linkek jól látható megjelenése
-          "a": Style(
-            color: const Color(0xFF1D4ED8),
-            textDecoration: TextDecoration.underline,
-          ),
-        },
-        onAnchorTap: (String? url, Map<String, String> attributes,
-            dom.Element? element) {
-          if (url == null || url.isEmpty) return;
-          final uri = Uri.tryParse(url);
-          if (uri == null) return;
-          launchUrl(
-            uri,
-            mode: LaunchMode.platformDefault,
-            webOnlyWindowName: '_blank',
-          );
-        },
-      );
-
-      if (limitWidth) {
-        // Reszponzív max szélesség: desktopon szélesebb, tableten közepes
-        double maxContentWidth;
-        if (screenWidth >= 1200) {
-          maxContentWidth = 1120; // nagy kijelzők
-        } else {
-          maxContentWidth = 960; // tablet / kisebb desktop
-        }
-
-        htmlWidget = Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxContentWidth),
-            child: htmlWidget,
-          ),
-        );
-      } else {
-        // Mobilon: belső padding 0, maximális szélesség érzet
-        htmlWidget = Padding(
-          padding: EdgeInsets.zero,
-          child: htmlWidget,
-        );
-      }
-
-      return MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: SingleChildScrollView(child: htmlWidget),
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -246,25 +138,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             context.go(uri.toString());
           },
         ),
-        actions: [
-          if (!isWebView)
-            Padding(
-              padding: EdgeInsets.only(right: isMobile ? 12 : 16),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.format_size,
-                  color: Color(0xFF6A5ACD), // purple-blue
-                ),
-                tooltip: _isTextScaled ? 'Eredeti méret' : 'Nagyobb szöveg',
-                onPressed: () {
-                  setState(() {
-                    _isTextScaled = !_isTextScaled;
-                    _fontScale = _isTextScaled ? 1.3 : 1.0;
-                  });
-                },
-              ),
-            ),
-        ],
+        actions: [],
       ),
       body: Container(
         color: const Color(0xFFF8F9FA),
@@ -286,22 +160,17 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
                           ),
                         ],
                       ),
-                child: Builder(
-                  builder: (_) {
-                    if (isMobile) {
-                      return buildNoteBody(limitWidth: false);
-                    }
-
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        color: Colors.white,
-                        padding: const EdgeInsets.all(20),
-                        child: buildNoteBody(limitWidth: true),
+                child: _hasContent && _viewId.isNotEmpty
+                    ? HtmlElementView(
+                        key: ValueKey('iframe_$_viewId'),
+                        viewType: _viewId,
+                      )
+                    : const Center(
+                        child: Text(
+                          'Ez a jegyzet nem tartalmaz tartalmat.',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
                       ),
-                    );
-                  },
-                ),
               ),
             ),
             if (data['audioUrl'] != null &&

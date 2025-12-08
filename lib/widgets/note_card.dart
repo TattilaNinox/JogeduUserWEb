@@ -34,6 +34,8 @@ class NoteCard extends StatelessWidget {
         return Icons.quiz;
       case 'dynamic_quiz_dual':
         return Icons.quiz_outlined;
+      case 'memoriapalota_allomasok':
+        return Icons.train;
       default:
         return Icons.menu_book;
     }
@@ -61,6 +63,8 @@ class NoteCard extends StatelessWidget {
             context.go('/interactive-note/$id');
           } else if (type == 'deck') {
             context.go('/deck/$id/view');
+          } else if (type == 'memoriapalota_allomasok') {
+            context.go('/memoriapalota-allomas/$id');
           } else {
             context.go('/note/$id');
           }

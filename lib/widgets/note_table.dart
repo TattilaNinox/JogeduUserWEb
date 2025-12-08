@@ -300,6 +300,8 @@ class _NoteTableState extends State<NoteTable> {
           return Icons.quiz_outlined;
         case 'source':
           return Icons.source;
+        case 'memoriapalota_allomasok':
+          return Icons.train;
         default:
           return Icons.menu_book;
       }
@@ -430,6 +432,8 @@ class _NoteTableState extends State<NoteTable> {
                           dualMode: noteType == 'dynamic_quiz_dual');
                     } else if (noteType == 'interactive') {
                       context.go('/interactive-note/${doc.id}');
+                    } else if (noteType == 'memoriapalota_allomasok') {
+                      context.go('/memoriapalota-allomas/${doc.id}');
                     } else {
                       context.go('/note/${doc.id}');
                     }

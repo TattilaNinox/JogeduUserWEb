@@ -22,6 +22,7 @@ import 'screens/flashcard_deck_view_screen.dart';
 import 'screens/flashcard_study_screen.dart';
 import 'screens/interactive_note_view_screen.dart';
 import 'screens/dynamic_quiz_view_screen.dart';
+import 'screens/memoriapalota_allomas_view_screen.dart';
 import 'core/session_guard.dart';
 import 'screens/guard_splash_screen.dart';
 import 'screens/account_screen.dart';
@@ -267,6 +268,14 @@ final _router = GoRouter(
       builder: (context, state) {
         final deckId = state.pathParameters['deckId']!;
         return FlashcardStudyScreen(deckId: deckId);
+      },
+    ),
+    // Memóriapalota állomások megtekintése
+    GoRoute(
+      path: '/memoriapalota-allomas/:noteId',
+      builder: (context, state) {
+        final noteId = state.pathParameters['noteId']!;
+        return MemoriapalotaAllomasViewScreen(noteId: noteId);
       },
     ),
     GoRoute(

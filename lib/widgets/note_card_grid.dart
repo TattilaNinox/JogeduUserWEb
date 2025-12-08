@@ -123,31 +123,100 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           query = query.where('type', isEqualTo: widget.selectedType);
         }
 
+        // Debug: lekérdezés paraméterek
+        debugPrint('[NoteCardGrid] Query params - science: $userScience, status: ${isAdmin ? "Published/Draft" : "Published"}, type: ${widget.selectedType ?? "all"}');
+
+        // Ha nincs típus szűrő, vagy ha a típus szűrő "memoriapalota_allomasok", betöltjük a fő útvonal dokumentumokat
+        final shouldLoadAllomasok = widget.selectedType == null || 
+                                     widget.selectedType!.isEmpty || 
+                                     widget.selectedType == 'memoriapalota_allomasok';
+
+        // Fő útvonal dokumentumok lekérdezése a memoriapalota_allomasok kollekcióból
+        // Ezek a fő dokumentumok, amelyek az utvonalId-val rendelkeznek
+        final allomasQuery = shouldLoadAllomasok
+            ? FirebaseConfig.firestore
+                .collection('memoriapalota_allomasok')
+                .where('science', isEqualTo: userScience)
+            : null;
+
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: query.snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                  child: Text(
-                      'Hiba az adatok betöltésekor: ${snapshot.error.toString()}'));
-            }
-            final docs = (snapshot.data?.docs ??
-                    const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
-                .where((d) => !(d.data()['deletedAt'] != null))
-                .where((d) => (d.data()['title'] ?? '')
-                    .toString()
-                    .toLowerCase()
-                    .contains(widget.searchText.toLowerCase()))
-                .toList();
+            // Állomások stream builder
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: allomasQuery?.snapshots(),
+              builder: (context, allomasSnapshot) {
+                // Debug: találatok száma
+                if (snapshot.hasData) {
+                  final docs = snapshot.data!.docs;
+                  debugPrint('[NoteCardGrid] Found ${docs.length} notes');
+                  // Debug: típusok listája
+                  final types = docs.map((d) => d.data()['type'] as String? ?? 'unknown').toSet();
+                  debugPrint('[NoteCardGrid] Note types found: $types');
+                }
+                if (allomasSnapshot.hasData) {
+                  debugPrint('[NoteCardGrid] Found ${allomasSnapshot.data!.docs.length} allomasok');
+                }
+                
+                if (snapshot.hasError) {
+                  return Center(
+                      child: Text(
+                          'Hiba az adatok betöltésekor: ${snapshot.error.toString()}'));
+                }
+                
+                // Összegyűjtjük a notes dokumentumokat
+                final notesDocs = (snapshot.data?.docs ??
+                        const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                    .where((d) => !(d.data()['deletedAt'] != null))
+                    .where((d) => (d.data()['title'] ?? '')
+                        .toString()
+                        .toLowerCase()
+                        .contains(widget.searchText.toLowerCase()))
+                    .toList();
 
-            if (!snapshot.hasData &&
-                snapshot.connectionState != ConnectionState.active) {
-              return const Center(child: CircularProgressIndicator());
-            }
+                // Összefésüljük a két listát
+                // A fő útvonal dokumentumokat hozzáadjuk, de virtuálisan hozzáadjuk a type mezőt
+                final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                allDocs.addAll(notesDocs);
+                
+                // Fő útvonal dokumentumok hozzáadása - csak akkor, ha nincs típus szűrő vagy az állomások típusa van kiválasztva
+                if (shouldLoadAllomasok) {
+                  final allomasDocs = (allomasSnapshot.data?.docs ??
+                          const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                      .where((d) {
+                        final data = d.data();
+                        // Szűrés cím alapján (cim mező)
+                        final cim = (data['cim'] ?? '').toString();
+                        return cim.toLowerCase().contains(widget.searchText.toLowerCase());
+                      })
+                      .toList();
+                  allDocs.addAll(allomasDocs);
+                }
+                
+                // Típus szűrés
+                final filteredDocs = widget.selectedType != null && widget.selectedType!.isNotEmpty
+                    ? allDocs.where((d) {
+                        final data = d.data();
+                        // A fő útvonal dokumentumok a memoriapalota_allomasok kollekcióból jönnek
+                        if (d.reference.path.contains('memoriapalota_allomasok') && 
+                            !d.reference.path.contains('/allomasok/')) {
+                          return widget.selectedType == 'memoriapalota_allomasok';
+                        }
+                        return data['type'] == widget.selectedType;
+                      }).toList()
+                    : allDocs;
+                
+                final docs = filteredDocs;
 
-            if (docs.isEmpty) {
-              return const Center(child: Text('Nincs találat.'));
-            }
+                if (!snapshot.hasData &&
+                    snapshot.connectionState != ConnectionState.active &&
+                    (!shouldLoadAllomasok || !allomasSnapshot.hasData)) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (docs.isEmpty) {
+                  return const Center(child: Text('Nincs találat.'));
+                }
 
             // Csoportosítás kategóriánként
             final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
@@ -160,8 +229,14 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             // Kategórián belüli rendezés típus és cím alapján
             grouped.forEach((key, value) {
               value.sort((a, b) {
-                final typeA = a.data()['type'] as String? ?? '';
-                final typeB = b.data()['type'] as String? ?? '';
+                // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
+                final isAllomasA = a.reference.path.contains('memoriapalota_allomasok') && 
+                                   !a.reference.path.contains('/allomasok/');
+                final isAllomasB = b.reference.path.contains('memoriapalota_allomasok') && 
+                                   !b.reference.path.contains('/allomasok/');
+                final typeA = isAllomasA ? 'memoriapalota_allomasok' : (a.data()['type'] as String? ?? '');
+                final typeB = isAllomasB ? 'memoriapalota_allomasok' : (b.data()['type'] as String? ?? '');
+                
                 // 'source' típus mindig a lista végére kerüljön
                 final bool isSourceA = typeA == 'source';
                 final bool isSourceB = typeB == 'source';
@@ -173,23 +248,30 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                 if (typeCompare != 0) {
                   return typeCompare;
                 }
-                final titleA = a.data()['title'] as String? ?? '';
-                final titleB = b.data()['title'] as String? ?? '';
+                // Cím meghatározása: fő útvonal dokumentumoknál 'cim', egyébként 'title'
+                final titleA = isAllomasA 
+                    ? (a.data()['cim'] as String? ?? '')
+                    : (a.data()['title'] as String? ?? '');
+                final titleB = isAllomasB 
+                    ? (b.data()['cim'] as String? ?? '')
+                    : (b.data()['title'] as String? ?? '');
                 return titleA.compareTo(titleB);
               });
             });
 
-            return ListView(
-              padding: EdgeInsets.zero,
-              children: grouped.entries.map((entry) {
-                final items = entry.value;
-                return _CategorySection(
-                  category: entry.key,
-                  docs: items,
-                  selectedCategory: widget.selectedCategory,
-                  hasPremiumAccess: hasPremiumAccess,
+                return ListView(
+                  padding: EdgeInsets.zero,
+                  children: grouped.entries.map((entry) {
+                    final items = entry.value;
+                    return _CategorySection(
+                      category: entry.key,
+                      docs: items,
+                      selectedCategory: widget.selectedCategory,
+                      hasPremiumAccess: hasPremiumAccess,
+                    );
+                  }).toList(),
                 );
-              }).toList(),
+              },
             );
           },
         );
@@ -338,7 +420,16 @@ class _CategorySectionState extends State<_CategorySection> {
                       itemBuilder: (context, index) {
                         final doc = widget.docs[index];
                         final data = doc.data();
-                        final type = data['type'] as String? ?? 'standard';
+                        // Fő útvonal dokumentumok esetén külön kezelés (nem subcollection)
+                        final isAllomas = doc.reference.path.contains('memoriapalota_allomasok') && 
+                                         !doc.reference.path.contains('/allomasok/');
+                        final type = isAllomas 
+                            ? 'memoriapalota_allomasok' 
+                            : (data['type'] as String? ?? 'standard');
+                        // Fő útvonal dokumentumoknál 'cim' mező, egyébként 'title'
+                        final title = isAllomas 
+                            ? (data['cim'] as String? ?? '')
+                            : (data['title'] as String? ?? '');
                         // Ha az isFree mező hiányzik, akkor ZÁRT (false)
                         final isFree = data['isFree'] as bool? ?? false;
 
@@ -347,7 +438,7 @@ class _CategorySectionState extends State<_CategorySection> {
 
                         return NoteListTile(
                           id: doc.id,
-                          title: data['title'] ?? '',
+                          title: title,
                           type: type,
                           hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
                           hasAudio:

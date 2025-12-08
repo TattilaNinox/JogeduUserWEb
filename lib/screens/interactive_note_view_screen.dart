@@ -25,10 +25,8 @@ class InteractiveNoteViewScreen extends StatefulWidget {
 
 class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
   DocumentSnapshot? _noteSnapshot;
-  late final String _viewId;
-  final web.HTMLIFrameElement _iframeElement = web.HTMLIFrameElement();
+  String _viewId = '';
   bool _hasContent = false;
-  // Using srcdoc, no object URL needed
 
   late final StreamSubscription<DocumentSnapshot> _subscription;
   bool _accessDenied = false;
@@ -36,23 +34,6 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
   @override
   void initState() {
     super.initState();
-
-    _viewId = "interactive-note-iframe-${widget.noteId}";
-
-    _iframeElement
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..style.border = 'none';
-
-    // More permissive sandbox settings
-    _iframeElement.sandbox.add('allow-scripts');
-    _iframeElement.sandbox.add('allow-same-origin');
-    _iframeElement.sandbox.add('allow-forms');
-    _iframeElement.sandbox.add('allow-popups');
-
-    // ignore: undefined_prefixed_name
-    ui_web.platformViewRegistry
-        .registerViewFactory(_viewId, (int viewId) => _iframeElement);
 
     _subscription = FirebaseFirestore.instance
         .collection('notes')
@@ -68,6 +49,34 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
             }
           },
         );
+  }
+
+  void _setupIframe(String htmlContent) {
+    // Minden alkalommal új view ID-t generálunk, amikor a tartalom változik
+    _viewId = 'interactive-note-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Iframe elem létrehozása
+    final iframeElement = web.HTMLIFrameElement()
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.border = 'none';
+    
+    iframeElement.sandbox.add('allow-scripts');
+    iframeElement.sandbox.add('allow-same-origin');
+    iframeElement.sandbox.add('allow-forms');
+    iframeElement.sandbox.add('allow-popups');
+    
+    // Iframe src beállítása data URI-val
+    if (htmlContent.isNotEmpty) {
+      iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(htmlContent)}';
+    }
+    
+    // Platform view regisztrálása
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(
+      _viewId,
+      (int viewId) => iframeElement,
+    );
   }
 
   void _showAccessDeniedAndGoBack() {
@@ -109,8 +118,6 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
       return;
     }
 
-    // No object URL to revoke when using srcdoc
-
     String? htmlContentToLoad;
     final data = snapshot.data() as Map<String, dynamic>?;
     if (data != null) {
@@ -123,16 +130,20 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
       }
     }
 
-    setState(() {
-      _noteSnapshot = snapshot;
-      if (htmlContentToLoad != null && htmlContentToLoad.isNotEmpty) {
-        // Use srcdoc for reliable inline HTML rendering
-        _iframeElement.srcdoc = htmlContentToLoad;
+    if (htmlContentToLoad != null && htmlContentToLoad.isNotEmpty) {
+      // Új iframe-et hozunk létre az új tartalommal
+      _setupIframe(htmlContentToLoad);
+      
+      setState(() {
+        _noteSnapshot = snapshot;
         _hasContent = true;
-      } else {
+      });
+    } else {
+      setState(() {
+        _noteSnapshot = snapshot;
         _hasContent = false;
-      }
-    });
+      });
+    }
   }
 
   void _handleQuizNavigation() {
@@ -302,10 +313,13 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
                   ),
                 ),
               ),
-            ] else if (_hasContent) ...[
+            ] else if (_hasContent && _viewId.isNotEmpty) ...[
               // Regular interactive content
               Expanded(
-                child: HtmlElementView(viewType: _viewId),
+                child: HtmlElementView(
+                  key: ValueKey('iframe_$_viewId'),
+                  viewType: _viewId,
+                ),
               )
             ] else ...[
               // No content fallback

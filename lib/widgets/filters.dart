@@ -57,7 +57,8 @@ class _FiltersState extends State<Filters> {
     'dynamic_quiz',
     'dynamic_quiz_dual',
     'deck',
-    'source'
+    'source',
+    'memoriapalota_allomasok'
   ];
 
   @override

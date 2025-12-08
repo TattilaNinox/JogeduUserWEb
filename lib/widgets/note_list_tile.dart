@@ -47,6 +47,8 @@ class NoteListTile extends StatelessWidget {
         return Icons.quiz_outlined;
       case 'source':
         return Icons.source;
+      case 'memoriapalota_allomasok':
+        return Icons.train;
       default:
         return Icons.menu_book;
     }
@@ -93,6 +95,8 @@ class NoteListTile extends StatelessWidget {
       }
     } else if (type == 'deck') {
       context.go('/deck/$id/view');
+    } else if (type == 'memoriapalota_allomasok') {
+      context.go('/memoriapalota-allomas/$id');
     } else {
       context.go('/note/$id');
     }
