@@ -3,6 +3,8 @@ Buildelés (amikor kell):
    flutter build web --release
 Deployolás (amikor kell):
    .\deploy-preview-only.bat
+firebase hosting:channel:deploy preview --expires 30d
+
 Vagy egyedi channel névvel:
    .\deploy-preview-only.bat test-feature
 Mit csinál a script
