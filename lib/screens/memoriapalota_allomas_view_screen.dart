@@ -1525,9 +1525,6 @@ class _MemoriapalotaAllomasViewScreenState
                       child: Image.network(
                         _currentImageUrl!,
                         fit: BoxFit.contain,
-                        headers: const {
-                          'Access-Control-Allow-Origin': '*',
-                        },
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
                           return const Center(
@@ -1537,29 +1534,63 @@ class _MemoriapalotaAllomasViewScreenState
                         errorBuilder: (context, error, stackTrace) {
                           debugPrint('Image load error: $error');
                           return Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Nem sikerült betölteni a képet',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                                if (kIsWeb)
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 4.0),
-                                    child: Text(
-                                      '(CORS hiba lehet)',
-                                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Nem sikerült betölteni a képet',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                  ),
+                                  if (kIsWeb)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 4.0),
+                                      child: Text(
+                                        '(CORS hiba vagy hozzáférési hiba)',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  // Hiba részletek és URL megjelenítése
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: SelectableText(
+                                      'Hiba: $error\n\nKattints az Újrapróbálás gombra!',
+                                      style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                      textAlign: TextAlign.center,
                                     ),
                                   ),
-                              ],
+                                  const SizedBox(height: 16),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        if (_currentImageUrl != null) {
+                                          // Cache busting timestamp hozzáadása az URL-hez
+                                          final timestamp = DateTime.now().millisecondsSinceEpoch;
+                                          if (_currentImageUrl!.contains('cache_bust=')) {
+                                            _currentImageUrl = _currentImageUrl!.replaceAll(
+                                              RegExp(r'cache_bust=\d+'), 
+                                              'cache_bust=$timestamp'
+                                            );
+                                          } else {
+                                            final separator = _currentImageUrl!.contains('?') ? '&' : '?';
+                                            _currentImageUrl = '$_currentImageUrl${separator}cache_bust=$timestamp';
+                                          }
+                                        }
+                                      });
+                                    },
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Újrapróbálás (Cache törlés)'),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
