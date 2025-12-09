@@ -1,12 +1,14 @@
 @echo off
 setlocal enabledelayedexpansion
-REM Preview deployment script Windows-ra
+REM Preview deployment script Windows-ra - CSAK DEPLOY, BUILD NÉLKÜL
 REM Feltölt egy preview channel-re, NEM írja felül az éles verziót
-REM Használat: deploy-preview.bat [channel-name]
+REM Használat: deploy-preview-only.bat [channel-name]
+REM Előfeltétel: build/web mappa létezik (flutter build web --release után)
 
 echo.
 echo ========================================
-echo   Lomedu Web App - Preview Deployment
+echo   Lomedu Web App - Preview Deploy Only
+echo   (Nem buildel, csak deployol!)
 echo   (Nem írja felül az éles verziót!)
 echo ========================================
 echo.
@@ -17,40 +19,33 @@ if "%CHANNEL_NAME%"=="" (
     set CHANNEL_NAME=preview
 )
 
-REM Verzió frissítés ellenőrzése
-echo [1/4] Updating version.json...
-dart tools\update_version.dart
-if %errorlevel% neq 0 (
-    echo [ERROR] Version update failed
+REM Build mappa ellenőrzése
+if not exist build\web (
+    echo [ERROR] build\web mappa nem talalhato!
+    echo    Eloszor futtasd: flutter build web --release
     pause
-    exit /b %errorlevel%
+    exit /b 1
 )
-echo [OK] Version updated successfully
-echo.
 
-REM Build
-echo [2/4] Building web app...
-call flutter build web --release
-if %errorlevel% neq 0 (
-    echo [ERROR] Build failed
-    pause
-    exit /b %errorlevel%
-)
-echo [OK] Build completed successfully
-echo.
-
-REM Version.json másolása
-echo [3/4] Verifying version.json in build...
+REM Version.json ellenőrzés
+echo [1/2] Verifying version.json in build...
 if exist build\web\version.json (
     echo [OK] version.json found in build\web
 ) else (
     echo [WARNING] version.json not found, copying...
-    copy web\version.json build\web\version.json
+    if exist web\version.json (
+        copy web\version.json build\web\version.json
+        echo [OK] version.json copied
+    ) else (
+        echo [ERROR] version.json not found in web\ folder either!
+        pause
+        exit /b 1
+    )
 )
 echo.
 
 REM Firebase deploy to preview channel
-echo [4/4] Deploying to Firebase Hosting Preview Channel: %CHANNEL_NAME%...
+echo [2/2] Deploying to Firebase Hosting Preview Channel: %CHANNEL_NAME%...
 echo [NOTE] This will NOT overwrite the production version!
 echo.
 
@@ -100,22 +95,4 @@ if defined PREVIEW_URL (
 echo ========================================
 echo.
 pause
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

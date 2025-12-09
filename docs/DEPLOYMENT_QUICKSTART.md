@@ -117,10 +117,45 @@ flutter build web --release
 
 ---
 
+## 🔒 Privát Preview Deployolás
+
+Ha szeretnél privát URL-t generálni teszteléshez (amit csak linkkel lehet elérni):
+
+### Teljes Folyamat (Build + Deploy)
+
+**Windows:**
+```bash
+.\deploy-preview.bat [channel-name]
+```
+
+**Linux/Mac:**
+```bash
+./deploy-preview.sh [channel-name]
+```
+
+### Csak Deploy (Ha Már Buildeltél)
+
+**Windows:**
+```bash
+.\deploy-preview-only.bat [channel-name]
+```
+
+**Linux/Mac:**
+```bash
+./deploy-preview-only.sh [channel-name]
+```
+
+**Előfeltétel**: `flutter build web --release` már lefutott
+
+Részletes útmutató: [PREVIEW_DEPLOYMENT_GUIDE.md](PREVIEW_DEPLOYMENT_GUIDE.md)
+
+---
+
 ## 📚 Részletes Dokumentáció
 
 - **Teljes útmutató**: [docs/AUTO_VERSION_UPDATE_GUIDE.md](docs/AUTO_VERSION_UPDATE_GUIDE.md)
 - **Implementáció részletek**: [AUTO_VERSION_UPDATE_SUMMARY.md](AUTO_VERSION_UPDATE_SUMMARY.md)
+- **Preview Deployment**: [PREVIEW_DEPLOYMENT_GUIDE.md](PREVIEW_DEPLOYMENT_GUIDE.md)
 
 ---
 

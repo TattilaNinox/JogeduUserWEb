@@ -1,13 +1,15 @@
 #!/bin/bash
-# Preview deployment script Linux/Mac-re
+# Preview deployment script Linux/Mac-re - CSAK DEPLOY, BUILD NÉLKÜL
 # Feltölt egy preview channel-re, NEM írja felül az éles verziót
-# Használat: ./deploy-preview.sh [channel-name]
+# Használat: ./deploy-preview-only.sh [channel-name]
+# Előfeltétel: build/web mappa létezik (flutter build web --release után)
 
 set -e  # Exit on error
 
 echo ""
 echo "========================================"
-echo "  Lomedu Web App - Preview Deployment"
+echo "  Lomedu Web App - Preview Deploy Only"
+echo "  (Nem buildel, csak deployol!)"
 echo "  (Nem írja felül az éles verziót!)"
 echo "========================================"
 echo ""
@@ -15,30 +17,31 @@ echo ""
 # Channel név beállítása
 CHANNEL_NAME=${1:-preview}
 
-# Verzió frissítés
-echo "[1/4] Updating version.json..."
-dart tools/update_version.dart
-echo "✅ Version updated successfully"
-echo ""
-
-# Build
-echo "[2/4] Building web app..."
-flutter build web --release
-echo "✅ Build completed successfully"
-echo ""
+# Build mappa ellenőrzése
+if [ ! -d "build/web" ]; then
+    echo "❌ Error: build/web mappa nem található!"
+    echo "   Először futtasd: flutter build web --release"
+    exit 1
+fi
 
 # Version.json ellenőrzés
-echo "[3/4] Verifying version.json in build..."
+echo "[1/2] Verifying version.json in build..."
 if [ -f "build/web/version.json" ]; then
     echo "✅ version.json found in build/web"
 else
     echo "⚠️  Warning: version.json not found, copying..."
-    cp web/version.json build/web/version.json
+    if [ -f "web/version.json" ]; then
+        cp web/version.json build/web/version.json
+        echo "✅ version.json copied"
+    else
+        echo "❌ Error: version.json not found in web/ folder either!"
+        exit 1
+    fi
 fi
 echo ""
 
 # Firebase deploy to preview channel
-echo "[4/4] Deploying to Firebase Hosting Preview Channel: $CHANNEL_NAME..."
+echo "[2/2] Deploying to Firebase Hosting Preview Channel: $CHANNEL_NAME..."
 echo "⚠️  NOTE: This will NOT overwrite the production version!"
 echo ""
 
@@ -78,22 +81,4 @@ fi
 
 echo "========================================"
 echo ""
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

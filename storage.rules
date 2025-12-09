@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Memóriapalota képek - felhasználók csak a saját képeiket tölthetik fel
+    match /memoriapalota_images/{utvonalId}/{allomasId}/{userId}/{allFiles=**} {
+      // Olvasás: bejelentkezett felhasználók olvashatják
+      allow read: if request.auth != null;
+      
+      // Írás: csak a saját user ID-jével lehet feltölteni
+      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // Törlés: csak a saját képet lehet törölni
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Egyéb fájlok - alapértelmezett deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

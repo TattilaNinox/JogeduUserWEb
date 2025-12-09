@@ -1,0 +1,13 @@
+Használat
+Buildelés (amikor kell):
+   flutter build web --release
+Deployolás (amikor kell):
+   .\deploy-preview-only.bat
+Vagy egyedi channel névvel:
+   .\deploy-preview-only.bat test-feature
+Mit csinál a script
+Ellenőrzi, hogy létezik-e a build/web mappa
+Ellenőrzi a version.json-t (ha nincs, másolja)
+Feltölti a Firebase Preview Channel-re
+Megjeleníti a generált privát preview URL-t
+A dokumentációt is frissítettem, tartalmazza mindkét scriptet. Most már külön kezelheted a build és a deploy folyamatokat.

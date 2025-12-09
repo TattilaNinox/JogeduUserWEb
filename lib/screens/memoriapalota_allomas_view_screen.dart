@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, compute;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
@@ -13,7 +13,7 @@ import 'dart:typed_data';
 import 'dart:convert';
 import '../core/firebase_config.dart';
 
-// Top-level függvény a compute-hoz - optimalizált verzió
+// Top-level függvény a compute-hoz - gyorsított, egyszerűsített verzió
 Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
   // Ha már 200 KB alatt van, visszaadja
   if (imageBytes.length <= 200 * 1024) {
@@ -27,98 +27,104 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
       throw Exception('Nem sikerült dekódolni a képet');
     }
     
-    // Optimalizált kezdeti becslés az eredeti méret alapján
+    // Agresszív kezdeti beállítások - gyors tömörítés
     final originalSizeKB = imageBytes.length / 1024;
     final targetSizeKB = 200.0;
     final sizeRatio = originalSizeKB / targetSizeKB;
     
-    // Kezdeti értékek jobb becsléssel
+    // Kezdeti értékek - agresszívabb tömörítés
     int targetWidth = decodedImage.width;
     int targetHeight = decodedImage.height;
-    int quality = 85;
+    int quality = 70; // Alacsonyabb kezdeti minőség
     
-    // Ha a kép túl nagy, először csökkentjük a méretet
-    if (sizeRatio > 4) {
-      // Nagyon nagy kép: jelentősen csökkentjük a méretet
-      final scale = 0.6;
+    // Agresszív méret csökkentés azonnal
+    if (sizeRatio > 3) {
+      // Nagyon nagy kép: jelentősen csökkentjük
+      final scale = 0.5;
       targetWidth = (decodedImage.width * scale).round();
       targetHeight = (decodedImage.height * scale).round();
-      quality = 75;
+      quality = 60;
     } else if (sizeRatio > 2) {
-      // Nagy kép: mérsékelten csökkentjük a méretet
-      final scale = 0.75;
+      // Nagy kép: mérsékelten csökkentjük
+      final scale = 0.65;
       targetWidth = (decodedImage.width * scale).round();
       targetHeight = (decodedImage.height * scale).round();
-      quality = 80;
+      quality = 65;
     } else if (sizeRatio > 1.5) {
-      // Közepes kép: kicsit csökkentjük a méretet
-      final scale = 0.85;
+      // Közepes kép: kicsit csökkentjük
+      final scale = 0.8;
       targetWidth = (decodedImage.width * scale).round();
       targetHeight = (decodedImage.height * scale).round();
-      quality = 80;
+      quality = 70;
     }
     
-    // Maximum méret korlátozás
-    if (targetWidth > 1200) {
-      final scale = 1200.0 / targetWidth;
-      targetWidth = 1200;
+    // Maximum méret korlátozás - agresszívabb
+    if (targetWidth > 1000) {
+      final scale = 1000.0 / targetWidth;
+      targetWidth = 1000;
       targetHeight = (targetHeight * scale).round();
     }
-    if (targetHeight > 1200) {
-      final scale = 1200.0 / targetHeight;
-      targetHeight = 1200;
+    if (targetHeight > 1000) {
+      final scale = 1000.0 / targetHeight;
+      targetHeight = 1000;
       targetWidth = (targetWidth * scale).round();
     }
     
+    // Egyszerű, gyors tömörítés - max 2 iteráció
     Uint8List? compressed;
-    
-    // Optimalizált iteratív tömörítés - max 3-4 iteráció
-    int maxIterations = 4;
+    int maxIterations = 2; // Csak 2 iteráció a gyorsaságért
     int iteration = 0;
     
     while (iteration < maxIterations && (compressed == null || compressed.length > 200 * 1024)) {
       iteration++;
       
-      // Kép átméretezése (ha szükséges)
+      // Kép átméretezése (ha szükséges) - csak egyszer
       img.Image resizedImage;
-      if (targetWidth != decodedImage.width || targetHeight != decodedImage.height) {
+      if (iteration == 1 && (targetWidth != decodedImage.width || targetHeight != decodedImage.height)) {
         resizedImage = img.copyResize(
           decodedImage,
           width: targetWidth,
           height: targetHeight,
           interpolation: img.Interpolation.linear,
         );
-      } else {
+      } else if (iteration == 1) {
         resizedImage = decodedImage;
+      } else {
+        // Második iterációban újra átméretezünk kisebbre
+        targetWidth = (targetWidth * 0.8).round();
+        targetHeight = (targetHeight * 0.8).round();
+        resizedImage = img.copyResize(
+          decodedImage,
+          width: targetWidth,
+          height: targetHeight,
+          interpolation: img.Interpolation.linear,
+        );
+        quality = 50; // Alacsony minőség második iterációban
       }
       
-      // JPEG formátumban kódolás minőség csökkentéssel
+      // JPEG formátumban kódolás
       compressed = Uint8List.fromList(
         img.encodeJpg(resizedImage, quality: quality),
       );
       
-      // Ha még mindig túl nagy, finomhangoljuk
-      if (compressed.length > 200 * 1024) {
-        if (quality > 60) {
-          // Először csökkentjük a minőséget nagyobb lépésekben
-          quality -= 15;
-        } else if (quality > 45) {
-          // Közepes lépésekben
-          quality -= 10;
-        } else {
-          // Ha a minőség már alacsony, csökkentjük a méretet
-          targetWidth = (targetWidth * 0.85).round();
-          targetHeight = (targetHeight * 0.85).round();
-          quality = 65; // Reset minőség
-        }
+      // Ha még mindig túl nagy, agresszívabb csökkentés
+      if (compressed.length > 200 * 1024 && iteration < maxIterations) {
+        quality = 40; // Nagyon alacsony minőség
+        targetWidth = (targetWidth * 0.7).round();
+        targetHeight = (targetHeight * 0.7).round();
       } else {
         break;
       }
     }
     
+    // Ha még mindig túl nagy, akkor elfogadjuk (max 250 KB)
+    if (compressed != null && compressed.length <= 250 * 1024) {
+      return compressed;
+    }
+    
     // Ha még mindig túl nagy, akkor hiba
-    if (compressed == null || compressed.length > 200 * 1024) {
-      throw Exception('A kép mérete még tömörítés után is meghaladja a 200 KB-ot (${(compressed?.length ?? 0) / 1024} KB). Kérlek, válassz egy kisebb képet!');
+    if (compressed == null || compressed.length > 250 * 1024) {
+      throw Exception('A kép mérete még tömörítés után is meghaladja a 250 KB-ot (${(compressed?.length ?? 0) / 1024} KB). Kérlek, válassz egy kisebb képet!');
     }
     
     return compressed;
@@ -731,7 +737,9 @@ class _MemoriapalotaAllomasViewScreenState
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 70, // Mobil eszközön alacsonyabb minőség a gyorsabb feldolgozásért
       );
       
       if (image != null) {
@@ -768,7 +776,7 @@ class _MemoriapalotaAllomasViewScreenState
           source: ImageSource.gallery,
           maxWidth: 1200,
           maxHeight: 1200,
-          imageQuality: 85,
+          imageQuality: kIsWeb ? 85 : 70, // Mobil eszközön alacsonyabb minőség a gyorsabb feldolgozásért
         );
         
         debugPrint('Image picker returned: ${image?.path ?? "NULL"}');
@@ -976,7 +984,14 @@ class _MemoriapalotaAllomasViewScreenState
       
       // Kép tömörítése 200 KB alá
       _updateUploadProgress(0.33, 'compressing');
-      final compressedBytes = await _compressImage(imageBytes);
+      
+      // Timeout hozzáadása mobil eszközön (15 másodperc - rövidebb, hogy gyorsabban jelezzen hibát)
+      final compressedBytes = await _compressImage(imageBytes).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('A kép tömörítése túl sokáig tartott. Kérlek, próbálj egy kisebb képet vagy újraindítsd az alkalmazást!');
+        },
+      );
       
       debugPrint('Compression done, compressed size: ${compressedBytes != null ? (compressedBytes.length / 1024).toStringAsFixed(1) : "null"} KB');
       
@@ -984,9 +999,9 @@ class _MemoriapalotaAllomasViewScreenState
         throw Exception('Nem sikerült tömöríteni a képet');
       }
       
-      // Méret ellenőrzés
-      if (compressedBytes.length > 200 * 1024) {
-        throw Exception('A kép mérete még tömörítés után is meghaladja a 200 KB-ot (${(compressedBytes.length / 1024).toStringAsFixed(1)} KB)');
+      // Méret ellenőrzés - 2 MB-ig engedjük
+      if (compressedBytes.length > 2 * 1024 * 1024) {
+        throw Exception('A kép mérete túl nagy (${(compressedBytes.length / 1024 / 1024).toStringAsFixed(1)} MB). Kérlek, válassz kisebb képet!');
       }
       
       _updateUploadProgress(0.66, 'uploading');
@@ -1019,12 +1034,17 @@ class _MemoriapalotaAllomasViewScreenState
         );
       }
     } catch (e, stackTrace) {
-      debugPrint('Hiba a képfeltöltéskor: $e');
+      debugPrint('=== Hiba a képfeltöltéskor ===');
+      debugPrint('Error: $e');
       debugPrint('Stack trace: $stackTrace');
       
       // Progress dialog bezárása
       if (mounted) {
-        Navigator.of(context).pop(); // Progress dialog bezárása
+        try {
+          Navigator.of(context).pop(); // Progress dialog bezárása
+        } catch (navError) {
+          debugPrint('Error closing dialog: $navError');
+        }
       }
       
       // Hiba esetén visszaállítjuk az előző állapotot
@@ -1034,18 +1054,38 @@ class _MemoriapalotaAllomasViewScreenState
           _currentImageUrl = previousImageUrl; // Visszaállítjuk az előző képet
         });
         
+        // Részletes hibaüzenet megjelenítése
+        String errorMessage = 'Hiba a képfeltöltéskor';
+        if (e.toString().contains('timeout') || e.toString().contains('Timeout')) {
+          errorMessage = 'A művelet túl sokáig tartott. Kérlek, próbáld újra!';
+        } else if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+          errorMessage = 'Nincs jogosultság a képfeltöltéshez. Ellenőrizd a beállításokat!';
+        } else if (e.toString().contains('network') || e.toString().contains('Network')) {
+          errorMessage = 'Hálózati hiba. Ellenőrizd az internetkapcsolatot!';
+        } else {
+          errorMessage = 'Hiba: ${e.toString()}';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hiba a képfeltöltéskor: $e'),
-            duration: const Duration(seconds: 5),
+            content: Text(errorMessage),
+            duration: const Duration(seconds: 8),
             backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Részletek',
+              textColor: Colors.white,
+              onPressed: () {
+                // További részletek megjelenítése (opcionális)
+                debugPrint('Full error details: $e');
+              },
+            ),
           ),
         );
       }
     }
   }
   
-  // Kép tömörítése 200 KB alá
+  // Kép tömörítése 200 KB alá - gyorsított verzió
   Future<Uint8List?> _compressImage(Uint8List imageBytes) async {
     // Ha már 200 KB alatt van, visszaadja
     if (imageBytes.length <= 200 * 1024) {
@@ -1053,17 +1093,44 @@ class _MemoriapalotaAllomasViewScreenState
     }
     
     try {
-      // Web-en a compute nem mindig működik megfelelően, ez okozhat problémákat
-      // Közvetlenül futtatjuk a tömörítést, de kis késleltetéssel, hogy az UI frissülhessen
-      debugPrint('Starting image compression directly...');
+      debugPrint('Starting image compression, platform: ${kIsWeb ? "web" : "mobile"}, size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
       
-      // Kis késleltetés, hogy az UI frissülhessen
-      await Future.delayed(const Duration(milliseconds: 50));
+      Uint8List? compressed;
       
-      // Aszinkron módon futtatjuk, hogy ne blokkolja a UI-t
-      final compressed = await Future(() => _compressImageInIsolate(imageBytes));
+      if (kIsWeb) {
+        // Web-en a compute nem mindig működik megfelelően
+        // Kis késleltetés, hogy az UI frissülhessen
+        await Future.delayed(const Duration(milliseconds: 50));
+        
+        // Aszinkron módon futtatjuk, hogy ne blokkolja a UI-t
+        compressed = await Future(() => _compressImageInIsolate(imageBytes));
+      } else {
+        // Mobil eszközön először próbáljuk a compute-ot, de ha nem működik, közvetlenül futtatjuk
+        debugPrint('Using compute for mobile compression...');
+        try {
+          // Kis késleltetés, hogy az UI frissülhessen
+          await Future.delayed(const Duration(milliseconds: 100));
+          compressed = await compute(_compressImageInIsolate, imageBytes).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('Tömörítés timeout');
+            },
+          );
+        } catch (e) {
+          debugPrint('Compute failed or timeout, trying direct compression: $e');
+          // Ha a compute nem működik vagy timeout, próbáljuk közvetlenül
+          // Kis késleltetés, hogy az UI frissülhessen
+          await Future.delayed(const Duration(milliseconds: 100));
+          compressed = await Future(() => _compressImageInIsolate(imageBytes)).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('Tömörítés timeout (közvetlen)');
+            },
+          );
+        }
+      }
       
-      debugPrint('Compression completed: ${compressed?.length ?? 0} bytes');
+      debugPrint('Compression completed: ${compressed?.length ?? 0} bytes (${(compressed?.length ?? 0) / 1024} KB)');
       return compressed;
     } catch (e, stackTrace) {
       debugPrint('Hiba a tömörítéskor: $e');
@@ -1075,20 +1142,30 @@ class _MemoriapalotaAllomasViewScreenState
   // Firebase Storage-ba feltöltés
   Future<void> _uploadImageToStorage(Uint8List imageBytes) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
-      return;
+    if (user == null) {
+      throw Exception('Nincs bejelentkezve felhasználó!');
+    }
+    
+    if (_allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
+      throw Exception('Nincs kiválasztott állomás!');
     }
     
     final currentAllomas = _allomasok[_currentIndex];
     final allomasId = currentAllomas.id;
     final utvonalId = widget.noteId;
     
+    debugPrint('Uploading image to Storage: memoriapalota_images/$utvonalId/$allomasId/${user.uid}/image.jpg');
+    debugPrint('Image size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
+    
     // Régi kép törlése (ha van)
-    if (_currentImageUrl != null) {
+    if (_currentImageUrl != null && _currentImageUrl!.startsWith('https://')) {
       try {
+        debugPrint('Deleting old image: $_currentImageUrl');
         final oldRef = FirebaseStorage.instance.refFromURL(_currentImageUrl!);
-        await oldRef.delete();
+        await oldRef.delete().timeout(const Duration(seconds: 5));
+        debugPrint('Old image deleted successfully');
       } catch (e) {
+        debugPrint('Could not delete old image (continuing anyway): $e');
         // Ha nem sikerül törölni, folytatjuk
       }
     }
@@ -1098,11 +1175,36 @@ class _MemoriapalotaAllomasViewScreenState
       'memoriapalota_images/$utvonalId/$allomasId/${user.uid}/image.jpg',
     );
     
-    await ref.putData(imageBytes);
-    final imageUrl = await ref.getDownloadURL();
+    debugPrint('Starting upload to Firebase Storage...');
+    try {
+      await ref.putData(
+        imageBytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('A képfeltöltés túl sokáig tartott. Kérlek, próbáld újra!');
+        },
+      );
+      debugPrint('Upload to Storage completed');
+    } catch (e) {
+      debugPrint('Error uploading to Storage: $e');
+      rethrow;
+    }
+    
+    debugPrint('Getting download URL...');
+    final imageUrl = await ref.getDownloadURL().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        throw Exception('Nem sikerült lekérni a kép URL-jét. Kérlek, próbáld újra!');
+      },
+    );
+    debugPrint('Download URL obtained: $imageUrl');
     
     // Firestore-ba mentés
+    debugPrint('Saving to Firestore...');
     await _saveImageUrlToFirestore(imageUrl);
+    debugPrint('Saved to Firestore successfully');
     
     // State frissítése
     if (mounted) {
@@ -1115,25 +1217,43 @@ class _MemoriapalotaAllomasViewScreenState
   // Firestore-ba mentés
   Future<void> _saveImageUrlToFirestore(String imageUrl) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
-      return;
+    if (user == null) {
+      throw Exception('Nincs bejelentkezve felhasználó!');
+    }
+    
+    if (_allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
+      throw Exception('Nincs kiválasztott állomás!');
     }
     
     final currentAllomas = _allomasok[_currentIndex];
     final allomasId = currentAllomas.id;
     final utvonalId = widget.noteId;
     
-    await FirebaseConfig.firestore
-        .collection('memoriapalota_allomasok')
-        .doc(utvonalId)
-        .collection('allomasok')
-        .doc(allomasId)
-        .collection('userImages')
-        .doc(user.uid)
-        .set({
-          'imageUrl': imageUrl,
-          'uploadedAt': Timestamp.now(),
-        });
+    debugPrint('Saving to Firestore: memoriapalota_allomasok/$utvonalId/allomasok/$allomasId/userImages/${user.uid}');
+    
+    try {
+      await FirebaseConfig.firestore
+          .collection('memoriapalota_allomasok')
+          .doc(utvonalId)
+          .collection('allomasok')
+          .doc(allomasId)
+          .collection('userImages')
+          .doc(user.uid)
+          .set({
+            'imageUrl': imageUrl,
+            'uploadedAt': Timestamp.now(),
+          })
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('A Firestore mentés túl sokáig tartott. Kérlek, próbáld újra!');
+            },
+          );
+      debugPrint('Firestore save completed');
+    } catch (e) {
+      debugPrint('Error saving to Firestore: $e');
+      rethrow;
+    }
   }
   
   // Kép törlése
@@ -1405,6 +1525,9 @@ class _MemoriapalotaAllomasViewScreenState
                       child: Image.network(
                         _currentImageUrl!,
                         fit: BoxFit.contain,
+                        headers: const {
+                          'Access-Control-Allow-Origin': '*',
+                        },
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
                           return const Center(
@@ -1412,11 +1535,31 @@ class _MemoriapalotaAllomasViewScreenState
                           );
                         },
                         errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(
-                              Icons.error_outline,
-                              color: Colors.red,
-                              size: 48,
+                          debugPrint('Image load error: $error');
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: Colors.red,
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Nem sikerült betölteni a képet',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                if (kIsWeb)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      '(CORS hiba lehet)',
+                                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                                    ),
+                                  ),
+                              ],
                             ),
                           );
                         },
