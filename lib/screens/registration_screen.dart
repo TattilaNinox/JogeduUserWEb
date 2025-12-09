@@ -350,7 +350,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1E3A8A),
                         disabledBackgroundColor:
-                            const Color(0xFF1E3A8A).withOpacity(0.7),
+                            const Color(0xFF1E3A8A).withValues(alpha: 0.7),
                         foregroundColor: Colors.white,
                         disabledForegroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(

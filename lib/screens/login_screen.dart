@@ -358,8 +358,9 @@ class LoginScreenState extends State<LoginScreen>
                                       hoverColor: Colors.transparent,
                                       highlightColor: Colors.transparent,
                                       splashColor: Colors.transparent,
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      child: const Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
                                           Text(
                                             'Adatvédelmi irányelvek és felhasználási feltételek',
@@ -554,7 +555,7 @@ class LoginScreenState extends State<LoginScreen>
                                               foregroundColor: Colors.white,
                                               disabledBackgroundColor:
                                                   const Color(0xFF1E3A8A)
-                                                      .withOpacity(0.6),
+                                                      .withValues(alpha: 0.6),
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 24,

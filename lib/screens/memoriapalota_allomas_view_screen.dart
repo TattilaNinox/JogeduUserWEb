@@ -29,7 +29,7 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
     
     // Agresszív kezdeti beállítások - gyors tömörítés
     final originalSizeKB = imageBytes.length / 1024;
-    final targetSizeKB = 200.0;
+    const targetSizeKB = 200.0;
     final sizeRatio = originalSizeKB / targetSizeKB;
     
     // Kezdeti értékek - agresszívabb tömörítés
@@ -40,19 +40,19 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
     // Agresszív méret csökkentés azonnal
     if (sizeRatio > 3) {
       // Nagyon nagy kép: jelentősen csökkentjük
-      final scale = 0.5;
+      const scale = 0.5;
       targetWidth = (decodedImage.width * scale).round();
       targetHeight = (decodedImage.height * scale).round();
       quality = 60;
     } else if (sizeRatio > 2) {
       // Nagy kép: mérsékelten csökkentjük
-      final scale = 0.65;
+      const scale = 0.65;
       targetWidth = (decodedImage.width * scale).round();
       targetHeight = (decodedImage.height * scale).round();
       quality = 65;
     } else if (sizeRatio > 1.5) {
       // Közepes kép: kicsit csökkentjük
-      final scale = 0.8;
+      const scale = 0.8;
       targetWidth = (decodedImage.width * scale).round();
       targetHeight = (decodedImage.height * scale).round();
       quality = 70;
@@ -637,7 +637,9 @@ class _MemoriapalotaAllomasViewScreenState
                 debugPrint('=== TextButton onPressed END ===');
               },
               icon: const Icon(Icons.photo_library),
-              label: Text(kIsWeb ? 'Fájlból választás' : 'Galériából választás'),
+              label: kIsWeb 
+                  ? const Text('Fájlból választás')
+                  : const Text('Galériából választás'),
             ),
             if (_currentImageUrl != null) ...[
               const SizedBox(height: 8),
@@ -1346,7 +1348,7 @@ class _MemoriapalotaAllomasViewScreenState
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -1460,7 +1462,7 @@ class _MemoriapalotaAllomasViewScreenState
             ),
             const SizedBox(height: 2),
             Text(
-              '${allomasSorszam}/${_allomasok.length}',
+              '$allomasSorszam/${_allomasok.length}',
               style: TextStyle(
                 fontSize: isMobile ? 10 : (isTablet ? 11 : 12),
                 fontWeight: FontWeight.normal,
@@ -1668,7 +1670,7 @@ class _MemoriapalotaAllomasViewScreenState
                 child: Container(
                   decoration: BoxDecoration(
                     color: _currentImageUrl != null 
-                        ? Colors.white.withOpacity(0.85) // Félig átlátszó fehér, ha van kép
+                        ? Colors.white.withValues(alpha: 0.85) // Félig átlátszó fehér, ha van kép
                         : Colors.white, // Fehér háttér, ha nincs kép
                   ),
                   child: kIsWeb && _currentHtmlContent.isNotEmpty && _viewId.isNotEmpty
@@ -1727,7 +1729,7 @@ class _MemoriapalotaAllomasViewScreenState
                 color: Theme.of(context).scaffoldBackgroundColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),

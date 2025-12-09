@@ -138,7 +138,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             context.go(uri.toString());
           },
         ),
-        actions: [],
+        actions: const [],
       ),
       body: Container(
         color: const Color(0xFFF8F9FA),

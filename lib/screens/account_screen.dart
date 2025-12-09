@@ -24,8 +24,6 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   bool _dialogShown = false;
-  bool? _isAdmin;
-  bool _isLoadingCheck = true;
 
   @override
   void initState() {
@@ -33,51 +31,7 @@ class _AccountScreenState extends State<AccountScreen> {
     // PostFrameCallback használata - NEM blokkolja a build-et
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handlePaymentCallback();
-      _checkAdminStatus();
     });
-  }
-
-  Future<void> _checkAdminStatus() async {
-    if (!mounted) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _isLoadingCheck = false;
-        });
-      }
-      return;
-    }
-
-    try {
-      // Email alapú ellenőrzés
-      final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
-      
-      // Firestore-ban tárolt admin flag ellenőrzése
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      final isAdminValue = userDoc.data()?['isAdmin'];
-      final isAdminBool = isAdminValue is bool && isAdminValue == true;
-
-      if (mounted) {
-        setState(() {
-          _isAdmin = isAdminBool || isAdminEmail;
-          _isLoadingCheck = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('[AccountScreen] Admin check error: $e');
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _isLoadingCheck = false;
-        });
-      }
-    }
   }
 
   Future<void> _handlePaymentCallback() async {
@@ -209,20 +163,6 @@ class _AccountScreenState extends State<AccountScreen> {
         }
       });
 
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Fiók adatok'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/notes'),
-          ),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    // Admin ellenőrzés
-    if (_isLoadingCheck) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Fiók adatok'),
@@ -533,6 +473,11 @@ class _AccountScreenState extends State<AccountScreen> {
                                   onPressed: () async {
                                     if (!mounted) return;
 
+                                    // ScaffoldMessenger mentése az async művelet előtt
+                                    final scaffoldMessenger =
+                                        ScaffoldMessenger.maybeOf(context);
+                                    if (scaffoldMessenger == null) return;
+
                                     final confirmed = await showDialog<bool>(
                                           context: context,
                                           barrierDismissible: false,
@@ -563,10 +508,6 @@ class _AccountScreenState extends State<AccountScreen> {
                                         ) ??
                                         false;
                                     if (!mounted || !confirmed) return;
-
-                                    // Context és ScaffoldMessenger mentése az async műveletek előtt
-                                    final scaffoldMessenger =
-                                        ScaffoldMessenger.of(context);
 
                                     final now = DateTime.now();
                                     final expiry =
@@ -640,6 +581,11 @@ class _AccountScreenState extends State<AccountScreen> {
                                   onPressed: () async {
                                     if (!mounted) return;
 
+                                    // ScaffoldMessenger mentése az async művelet előtt
+                                    final scaffoldMessenger =
+                                        ScaffoldMessenger.maybeOf(context);
+                                    if (scaffoldMessenger == null) return;
+
                                     final confirmed = await showDialog<bool>(
                                           context: context,
                                           barrierDismissible: false,
@@ -673,10 +619,6 @@ class _AccountScreenState extends State<AccountScreen> {
                                         ) ??
                                         false;
                                     if (!mounted || !confirmed) return;
-
-                                    // Context és ScaffoldMessenger mentése az async műveletek előtt
-                                    final scaffoldMessenger =
-                                        ScaffoldMessenger.of(context);
 
                                     final now = DateTime.now();
                                     final expiredDate =
@@ -758,6 +700,10 @@ class _AccountScreenState extends State<AccountScreen> {
                     onPressed: () async {
                       if (!mounted) return;
 
+                      // ScaffoldMessenger mentése az async művelet előtt
+                      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+                      if (scaffoldMessenger == null) return;
+
                       final confirmed = await showDialog<bool>(
                             context: context,
                             barrierDismissible: false,
@@ -788,9 +734,6 @@ class _AccountScreenState extends State<AccountScreen> {
                           ) ??
                           false;
                       if (!mounted || !confirmed) return;
-
-                      // Context és ScaffoldMessenger mentése az async műveletek előtt
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
 
                       try {
                         final now = DateTime.now();
