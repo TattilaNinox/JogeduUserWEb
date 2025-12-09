@@ -218,10 +218,10 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                   return const Center(child: Text('Nincs találat.'));
                 }
 
-            // Hierarchikus csoportosítás: Kategória → Címkék (tudomány szint nélkül, mert csak "Jogász" van)
-            // Map<category, Map<tag, List<docs>>>
-            final Map<String, Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>> 
-                hierarchical = {};
+            // Hierarchikus csoportosítás: Kategória → Címkék hierarchia (tudomány szint nélkül, mert csak "Jogász" van)
+            // A címkék hierarchikusan működnek: tags[0] = főcím, tags[1] = alcím, tags[2] = alcím az alcím alatt, stb.
+            // Map<category, Map<firstTag, Map<secondTag, Map<thirdTag, ...>>>>
+            final Map<String, Map<String, dynamic>> hierarchical = {};
             
             for (var d in docs) {
               final category = (d.data()['category'] ?? 'Egyéb') as String;
@@ -229,49 +229,96 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               
               hierarchical.putIfAbsent(category, () => {});
               
-              // Címkék szerint csoportosítás
+              // Címkék hierarchikus csoportosítása
               if (tags.isEmpty) {
-                hierarchical[category]!.putIfAbsent('Nincs címke', () => []).add(d);
+                hierarchical[category]!.putIfAbsent('Nincs címke', () => <QueryDocumentSnapshot<Map<String, dynamic>>>[]).add(d);
               } else {
-                for (var tag in tags) {
-                  hierarchical[category]!.putIfAbsent(tag, () => []).add(d);
+                // A címkék sorrendje fontos: tags[0] = főcím, tags[1] = alcím, stb.
+                // Hierarchikusan építjük fel: category -> tags[0] -> tags[1] -> tags[2] -> ... -> docs
+                Map<String, dynamic> current = hierarchical[category]!;
+                
+                for (int i = 0; i < tags.length; i++) {
+                  final tag = tags[i];
+                  final isLast = i == tags.length - 1;
+                  
+                  if (isLast) {
+                    // Ha ez az utolsó címke, akkor itt vannak a jegyzetek
+                    // Ha már létezik ez a kulcs és Map típusú, akkor az üres kulcs alá tesszük
+                    if (current.containsKey(tag)) {
+                      if (current[tag] is Map<String, dynamic>) {
+                        // Ha már Map van, akkor az üres kulcs alá tesszük a jegyzetet
+                        final map = current[tag] as Map<String, dynamic>;
+                        if (!map.containsKey('')) {
+                          map[''] = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                        }
+                        (map[''] as List<QueryDocumentSnapshot<Map<String, dynamic>>>).add(d);
+                      } else {
+                        // Ha lista van, akkor hozzáadjuk
+                        (current[tag] as List<QueryDocumentSnapshot<Map<String, dynamic>>>).add(d);
+                      }
+                    } else {
+                      // Ha nem létezik, akkor létrehozzuk listaként
+                      current[tag] = <QueryDocumentSnapshot<Map<String, dynamic>>>[d];
+                    }
+                  } else {
+                    // Ha nem az utolsó, akkor egy köztes szint
+                    if (!current.containsKey(tag)) {
+                      current[tag] = <String, dynamic>{};
+                    } else if (current[tag] is! Map) {
+                      // Ha véletlenül lista van, átalakítjuk Map-pé és összefésüljük
+                      // Ez akkor történik, amikor egy jegyzetnek csak ["MP"] címkéje van,
+                      // majd egy másik jegyzetnek ["MP", "Teszt"] címkéi vannak
+                      final existingDocs = current[tag] as List<QueryDocumentSnapshot<Map<String, dynamic>>>;
+                      current[tag] = <String, dynamic>{'': existingDocs};
+                    }
+                    current = current[tag] as Map<String, dynamic>;
+                  }
                 }
               }
             }
 
-            // Rendezés minden szinten
-            hierarchical.forEach((category, tags) {
-              tags.forEach((tag, docsList) {
-                docsList.sort((a, b) {
-                  // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
-                  final isAllomasA = a.reference.path.contains('memoriapalota_allomasok') && 
-                                     !a.reference.path.contains('/allomasok/');
-                  final isAllomasB = b.reference.path.contains('memoriapalota_allomasok') && 
-                                     !b.reference.path.contains('/allomasok/');
-                  final typeA = isAllomasA ? 'memoriapalota_allomasok' : (a.data()['type'] as String? ?? '');
-                  final typeB = isAllomasB ? 'memoriapalota_allomasok' : (b.data()['type'] as String? ?? '');
-                  
-                  // 'source' típus mindig a lista végére kerüljön
-                  final bool isSourceA = typeA == 'source';
-                  final bool isSourceB = typeB == 'source';
-                  if (isSourceA != isSourceB) {
-                    return isSourceA ? 1 : -1; // source után soroljuk
-                  }
-                  // ha mindkettő ugyanaz a forrás státusz, marad a korábbi logika
-                  final typeCompare = typeA.compareTo(typeB);
-                  if (typeCompare != 0) {
-                    return typeCompare;
-                  }
-                  // Cím meghatározása: fő útvonal dokumentumoknál 'cim', egyébként 'title'
-                  final titleA = isAllomasA 
-                      ? (a.data()['cim'] as String? ?? '')
-                      : (a.data()['title'] as String? ?? '');
-                  final titleB = isAllomasB 
-                      ? (b.data()['cim'] as String? ?? '')
-                      : (b.data()['title'] as String? ?? '');
-                  return titleA.compareTo(titleB);
-                });
+            // Rendezés minden szinten - rekurzívan
+            void sortDocs(Map<String, dynamic> level) {
+              level.forEach((key, value) {
+                if (value is List<QueryDocumentSnapshot<Map<String, dynamic>>>) {
+                  value.sort((a, b) {
+                    // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
+                    final isAllomasA = a.reference.path.contains('memoriapalota_allomasok') && 
+                                       !a.reference.path.contains('/allomasok/');
+                    final isAllomasB = b.reference.path.contains('memoriapalota_allomasok') && 
+                                       !b.reference.path.contains('/allomasok/');
+                    final typeA = isAllomasA ? 'memoriapalota_allomasok' : (a.data()['type'] as String? ?? '');
+                    final typeB = isAllomasB ? 'memoriapalota_allomasok' : (b.data()['type'] as String? ?? '');
+                    
+                    // 'source' típus mindig a lista végére kerüljön
+                    final bool isSourceA = typeA == 'source';
+                    final bool isSourceB = typeB == 'source';
+                    if (isSourceA != isSourceB) {
+                      return isSourceA ? 1 : -1; // source után soroljuk
+                    }
+                    // ha mindkettő ugyanaz a forrás státusz, marad a korábbi logika
+                    final typeCompare = typeA.compareTo(typeB);
+                    if (typeCompare != 0) {
+                      return typeCompare;
+                    }
+                    // Cím meghatározása: fő útvonal dokumentumoknál 'cim', egyébként 'title'
+                    final titleA = isAllomasA 
+                        ? (a.data()['cim'] as String? ?? '')
+                        : (a.data()['title'] as String? ?? '');
+                    final titleB = isAllomasB 
+                        ? (b.data()['cim'] as String? ?? '')
+                        : (b.data()['title'] as String? ?? '');
+                    return titleA.compareTo(titleB);
+                  });
+                } else if (value is Map<String, dynamic>) {
+                  // Rekurzívan rendezzük az al-szinteket
+                  sortDocs(value);
+                }
               });
+            }
+            
+            hierarchical.forEach((category, tags) {
+              sortDocs(tags);
             });
 
                 return ListView(
@@ -280,7 +327,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                     return _CategorySection(
                       key: ValueKey('category_${categoryEntry.key}'),
                       category: categoryEntry.key,
-                      tags: categoryEntry.value,
+                      tagHierarchy: categoryEntry.value,
                       selectedCategory: widget.selectedCategory,
                       selectedTag: widget.selectedTag,
                       hasPremiumAccess: hasPremiumAccess,
@@ -299,7 +346,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 // Kategória szintű szekció widget
 class _CategorySection extends StatefulWidget {
   final String category;
-  final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>> tags;
+  final Map<String, dynamic> tagHierarchy;
   final String? selectedCategory;
   final String? selectedTag;
   final bool hasPremiumAccess;
@@ -307,7 +354,7 @@ class _CategorySection extends StatefulWidget {
   const _CategorySection({
     super.key,
     required this.category,
-    required this.tags,
+    required this.tagHierarchy,
     this.selectedCategory,
     this.selectedTag,
     required this.hasPremiumAccess,
@@ -327,9 +374,83 @@ class _CategorySectionState extends State<_CategorySection> {
     _isExpanded = widget.category == widget.selectedCategory && widget.selectedCategory != null;
   }
 
+  /// Rekurzív címke szint építése
+  /// A címkék hierarchikusan működnek: tags[0] = főcím, tags[1] = alcím, tags[2] = alcím az alcím alatt, stb.
+  Widget _buildTagLevel(
+    Map<String, dynamic> tagLevel,
+    String category,
+    String? selectedTag,
+    bool hasPremiumAccess, {
+    int depth = 0,
+  }) {
+    final List<Widget> children = [];
+    
+    for (var entry in tagLevel.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      
+      if (value is List<QueryDocumentSnapshot<Map<String, dynamic>>>) {
+        // Ha lista, akkor ezek a jegyzetek - közvetlenül megjelenítjük
+        children.add(_TagSection(
+          key: ValueKey('tag_${category}_${key}_$depth'),
+          tag: key.isEmpty ? 'Nincs címke' : key,
+          docs: value,
+          selectedTag: selectedTag,
+          hasPremiumAccess: hasPremiumAccess,
+        ));
+      } else if (value is Map<String, dynamic>) {
+        // Ha Map, akkor ez egy köztes szint - rekurzívan építjük
+        // Először összegyűjtjük a jegyzeteket ezen a szinten (ha vannak)
+        final docsAtThisLevel = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        // Csak az üres kulcs alatt lévő jegyzeteket gyűjtjük össze (ezek közvetlenül ezen a szinten vannak)
+        if (value.containsKey('') && value[''] is List) {
+          docsAtThisLevel.addAll((value[''] as List).cast<QueryDocumentSnapshot<Map<String, dynamic>>>());
+        }
+        
+        // Rekurzívan építjük az alcímkéket (az üres kulcs nélkül)
+        final childMap = Map<String, dynamic>.from(value)..remove('');
+        final childWidget = childMap.isEmpty 
+            ? null
+            : _buildTagLevel(
+                childMap,
+                category,
+                selectedTag,
+                hasPremiumAccess,
+                depth: depth + 1,
+              );
+        
+        children.add(_TagSection(
+          key: ValueKey('tag_${category}_${key}_$depth'),
+          tag: key,
+          docs: docsAtThisLevel,
+          selectedTag: selectedTag,
+          hasPremiumAccess: hasPremiumAccess,
+          children: childWidget,
+        ));
+      }
+    }
+    
+    return Column(
+      children: children,
+    );
+  }
+
+  /// Összegyűjti az összes jegyzetet a hierarchiából
+  int _countTotalDocs(Map<String, dynamic> hierarchy) {
+    int count = 0;
+    for (var value in hierarchy.values) {
+      if (value is List) {
+        count += value.length;
+      } else if (value is Map) {
+        count += _countTotalDocs(value as Map<String, dynamic>);
+      }
+    }
+    return count;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalDocs = widget.tags.values.fold<int>(0, (sum, docs) => sum + docs.length);
+    final totalDocs = _countTotalDocs(widget.tagHierarchy);
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -434,21 +555,12 @@ class _CategorySectionState extends State<_CategorySection> {
             child: _isExpanded
                 ? Padding(
                     padding: const EdgeInsets.only(top: 2, bottom: 6),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: widget.tags.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 4),
-                      itemBuilder: (context, index) {
-                        final tagEntry = widget.tags.entries.elementAt(index);
-                        return _TagSection(
-                          key: ValueKey('tag_${widget.category}_${tagEntry.key}'),
-                          tag: tagEntry.key,
-                          docs: tagEntry.value,
-                          selectedTag: widget.selectedTag,
-                          hasPremiumAccess: widget.hasPremiumAccess,
-                        );
-                      },
+                    child: _buildTagLevel(
+                      widget.tagHierarchy,
+                      widget.category,
+                      widget.selectedTag,
+                      widget.hasPremiumAccess,
+                      depth: 0,
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -465,6 +577,7 @@ class _TagSection extends StatefulWidget {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
   final String? selectedTag;
   final bool hasPremiumAccess;
+  final Widget? children; // Alcímkék hierarchikus struktúrája
 
   const _TagSection({
     super.key,
@@ -472,6 +585,7 @@ class _TagSection extends StatefulWidget {
     required this.docs,
     this.selectedTag,
     required this.hasPremiumAccess,
+    this.children,
   });
 
   @override
@@ -558,7 +672,7 @@ class _TagSectionState extends State<_TagSection> {
                       ),
                     ),
                     Text(
-                      '${widget.docs.length}',
+                      '${widget.docs.length + (widget.children != null ? 1 : 0)}',
                       style: const TextStyle(
                         color: Color(0xFF6B7280),
                         fontSize: 11,
@@ -566,15 +680,16 @@ class _TagSectionState extends State<_TagSection> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    AnimatedRotation(
-                      turns: _isExpanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Color(0xFF6B7280),
-                        size: 16,
+                    if (widget.children != null || widget.docs.isNotEmpty)
+                      AnimatedRotation(
+                        turns: _isExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: Color(0xFF6B7280),
+                          size: 16,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -586,48 +701,61 @@ class _TagSectionState extends State<_TagSection> {
             child: _isExpanded
                 ? Padding(
                     padding: const EdgeInsets.only(top: 2, bottom: 4),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: widget.docs.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 0),
-                      itemBuilder: (context, index) {
-                        final doc = widget.docs[index];
-                        final data = doc.data();
-                        // Fő útvonal dokumentumok esetén külön kezelés (nem subcollection)
-                        final isAllomas = doc.reference.path.contains('memoriapalota_allomasok') && 
-                                         !doc.reference.path.contains('/allomasok/');
-                        final type = isAllomas 
-                            ? 'memoriapalota_allomasok' 
-                            : (data['type'] as String? ?? 'standard');
-                        // Fő útvonal dokumentumoknál 'cim' mező, egyébként 'title'
-                        final title = isAllomas 
-                            ? (data['cim'] as String? ?? '')
-                            : (data['title'] as String? ?? '');
-                        // Ha az isFree mező hiányzik, akkor ZÁRT (false)
-                        final isFree = data['isFree'] as bool? ?? false;
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Alcímkék hierarchikus struktúrája (ha van)
+                        if (widget.children != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: widget.children!,
+                          ),
+                        // Jegyzetek listája
+                        if (widget.docs.isNotEmpty)
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: widget.docs.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 0),
+                            itemBuilder: (context, index) {
+                              final doc = widget.docs[index];
+                              final data = doc.data();
+                              // Fő útvonal dokumentumok esetén külön kezelés (nem subcollection)
+                              final isAllomas = doc.reference.path.contains('memoriapalota_allomasok') && 
+                                               !doc.reference.path.contains('/allomasok/');
+                              final type = isAllomas 
+                                  ? 'memoriapalota_allomasok' 
+                                  : (data['type'] as String? ?? 'standard');
+                              // Fő útvonal dokumentumoknál 'cim' mező, egyébként 'title'
+                              final title = isAllomas 
+                                  ? (data['cim'] as String? ?? '')
+                                  : (data['title'] as String? ?? '');
+                              // Ha az isFree mező hiányzik, akkor ZÁRT (false)
+                              final isFree = data['isFree'] as bool? ?? false;
 
-                        final isLocked = !isFree && !widget.hasPremiumAccess;
-                        final isLast = index == widget.docs.length - 1;
+                              final isLocked = !isFree && !widget.hasPremiumAccess;
+                              final isLast = index == widget.docs.length - 1;
 
-                        return NoteListTile(
-                          id: doc.id,
-                          title: title,
-                          type: type,
-                          hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
-                          hasAudio:
-                              (data['audioUrl'] ?? '').toString().isNotEmpty,
-                          audioUrl: (data['audioUrl'] ?? '').toString(),
-                          hasVideo:
-                              (data['videoUrl'] ?? '').toString().isNotEmpty,
-                          deckCount: type == 'deck'
-                              ? (data['flashcards'] as List<dynamic>? ?? [])
-                                  .length
-                              : null,
-                          isLocked: isLocked,
-                          isLast: isLast,
-                        );
-                      },
+                              return NoteListTile(
+                                id: doc.id,
+                                title: title,
+                                type: type,
+                                hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
+                                hasAudio:
+                                    (data['audioUrl'] ?? '').toString().isNotEmpty,
+                                audioUrl: (data['audioUrl'] ?? '').toString(),
+                                hasVideo:
+                                    (data['videoUrl'] ?? '').toString().isNotEmpty,
+                                deckCount: type == 'deck'
+                                    ? (data['flashcards'] as List<dynamic>? ?? [])
+                                        .length
+                                    : null,
+                                isLocked: isLocked,
+                                isLast: isLast,
+                              );
+                            },
+                          ),
+                      ],
                     ),
                   )
                 : const SizedBox.shrink(),

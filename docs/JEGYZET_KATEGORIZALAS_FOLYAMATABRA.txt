@@ -1,0 +1,228 @@
+═══════════════════════════════════════════════════════════════════════════════
+  JEGYZET KATEGORIZÁLÁS FOLYAMATÁBRA
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    JEGYZET LÉTREHOZÁSA / SZERKESZTÉSE                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. CÍM MEGADÁSA (title)                                                     │
+│     • Kötelező mező                                                         │
+│     • Szöveges bevitel                                                      │
+│     • Egyediség ellenőrzés: (title + type + category) kombináció           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  2. TÍPUS KIVÁLASZTÁSA (type) - BESOROLÁS                                  │
+│     • Kötelező mező                                                         │
+│     • Lehetséges értékek:                                                  │
+│       - 'text' → Szöveges                                                  │
+│       - 'interactive' → Interaktív                                         │
+│       - 'dynamic_quiz' → Dinamikus Kvíz                                    │
+│       - 'dynamic_quiz_dual' → 2-válaszos Dinamikus Kvíz                   │
+│       - 'deck' → Pakli                                                     │
+│       - 'source' → Forrás                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  3. TUDOMÁNY KIVÁLASZTÁSA (science)                                         │
+│     • Kötelező mező                                                         │
+│     • Betöltés: Firestore 'sciences' collection-ból                        │
+│     • A kiválasztás után betöltődnek a hozzá tartozó kategóriák           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  4. KATEGÓRIA KIVÁLASZTÁSA (category)                                      │
+│     • Kötelező mező                                                         │
+│     • Csak a kiválasztott tudományhoz tartozó kategóriák jelennek meg      │
+│     • Betöltés: Firestore 'categories' collection-ból                       │
+│       WHERE 'science' = kiválasztott tudomány                               │
+│     • A kategória a tudomány alárendeltje                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  5. CÍMKEK HOZZÁADÁSA (tags)                                                │
+│     • Opcionális mező                                                       │
+│     • Több címke hozzáadható                                                │
+│     • Mentéskor:                                                           │
+│       - A jegyzet 'tags' mezőjébe mentődnek (array)                        │
+│       - A 'tags' collection-be is mentődnek (doc ID = tag név)             │
+│     • Címkék szerkeszthetők és törölhetők                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  6. INGYENES HOZZÁFÉRÉS BEÁLLÍTÁSA (isFree)                                 │
+│     • Opcionális mező                                                       │
+│     • Boolean érték (true/false)                                            │
+│     • Alapértelmezett: false                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  7. MENTÉS FIRESTORE-BA                                                    │
+│     • Collection: 'notes'                                                  │
+│     • Dokumentum mezők:                                                    │
+│       {                                                                     │
+│         'title': string (kötelező),                                        │
+│         'type': string (kötelező),                                        │
+│         'science': string (kötelező),                                      │
+│         'category': string (kötelező),                                     │
+│         'tags': array<string> (opcionális),                                 │
+│         'isFree': boolean (opcionális),                                     │
+│         'status': 'Draft' | 'Published' | 'Archived',                      │
+│         'modified': Timestamp,                                             │
+│         'pages': array<string>,                                            │
+│         ... (egyéb mezők: audioUrl, videoUrl, pdfUrl)                      │
+│       }                                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+  SZŰRÉS / KATEGORIZÁLÁS A LISTÁZÁSNÁL
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    JEGYZETEK LISTÁZÁSA                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FIRESTORE QUERY ÉPÍTÉSE                                                   │
+│  Collection: 'notes'                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+    ┌───────────────────────────┐    ┌───────────────────────────┐
+    │  SZŰRÉSI LEHETŐSÉGEK     │    │  KERESÉSI LEHETŐSÉGEK     │
+    └───────────────────────────┘    └───────────────────────────┘
+                    │                               │
+    ┌───────────────┼───────────────┐             │
+    │               │               │             │
+    ▼               ▼               ▼             ▼
+┌─────────┐   ┌──────────┐   ┌──────────┐   ┌──────────────┐
+│ STATUS  │   │ CATEGORY│   │  SCIENCE │   │  CÍM KERESÉS │
+│         │   │         │   │          │   │  (szöveges)  │
+│ WHERE   │   │ WHERE   │   │ WHERE    │   │              │
+│ status =│   │category=│   │science = │   │  Client-side │
+│ 'Draft' │   │'...'    │   │'...'     │   │  szűrés      │
+└─────────┘   └──────────┘   └──────────┘   └──────────────┘
+    │               │               │
+    └───────┬───────┴───────┬───────┘
+            │               │
+            ▼               ▼
+    ┌───────────────┐   ┌───────────────┐
+    │     TYPE      │   │      TAG      │
+    │               │   │               │
+    │ WHERE type =  │   │ WHERE tags    │
+    │ 'text'        │   │ arrayContains │
+    │               │   │ '...'         │
+    └───────────────┘   └───────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+  KATEGORIZÁLÁSI HIERARCHIA
+═══════════════════════════════════════════════════════════════════════════════
+
+JEGYZET
+  │
+  ├─── TÍPUS (type) ──────────────────────────────┐
+  │     • Besorolás típus szerint                  │
+  │     • 6 különböző típus                        │
+  │                                                │
+  ├─── TUDOMÁNY (science) ────────────────────────┤
+  │     • Fő kategorizálás                         │
+  │     • Firestore: 'sciences' collection        │
+  │                                                │
+  │     └─── KATEGÓRIA (category) ───────────────┤
+  │           • Alárendelt a tudománynak           │
+  │           • Firestore: 'categories' collection │
+  │           • WHERE science = kiválasztott      │
+  │                                                │
+  ├─── CÍMKEK (tags) ─────────────────────────────┤
+  │     • Több címke lehetséges                    │
+  │     • Többszintű kategorizálás                │
+  │     • Firestore: 'tags' collection             │
+  │     • WHERE tags arrayContains '...'           │
+  │                                                │
+  └─── INGYENES HOZZÁFÉRÉS (isFree) ──────────────┤
+        • Boolean flag                             │
+        • Hozzáférési szint                        │
+        └─────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+  FIRESTORE ADATSTRUKTÚRA
+═══════════════════════════════════════════════════════════════════════════════
+
+Collection: 'notes'
+  Document ID: <auto-generated>
+    {
+      title: "Jegyzet címe",
+      type: "text" | "interactive" | "dynamic_quiz" | ...,
+      science: "Orvostudomány",
+      category: "Anatómia",
+      tags: ["címke1", "címke2", ...],
+      isFree: true | false,
+      status: "Draft" | "Published" | "Archived",
+      modified: Timestamp,
+      pages: [html_content],
+      ...
+    }
+
+Collection: 'sciences'
+  Document ID: <auto-generated>
+    {
+      name: "Orvostudomány"
+    }
+
+Collection: 'categories'
+  Document ID: <auto-generated>
+    {
+      name: "Anatómia",
+      science: "Orvostudomány"  // ← Kapcsolat a tudományhoz
+    }
+
+Collection: 'tags'
+  Document ID: <tag_név>
+    {
+      name: "címke1"
+    }
+
+═══════════════════════════════════════════════════════════════════════════════
+  PÉLDA: JEGYZET KATEGORIZÁLÁSA
+═══════════════════════════════════════════════════════════════════════════════
+
+CÍM: "A szív anatómiája"
+TÍPUS: "text" (Szöveges)
+TUDOMÁNY: "Orvostudomány"
+KATEGÓRIA: "Anatómia" (az Orvostudomány alatt)
+CÍMKEK: ["szív", "keringés", "anatómia"]
+INGYENES: false
+
+→ Firestore dokumentum:
+{
+  title: "A szív anatómiája",
+  type: "text",
+  science: "Orvostudomány",
+  category: "Anatómia",
+  tags: ["szív", "keringés", "anatómia"],
+  isFree: false,
+  status: "Draft",
+  ...
+}
+
+→ Szűrési lehetőségek:
+  • Tudomány szerint: "Orvostudomány"
+  • Kategória szerint: "Anatómia"
+  • Címke szerint: "szív" VAGY "keringés" VAGY "anatómia"
+  • Típus szerint: "text"
+  • Cím szerint: "szív" (szöveges keresés)
+
+═══════════════════════════════════════════════════════════════════════════════
+
