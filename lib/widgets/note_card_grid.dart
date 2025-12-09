@@ -218,55 +218,71 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                   return const Center(child: Text('Nincs találat.'));
                 }
 
-            // Csoportosítás kategóriánként
-            final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
-                grouped = {};
+            // Hierarchikus csoportosítás: Kategória → Címkék (tudomány szint nélkül, mert csak "Jogász" van)
+            // Map<category, Map<tag, List<docs>>>
+            final Map<String, Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>> 
+                hierarchical = {};
+            
             for (var d in docs) {
-              final cat = (d.data()['category'] ?? 'Egyéb') as String;
-              grouped.putIfAbsent(cat, () => []).add(d);
+              final category = (d.data()['category'] ?? 'Egyéb') as String;
+              final tags = (d.data()['tags'] as List<dynamic>? ?? []).cast<String>();
+              
+              hierarchical.putIfAbsent(category, () => {});
+              
+              // Címkék szerint csoportosítás
+              if (tags.isEmpty) {
+                hierarchical[category]!.putIfAbsent('Nincs címke', () => []).add(d);
+              } else {
+                for (var tag in tags) {
+                  hierarchical[category]!.putIfAbsent(tag, () => []).add(d);
+                }
+              }
             }
 
-            // Kategórián belüli rendezés típus és cím alapján
-            grouped.forEach((key, value) {
-              value.sort((a, b) {
-                // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
-                final isAllomasA = a.reference.path.contains('memoriapalota_allomasok') && 
-                                   !a.reference.path.contains('/allomasok/');
-                final isAllomasB = b.reference.path.contains('memoriapalota_allomasok') && 
-                                   !b.reference.path.contains('/allomasok/');
-                final typeA = isAllomasA ? 'memoriapalota_allomasok' : (a.data()['type'] as String? ?? '');
-                final typeB = isAllomasB ? 'memoriapalota_allomasok' : (b.data()['type'] as String? ?? '');
-                
-                // 'source' típus mindig a lista végére kerüljön
-                final bool isSourceA = typeA == 'source';
-                final bool isSourceB = typeB == 'source';
-                if (isSourceA != isSourceB) {
-                  return isSourceA ? 1 : -1; // source után soroljuk
-                }
-                // ha mindkettő ugyanaz a forrás státusz, marad a korábbi logika
-                final typeCompare = typeA.compareTo(typeB);
-                if (typeCompare != 0) {
-                  return typeCompare;
-                }
-                // Cím meghatározása: fő útvonal dokumentumoknál 'cim', egyébként 'title'
-                final titleA = isAllomasA 
-                    ? (a.data()['cim'] as String? ?? '')
-                    : (a.data()['title'] as String? ?? '');
-                final titleB = isAllomasB 
-                    ? (b.data()['cim'] as String? ?? '')
-                    : (b.data()['title'] as String? ?? '');
-                return titleA.compareTo(titleB);
+            // Rendezés minden szinten
+            hierarchical.forEach((category, tags) {
+              tags.forEach((tag, docsList) {
+                docsList.sort((a, b) {
+                  // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
+                  final isAllomasA = a.reference.path.contains('memoriapalota_allomasok') && 
+                                     !a.reference.path.contains('/allomasok/');
+                  final isAllomasB = b.reference.path.contains('memoriapalota_allomasok') && 
+                                     !b.reference.path.contains('/allomasok/');
+                  final typeA = isAllomasA ? 'memoriapalota_allomasok' : (a.data()['type'] as String? ?? '');
+                  final typeB = isAllomasB ? 'memoriapalota_allomasok' : (b.data()['type'] as String? ?? '');
+                  
+                  // 'source' típus mindig a lista végére kerüljön
+                  final bool isSourceA = typeA == 'source';
+                  final bool isSourceB = typeB == 'source';
+                  if (isSourceA != isSourceB) {
+                    return isSourceA ? 1 : -1; // source után soroljuk
+                  }
+                  // ha mindkettő ugyanaz a forrás státusz, marad a korábbi logika
+                  final typeCompare = typeA.compareTo(typeB);
+                  if (typeCompare != 0) {
+                    return typeCompare;
+                  }
+                  // Cím meghatározása: fő útvonal dokumentumoknál 'cim', egyébként 'title'
+                  final titleA = isAllomasA 
+                      ? (a.data()['cim'] as String? ?? '')
+                      : (a.data()['title'] as String? ?? '');
+                  final titleB = isAllomasB 
+                      ? (b.data()['cim'] as String? ?? '')
+                      : (b.data()['title'] as String? ?? '');
+                  return titleA.compareTo(titleB);
+                });
               });
             });
 
                 return ListView(
                   padding: EdgeInsets.zero,
-                  children: grouped.entries.map((entry) {
-                    final items = entry.value;
+                  children: hierarchical.entries.map((categoryEntry) {
                     return _CategorySection(
-                      category: entry.key,
-                      docs: items,
+                      key: ValueKey('category_${categoryEntry.key}'),
+                      category: categoryEntry.key,
+                      tags: categoryEntry.value,
                       selectedCategory: widget.selectedCategory,
+                      selectedTag: widget.selectedTag,
                       hasPremiumAccess: hasPremiumAccess,
                     );
                   }).toList(),
@@ -280,16 +296,20 @@ class _NoteCardGridState extends State<NoteCardGrid> {
   }
 }
 
+// Kategória szintű szekció widget
 class _CategorySection extends StatefulWidget {
   final String category;
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
+  final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>> tags;
   final String? selectedCategory;
+  final String? selectedTag;
   final bool hasPremiumAccess;
 
   const _CategorySection({
+    super.key,
     required this.category,
-    required this.docs,
+    required this.tags,
     this.selectedCategory,
+    this.selectedTag,
     required this.hasPremiumAccess,
   });
 
@@ -298,19 +318,21 @@ class _CategorySection extends StatefulWidget {
 }
 
 class _CategorySectionState extends State<_CategorySection> {
-  late bool _isExpanded; // Alapértelmezetten összecsukva
+  late bool _isExpanded;
 
   @override
   void initState() {
     super.initState();
-    // Ha ez a kategória van kiválasztva a szűrőben, akkor kibontva legyen
-    _isExpanded = widget.category == widget.selectedCategory;
+    // Alapértelmezetten zárva - csak akkor legyen kibontva, ha explicit módon kiválasztották a szűrőben
+    _isExpanded = widget.category == widget.selectedCategory && widget.selectedCategory != null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final totalDocs = widget.tags.values.fold<int>(0, (sum, docs) => sum + docs.length);
+    
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -320,8 +342,8 @@ class _CategorySectionState extends State<_CategorySection> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 3,
             offset: const Offset(0, 1),
           ),
         ],
@@ -344,7 +366,7 @@ class _CategorySectionState extends State<_CategorySection> {
                     )
                   : BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: _isExpanded 
                       ? const Color(0xFFF9FAFB)
@@ -369,25 +391,25 @@ class _CategorySectionState extends State<_CategorySection> {
                     Icon(
                       _isExpanded ? Icons.folder_open : Icons.folder_outlined,
                       color: const Color(0xFF6B7280),
-                      size: 20,
+                      size: 18,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         widget.category,
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF111827),
-                          fontSize: 15,
+                          fontSize: 14,
                           letterSpacing: -0.2,
                         ),
                       ),
                     ),
                     Text(
-                      '${widget.docs.length}',
+                      '$totalDocs',
                       style: const TextStyle(
                         color: Color(0xFF6B7280),
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -398,7 +420,7 @@ class _CategorySectionState extends State<_CategorySection> {
                       child: const Icon(
                         Icons.keyboard_arrow_down,
                         color: Color(0xFF6B7280),
-                        size: 20,
+                        size: 18,
                       ),
                     ),
                   ],
@@ -411,7 +433,159 @@ class _CategorySectionState extends State<_CategorySection> {
             curve: Curves.easeInOut,
             child: _isExpanded
                 ? Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    padding: const EdgeInsets.only(top: 2, bottom: 6),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: widget.tags.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
+                      itemBuilder: (context, index) {
+                        final tagEntry = widget.tags.entries.elementAt(index);
+                        return _TagSection(
+                          key: ValueKey('tag_${widget.category}_${tagEntry.key}'),
+                          tag: tagEntry.key,
+                          docs: tagEntry.value,
+                          selectedTag: widget.selectedTag,
+                          hasPremiumAccess: widget.hasPremiumAccess,
+                        );
+                      },
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Címke szintű szekció widget
+class _TagSection extends StatefulWidget {
+  final String tag;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
+  final String? selectedTag;
+  final bool hasPremiumAccess;
+
+  const _TagSection({
+    super.key,
+    required this.tag,
+    required this.docs,
+    this.selectedTag,
+    required this.hasPremiumAccess,
+  });
+
+  @override
+  State<_TagSection> createState() => _TagSectionState();
+}
+
+class _TagSectionState extends State<_TagSection> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    // Csak akkor legyen kibontva, ha konkrétan kiválasztva van a szűrőben
+    _isExpanded = widget.tag == widget.selectedTag;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _isExpanded = !_isExpanded;
+                });
+              },
+              borderRadius: _isExpanded
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(6),
+                      topRight: Radius.circular(6),
+                    )
+                  : BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _isExpanded 
+                      ? const Color(0xFFFAFBFC)
+                      : Colors.white,
+                  borderRadius: _isExpanded
+                      ? const BorderRadius.only(
+                          topLeft: Radius.circular(6),
+                          topRight: Radius.circular(6),
+                        )
+                      : BorderRadius.circular(6),
+                  border: _isExpanded
+                      ? const Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                        )
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isExpanded ? Icons.label : Icons.label_outline,
+                      color: const Color(0xFF6B7280),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.tag,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF111827),
+                          fontSize: 13,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${widget.docs.length}',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    AnimatedRotation(
+                      turns: _isExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Color(0xFF6B7280),
+                        size: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: _isExpanded
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 4),
                     child: ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
