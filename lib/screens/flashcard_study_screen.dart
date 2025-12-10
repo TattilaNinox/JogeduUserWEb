@@ -372,6 +372,9 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
 
     // Ha nincs esedékes kártya
     if (_dueCardIndices.isEmpty) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -382,6 +385,10 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
+            overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
+            maxLines: isMobile ? null : 2,
+            textAlign: TextAlign.center,
+            softWrap: true,
           ),
           backgroundColor: const Color(0xFF1E3A8A),
           foregroundColor: Colors.white,
@@ -398,6 +405,9 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
     final currentCardIndex = _dueCardIndices[_currentIndex];
     final currentCard = flashcards[currentCardIndex];
     final totalCards = _dueCardIndices.length;
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -409,8 +419,10 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
+          overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
+          maxLines: isMobile ? null : 2,
+          textAlign: TextAlign.center,
+          softWrap: true,
         ),
         backgroundColor: const Color(0xFF1E3A8A),
         foregroundColor: Colors.white,
