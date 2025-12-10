@@ -73,10 +73,46 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
     iframeElement.sandbox.add('allow-forms');
     iframeElement.sandbox.add('allow-popups');
     
-    // Iframe src beállítása data URI-val
+    // HTML tartalom CSS-szel ellátva - sötét szöveg, jól olvasható mobil eszközön is
+    String styledHtmlContent = htmlContent;
     if (htmlContent.isNotEmpty) {
-      iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(htmlContent)}';
+      // Ellenőrizzük, hogy van-e már <style> tag
+      if (!htmlContent.toLowerCase().contains('<style')) {
+        // CSS hozzáadása a szöveg sötét színéhez és olvashatóságához
+        const cssStyle = '''
+        <style>
+          body {
+            color: #202122 !important;
+            background-color: #ffffff !important;
+            font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif !important;
+            font-size: 16px !important;
+            line-height: 1.6 !important;
+            padding: 16px !important;
+            margin: 0 !important;
+          }
+          p, div, span, li, td, th {
+            color: #202122 !important;
+          }
+          h1, h2, h3, h4, h5, h6 {
+            color: #202122 !important;
+            font-weight: 600 !important;
+          }
+          * {
+            color: inherit !important;
+          }
+        </style>
+        ''';
+        styledHtmlContent = cssStyle + htmlContent;
+      } else {
+        // Ha már van style tag, hozzáadjuk a body stílust
+        styledHtmlContent = htmlContent.replaceAll(
+          RegExp(r'<body[^>]*>', caseSensitive: false),
+          '<body style="color: #202122 !important; background-color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif !important; font-size: 16px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important;">',
+        );
       }
+      
+      iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(styledHtmlContent)}';
+    }
     
     // Platform view regisztrálása
     // ignore: undefined_prefixed_name
