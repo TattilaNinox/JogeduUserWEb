@@ -529,9 +529,23 @@ class _CategorySectionState extends State<_CategorySection> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   color: _isExpanded ? const Color(0xFFF8F9FA) : Colors.white,
+                  border: _isExpanded
+                      ? const Border(
+                          bottom: BorderSide(
+                            color: Colors.white,
+                            width: 1,
+                          ),
+                        )
+                      : null,
                 ),
                 child: Row(
                   children: [
+                    Icon(
+                      _isExpanded ? Icons.folder_open : Icons.folder_outlined,
+                      color: const Color(0xFF54595D),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         widget.category,
@@ -665,10 +679,25 @@ class _TagSectionState extends State<_TagSection> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
-                  color: _isExpanded ? const Color(0xFFF8F9FA) : Colors.white,
+                  // Alköteg fejléce: szürkés kék, ha kibontva van
+                  color: _isExpanded ? const Color(0xFFE8F0F5) : Colors.white,
+                  border: _isExpanded
+                      ? const Border(
+                          bottom: BorderSide(
+                            color: Colors.white,
+                            width: 1,
+                          ),
+                        )
+                      : null,
                 ),
                 child: Row(
                   children: [
+                    Icon(
+                      _isExpanded ? Icons.label : Icons.label_outline,
+                      color: const Color(0xFF54595D),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         widget.tag,
