@@ -38,12 +38,12 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
         .get();
 
     if (!mounted) return;
-    
+
     final data = snapshot.data();
     String? htmlContent;
     if (data != null) {
-      final pages = data['pages'] as List<dynamic>? ?? [];
-      if (pages.isNotEmpty) {
+    final pages = data['pages'] as List<dynamic>? ?? [];
+    if (pages.isNotEmpty) {
         htmlContent = pages[_currentPageIndex] as String? ?? '';
       }
     }
@@ -76,7 +76,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
     // Iframe src beállítása data URI-val
     if (htmlContent.isNotEmpty) {
       iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(htmlContent)}';
-    }
+      }
     
     // Platform view regisztrálása
     // ignore: undefined_prefixed_name
@@ -169,8 +169,8 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
                         child: Text(
                           'Ez a jegyzet nem tartalmaz tartalmat.',
                           style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
                       ),
+                ),
               ),
             ),
             if (data['audioUrl'] != null &&

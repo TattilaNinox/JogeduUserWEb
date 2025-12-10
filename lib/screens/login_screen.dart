@@ -360,7 +360,8 @@ class LoginScreenState extends State<LoginScreen>
                                       splashColor: Colors.transparent,
                                       child: const Wrap(
                                         alignment: WrapAlignment.center,
-                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
                                         children: [
                                           Text(
                                             'Adatvédelmi irányelvek és felhasználási feltételek',

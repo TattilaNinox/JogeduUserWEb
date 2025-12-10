@@ -76,7 +76,7 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
     ui_web.platformViewRegistry.registerViewFactory(
       _viewId,
       (int viewId) => iframeElement,
-    );
+        );
   }
 
   void _showAccessDeniedAndGoBack() {
@@ -133,17 +133,17 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
     if (htmlContentToLoad != null && htmlContentToLoad.isNotEmpty) {
       // Új iframe-et hozunk létre az új tartalommal
       _setupIframe(htmlContentToLoad);
-      
-      setState(() {
-        _noteSnapshot = snapshot;
+
+    setState(() {
+      _noteSnapshot = snapshot;
         _hasContent = true;
       });
-    } else {
+      } else {
       setState(() {
         _noteSnapshot = snapshot;
         _hasContent = false;
       });
-    }
+      }
   }
 
   void _handleQuizNavigation() {

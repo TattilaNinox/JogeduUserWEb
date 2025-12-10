@@ -90,7 +90,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
         });
         
         // Betöltjük a jegyzetek adatait
-        await _loadNotesData();
+          await _loadNotesData();
         if (!mounted) return;
         
         // Beállítjuk a state-et, hogy betöltse az iframe-et

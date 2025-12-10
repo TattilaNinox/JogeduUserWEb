@@ -486,7 +486,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         final width = constraints.maxWidth;
         if (width >= 1200) {
           return Scaffold(
-            backgroundColor: const Color.fromARGB(255, 249, 250, 251),
+            backgroundColor: const Color(0xFFF8F9FA),
             body: Row(
               children: [
                 Sidebar(
@@ -527,6 +527,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         }
 
         return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
           appBar: AppBar(
             title: const Text('Jegyzetek'),
           ),
@@ -642,7 +643,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
               showHeaderActions: false,
             ),
           ),
-          backgroundColor: const Color.fromARGB(255, 249, 250, 251),
         );
       },
     );

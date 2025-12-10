@@ -207,9 +207,9 @@ class NoteListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Modern, hivatalos színvilág
+    // Wikipedia-stílusú színvilág
     const Color cardColor = Colors.white;
-    const Color borderColor = Color(0xFFE5E7EB);
+    const Color borderColor = Color(0xFFB0D4F1); // Halvány édenkék
 
     // Ha a jegyzet zárt, halványabb színeket használunk
     final effectiveCardColor =
@@ -217,33 +217,30 @@ class NoteListTile extends StatelessWidget {
     final effectiveBorderColor =
         isLocked ? borderColor.withValues(alpha: 0.5) : borderColor;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-      child: Opacity(
-        opacity: isLocked ? 0.6 : 1.0, // Elhalványítás zárt jegyzetek esetén
-        child: Container(
-          decoration: BoxDecoration(
-            color: effectiveCardColor,
-            border: isLast
-                ? null
-                : Border(
-                    bottom: BorderSide(
-                      color: effectiveBorderColor,
-                      width: 1,
-                    ),
+    return Opacity(
+      opacity: isLocked ? 0.6 : 1.0, // Elhalványítás zárt jegyzetek esetén
+      child: Container(
+        decoration: BoxDecoration(
+          color: effectiveCardColor,
+          border: isLast
+              ? null
+              : Border(
+                  bottom: BorderSide(
+                    color: effectiveBorderColor,
+                    width: 1,
                   ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _open(context),
-              splashColor:
-                  Theme.of(context).primaryColor.withValues(alpha: 0.08),
-              highlightColor:
-                  Theme.of(context).primaryColor.withValues(alpha: 0.04),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 0, vertical: 14),
+                ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _open(context),
+            hoverColor: const Color(0xFFF8F9FA),
+            splashColor: const Color(0xFF3366CC).withValues(alpha: 0.1),
+            highlightColor: const Color(0xFF3366CC).withValues(alpha: 0.05),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final bool isNarrow = constraints.maxWidth < 520;
@@ -277,11 +274,11 @@ class NoteListTile extends StatelessWidget {
                                 child: Text(
                                   title,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w400,
                                     fontSize: 14,
-                                    color: Color(0xFF111827),
-                                    height: 1.4,
-                                    letterSpacing: -0.1,
+                                    color: Color(0xFF202122),
+                                    height: 1.5,
+                                    letterSpacing: 0,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -292,8 +289,8 @@ class NoteListTile extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 const Icon(
                                   Icons.lock_outline,
-                                  size: 18,
-                                  color: Color(0xFF9CA3AF),
+                                  size: 16,
+                                  color: Color(0xFF54595D),
                                 ),
                               ],
                             ],
@@ -311,8 +308,8 @@ class NoteListTile extends StatelessWidget {
                             children: [
                               Icon(
                                 _typeIcon(),
-                                color: const Color(0xFF6B7280),
-                                size: 18,
+                                color: const Color(0xFF54595D),
+                                size: 16,
                               ),
                               const SizedBox(width: 12),
                               titleAndMeta,
@@ -331,8 +328,8 @@ class NoteListTile extends StatelessWidget {
                       children: [
                         Icon(
                           _typeIcon(),
-                          color: const Color(0xFF6B7280),
-                          size: 18,
+                          color: const Color(0xFF54595D),
+                          size: 16,
                         ),
                         const SizedBox(width: 12),
                         // Bal oldali cím/meta
@@ -358,7 +355,6 @@ class NoteListTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
