@@ -11,6 +11,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:image/image.dart' as img;
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:async';
 import '../core/firebase_config.dart';
 
 // Top-level függvény a compute-hoz - gyorsított, egyszerűsített verzió
@@ -902,34 +903,42 @@ class _MemoriapalotaAllomasViewScreenState
       barrierDismissible: false,
       builder: (dialogContext) => PopScope(
         canPop: false, // Nem lehet bezárni
-        child: AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                _uploadPhase == 'loading'
-                    ? 'Kép betöltése...'
-                    : _uploadPhase == 'compressing'
-                        ? 'Kép tömörítése...'
-                        : _uploadPhase == 'uploading'
-                            ? 'Kép feltöltése...'
-                            : 'Feldolgozás...',
-                style: const TextStyle(fontSize: 16),
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Animált progress bar - folyamatosan mozog, még akkor is, ha a tényleges progress nem frissül
+            return AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _uploadPhase == 'loading'
+                        ? 'Kép betöltése...'
+                        : _uploadPhase == 'compressing'
+                            ? 'Kép tömörítése...'
+                            : _uploadPhase == 'uploading'
+                                ? 'Kép feltöltése...'
+                                : 'Feldolgozás...',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  // Animált progress bar - ha nincs konkrét érték, akkor automatikusan animál
+                  LinearProgressIndicator(
+                    value: _uploadProgress > 0 ? _uploadProgress : null,
+                    minHeight: 6,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _uploadProgress > 0
+                        ? '${(_uploadProgress * 100).toStringAsFixed(0)}%'
+                        : 'Feldolgozás...',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: _uploadProgress,
-                minHeight: 4,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -980,7 +989,18 @@ class _MemoriapalotaAllomasViewScreenState
     // Progress dialog megjelenítése
     _showUploadProgressDialog();
     
+    // Animált progress - folyamatosan növekszik, még akkor is, ha a tényleges művelet blokkoló
+    StreamSubscription? progressTimer;
     try {
+      double simulatedProgress = 0.0;
+      progressTimer = Stream.periodic(const Duration(milliseconds: 100), (i) {
+        simulatedProgress = (i * 0.01).clamp(0.0, 0.95); // Max 95%-ig, hogy legyen hely a tényleges progressnek
+        return simulatedProgress;
+      }).listen((progress) {
+        if (mounted && progress > _uploadProgress) {
+          _updateUploadProgress(progress, _uploadPhase);
+        }
+      });
       _updateUploadProgress(0.1, 'loading');
       debugPrint('Starting compression, original size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
       
@@ -1015,6 +1035,9 @@ class _MemoriapalotaAllomasViewScreenState
       _updateUploadProgress(1.0, 'uploading');
       debugPrint('Upload completed successfully');
       
+      // Progress timer leállítása
+      progressTimer.cancel();
+      
       // Progress dialog bezárása
       if (mounted) {
         Navigator.of(context).pop(); // Progress dialog bezárása
@@ -1036,6 +1059,10 @@ class _MemoriapalotaAllomasViewScreenState
         );
       }
     } catch (e, stackTrace) {
+      // Progress timer leállítása hiba esetén is
+      if (progressTimer != null) {
+        progressTimer.cancel();
+      }
       debugPrint('=== Hiba a képfeltöltéskor ===');
       debugPrint('Error: $e');
       debugPrint('Stack trace: $stackTrace');
