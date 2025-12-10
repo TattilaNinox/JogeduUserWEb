@@ -285,6 +285,9 @@ class _AccountScreenState extends State<AccountScreen> {
                                     width: 1,
                                   ),
                                   foregroundColor: const Color(0xFF202122),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
                                 ),
                               ),
                             ),
@@ -348,6 +351,9 @@ class _AccountScreenState extends State<AccountScreen> {
                                     width: 1,
                                   ),
                                   foregroundColor: const Color(0xFF202122),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
                                 ),
                               ),
                               ElevatedButton.icon(
@@ -358,6 +364,9 @@ class _AccountScreenState extends State<AccountScreen> {
                                   backgroundColor: const Color(0xFFDC2626),
                                   foregroundColor: Colors.white,
                                   elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
                                 ),
                               ),
                             ],
