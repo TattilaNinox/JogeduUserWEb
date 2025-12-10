@@ -123,17 +123,14 @@ class _EnhancedSubscriptionStatusCardState
     }
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: const Color(0xFFB0D4F1),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,16 +144,16 @@ class _EnhancedSubscriptionStatusCardState
                 color: _getStatusColor(),
               ),
               const SizedBox(width: 12),
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Előfizetési állapot',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: _getStatusColor(),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                        color: Color(0xFF202122),
                       ),
                     ),
                   ],
@@ -195,17 +192,14 @@ class _EnhancedSubscriptionStatusCardState
 
   Widget _buildLoadingCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: const Color(0xFFB0D4F1),
+          width: 1,
+        ),
       ),
       child: const Column(
         children: [
@@ -283,13 +277,13 @@ class _EnhancedSubscriptionStatusCardState
   Widget _buildDetailRow(String label, String value, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
+        Icon(icon, size: 16, color: const Color(0xFF54595D)),
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
+          style: const TextStyle(
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF54595D),
             fontSize: 14,
           ),
         ),
@@ -297,7 +291,7 @@ class _EnhancedSubscriptionStatusCardState
           child: Text(
             value,
             style: const TextStyle(
-              color: Color(0xFF374151),
+              color: Color(0xFF202122),
               fontSize: 14,
             ),
           ),
@@ -368,9 +362,8 @@ class _EnhancedSubscriptionStatusCardState
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        color: const Color(0xFFF8F9FA),
+        border: Border.all(color: const Color(0xFFB0D4F1), width: 1),
       ),
       child: Row(
         children: [
@@ -378,10 +371,10 @@ class _EnhancedSubscriptionStatusCardState
           InkWell(
             onTap: () => _showSubscriptionInfoDialog(context),
             borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.all(4.0),
-              child:
-                  Icon(Icons.info_outline, color: Colors.blue[700], size: 24),
+            child: const Padding(
+              padding: EdgeInsets.all(4.0),
+              child: Icon(
+                  Icons.info_outline, color: Color(0xFF2563EB), size: 20),
             ),
           ),
           const SizedBox(width: 12),
@@ -389,21 +382,21 @@ class _EnhancedSubscriptionStatusCardState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   '30 napos előfizetés',
                   style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF202122),
                     fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '$formattedPrice / 30 nap',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF202122),
                   ),
                 ),
               ],

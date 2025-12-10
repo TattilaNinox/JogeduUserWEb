@@ -550,10 +550,17 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
     final canEdit = widget.canEdit || _isAdmin;
     final isFormEditable = canEdit && _isEditing;
 
-    return Card(
-      margin: EdgeInsets.zero,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(
+          color: const Color(0xFFB0D4F1),
+          width: 1,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -575,9 +582,9 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                       Text(
                         'Szállítási cím',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E3A8A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          color: Color(0xFF202122),
                         ),
                       ),
                     ],
@@ -588,7 +595,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                       icon: const Icon(Icons.edit, size: 16),
                       label: const Text('Szerkesztes'),
                       style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF1E3A8A),
+                        foregroundColor: const Color(0xFF202122),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -867,8 +874,9 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                     ElevatedButton(
                       onPressed: _isSaving ? null : _saveAddress,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E3A8A),
+                        backgroundColor: const Color(0xFF2563EB),
                         foregroundColor: Colors.white,
+                        elevation: 0,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
@@ -908,8 +916,9 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                           style: TextStyle(fontSize: 14),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red[600],
+                          backgroundColor: const Color(0xFFDC2626),
                           foregroundColor: Colors.white,
+                          elevation: 0,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 10,
@@ -943,8 +952,9 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                       style: TextStyle(fontSize: 14),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange[600],
+                      backgroundColor: const Color(0xFFD97706),
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 10,

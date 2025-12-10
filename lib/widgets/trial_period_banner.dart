@@ -27,23 +27,26 @@ class TrialPeriodBanner extends StatelessWidget {
     final displayDays = daysLeft < 1 ? 1 : daysLeft + 1;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade200),
+        color: Colors.white,
+        border: Border.all(
+          color: const Color(0xFFB0D4F1),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: Colors.blue.shade700),
+          const Icon(Icons.info_outline, color: Color(0xFF54595D), size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Ingyenes próbaidőszakodból még $displayDays nap van hátra.',
-              style: TextStyle(
-                color: Colors.blue.shade800,
-                fontWeight: FontWeight.w500,
+              style: const TextStyle(
+                color: Color(0xFF202122),
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
               ),
             ),
           ),

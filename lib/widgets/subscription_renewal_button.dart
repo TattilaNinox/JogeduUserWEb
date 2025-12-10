@@ -168,13 +168,13 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
   Widget _buildCardButton(
       SubscriptionStatusColor statusColor, bool canRenew, String? blockReason) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _getButtonColor(statusColor).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
         border: Border.all(
-          color: _getButtonColor(statusColor).withValues(alpha: 0.3),
-          width: 2,
+          color: const Color(0xFFB0D4F1),
+          width: 1,
         ),
       ),
       child: Column(
@@ -187,19 +187,19 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
           const SizedBox(height: 16),
           Text(
             _getButtonTitle(statusColor),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: _getButtonColor(statusColor),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF202122),
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             _getButtonDescription(statusColor),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: Color(0xFF54595D),
             ),
             textAlign: TextAlign.center,
           ),
@@ -234,6 +234,7 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _getButtonColor(statusColor),
           foregroundColor: Colors.white,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
         ),
         child: const Row(
@@ -267,9 +268,10 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _getButtonColor(statusColor),
           foregroundColor: Colors.white,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-          disabledBackgroundColor: Colors.grey[400],
-          disabledForegroundColor: Colors.grey[600],
+          disabledBackgroundColor: const Color(0xFF9CA3AF),
+          disabledForegroundColor: const Color(0xFF6B7280),
         ),
       ),
     );

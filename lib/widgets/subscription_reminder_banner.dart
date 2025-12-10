@@ -88,17 +88,13 @@ class _SubscriptionReminderBannerState
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
       decoration: BoxDecoration(
-        color: _getBannerColor(),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: _getBannerColor().withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.white,
+        border: Border.all(
+          color: const Color(0xFFB0D4F1),
+          width: 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -106,15 +102,15 @@ class _SubscriptionReminderBannerState
           onTap: _statusColor == SubscriptionStatusColor.expired
               ? widget.onRenewPressed
               : null,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.zero,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Row(
               children: [
                 Icon(
                   _getBannerIcon(),
-                  color: _getBannerTextColor(),
-                  size: 24,
+                  color: const Color(0xFF54595D),
+                  size: 20,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -123,17 +119,17 @@ class _SubscriptionReminderBannerState
                     children: [
                       Text(
                         _getBannerTitle(),
-                        style: TextStyle(
-                          color: _getBannerTextColor(),
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        style: const TextStyle(
+                          color: Color(0xFF202122),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         _getBannerMessage(),
-                        style: TextStyle(
-                          color: _getBannerTextColor().withValues(alpha: 0.9),
+                        style: const TextStyle(
+                          color: Color(0xFF54595D),
                           fontSize: 14,
                         ),
                       ),
@@ -145,20 +141,17 @@ class _SubscriptionReminderBannerState
                   ElevatedButton(
                     onPressed: widget.onRenewPressed,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: _getBannerColor(),
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
                     ),
                     child: const Text(
                       'Megújítás',
                       style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -171,9 +164,9 @@ class _SubscriptionReminderBannerState
                     });
                     widget.onDismissed?.call();
                   },
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.close,
-                    color: _getBannerTextColor().withValues(alpha: 0.7),
+                    color: Color(0xFF54595D),
                     size: 20,
                   ),
                 ),
@@ -183,24 +176,6 @@ class _SubscriptionReminderBannerState
         ),
       ),
     );
-  }
-
-  Color _getBannerColor() {
-    switch (_statusColor) {
-      case SubscriptionStatusColor.free:
-        return Colors.blue;
-      case SubscriptionStatusColor.premium:
-        return Colors.green;
-      case SubscriptionStatusColor.warning:
-        return Colors
-            .lightBlue[600]!; // Világos kék a hamarosan lejáró előfizetéshez
-      case SubscriptionStatusColor.expired:
-        return Colors.deepOrange[600]!; // Barátságosabb narancs árnyalat
-    }
-  }
-
-  Color _getBannerTextColor() {
-    return Colors.white;
   }
 
   IconData _getBannerIcon() {

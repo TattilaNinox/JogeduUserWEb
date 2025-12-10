@@ -471,9 +471,9 @@ class _CategorySectionState extends State<_CategorySection> {
           docs: docsAtThisLevel,
           selectedTag: selectedTag,
           hasPremiumAccess: hasPremiumAccess,
-          children: childWidget,
           isFirst: isFirst,
           isLast: isLast,
+          children: childWidget,
         ));
       }
     }
