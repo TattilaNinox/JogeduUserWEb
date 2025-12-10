@@ -409,6 +409,8 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
         backgroundColor: const Color(0xFF1E3A8A),
         foregroundColor: Colors.white,

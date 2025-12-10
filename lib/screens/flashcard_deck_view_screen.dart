@@ -262,30 +262,16 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: isMobile ? 16 : 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (flashcards.isNotEmpty) ...[
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.school,
-                      color: Color(0xFF1E3A8A), // Bíborkék
-                    ),
-                    tooltip: 'Tanulás',
-                    onPressed: () {
-                      context.go('/deck/${widget.deckId}/study');
-                    },
-                  ),
-                ],
-              ],
+            title: Text(
+              title,
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 18,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
+              maxLines: isMobile ? null : 2,
+              textAlign: TextAlign.center,
+              softWrap: true,
             ),
             backgroundColor: Colors.white,
             elevation: 1,
@@ -317,6 +303,19 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
                 context.go(uri.toString());
               },
             ),
+            actions: [
+              if (flashcards.isNotEmpty)
+                IconButton(
+                  icon: const Icon(
+                    Icons.school,
+                    color: Color(0xFF1E3A8A), // Bíborkék
+                  ),
+                  tooltip: 'Tanulás',
+                  onPressed: () {
+                    context.go('/deck/${widget.deckId}/study');
+                  },
+                ),
+            ],
           ),
           body: Row(
             children: [
@@ -332,30 +331,16 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
 
       return Scaffold(
         appBar: AppBar(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: isMobile ? 16 : 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (flashcards.isNotEmpty) ...[
-                const SizedBox(width: 16),
-                IconButton(
-                  icon: const Icon(
-                    Icons.school,
-                    color: Color(0xFF1E3A8A), // Bíborkék
-                  ),
-                  tooltip: 'Tanulás',
-                  onPressed: () {
-                    context.go('/deck/${widget.deckId}/study');
-                  },
-                ),
-              ],
-            ],
+          title: Text(
+            title,
+            style: TextStyle(
+              fontSize: isMobile ? 16 : 18,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
+            maxLines: isMobile ? null : 2,
+            textAlign: TextAlign.center,
+            softWrap: true,
           ),
           backgroundColor: Colors.white,
           elevation: 1,
@@ -387,6 +372,19 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
               context.go(uri.toString());
             },
           ),
+          actions: [
+            if (flashcards.isNotEmpty)
+              IconButton(
+                icon: const Icon(
+                  Icons.school,
+                  color: Color(0xFF1E3A8A), // Bíborkék
+                ),
+                tooltip: 'Tanulás',
+                onPressed: () {
+                  context.go('/deck/${widget.deckId}/study');
+                },
+              ),
+          ],
         ),
         drawer: const Drawer(
           child: SafeArea(
