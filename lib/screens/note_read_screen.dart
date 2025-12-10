@@ -84,30 +84,104 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           body {
             color: #202122 !important;
             background-color: #ffffff !important;
-            font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif !important;
-            font-size: 16px !important;
+            font-family: Verdana, sans-serif !important;
+            font-size: 13px !important;
             line-height: 1.6 !important;
             padding: 16px !important;
             margin: 0 !important;
+            text-align: justify !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            letter-spacing: 0.3px !important;
           }
           p, div, span, li, td, th {
             color: #202122 !important;
+            text-align: justify !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            letter-spacing: 0.3px !important;
           }
           h1, h2, h3, h4, h5, h6 {
             color: #202122 !important;
             font-weight: 600 !important;
+            text-align: left !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            letter-spacing: 0.3px !important;
           }
           * {
             color: inherit !important;
           }
         </style>
         ''';
-        styledHtmlContent = cssStyle + htmlContent;
+        // Hozzáadjuk a lang="hu" attribútumot az html vagy body taghez magyar szóelválasztáshoz
+        String htmlWithLang = htmlContent;
+        if (htmlContent.toLowerCase().contains('<html')) {
+          // Ha van html tag, hozzáadjuk a lang attribútumot
+          htmlWithLang = htmlContent.replaceAllMapped(
+            RegExp(r'<html([^>]*)>', caseSensitive: false),
+            (match) {
+              final attrs = match.group(1) ?? '';
+              if (attrs.toLowerCase().contains('lang=')) {
+                return match.group(0)!; // Ha már van lang, nem módosítjuk
+              }
+              return '<html lang="hu"$attrs>';
+            },
+          );
+          // Ha van body tag is, annak is adjuk hozzá
+          if (htmlWithLang.toLowerCase().contains('<body')) {
+            htmlWithLang = htmlWithLang.replaceAllMapped(
+              RegExp(r'<body([^>]*)>', caseSensitive: false),
+              (match) {
+                final attrs = match.group(1) ?? '';
+                if (attrs.toLowerCase().contains('lang=')) {
+                  return match.group(0)!;
+                }
+                return '<body lang="hu"$attrs>';
+              },
+            );
+          }
+        } else if (htmlContent.toLowerCase().contains('<body')) {
+          // Ha nincs html tag, de van body, akkor html taget is hozzáadunk
+          htmlWithLang = htmlContent.replaceAllMapped(
+            RegExp(r'<body([^>]*)>', caseSensitive: false),
+            (match) {
+              final attrs = match.group(1) ?? '';
+              if (attrs.toLowerCase().contains('lang=')) {
+                return match.group(0)!;
+              }
+              return '<body lang="hu"$attrs>';
+            },
+          );
+          htmlWithLang = '<html lang="hu">$htmlWithLang</html>';
+        } else {
+          // Ha nincs html vagy body tag, hozzáadjuk mindkettőt lang attribútummal
+          htmlWithLang = '<html lang="hu"><body lang="hu">$htmlContent</body></html>';
+        }
+        styledHtmlContent = cssStyle + htmlWithLang;
       } else {
-        // Ha már van style tag, hozzáadjuk a body stílust
-        styledHtmlContent = htmlContent.replaceAll(
+        // Ha már van style tag, hozzáadjuk a body stílust és az html lang attribútumot
+        String htmlWithLang = htmlContent;
+        // Hozzáadjuk a lang attribútumot az html taghez
+        if (htmlContent.toLowerCase().contains('<html')) {
+          htmlWithLang = htmlContent.replaceAllMapped(
+            RegExp(r'<html([^>]*)>', caseSensitive: false),
+            (match) {
+              final attrs = match.group(1) ?? '';
+              if (attrs.toLowerCase().contains('lang=')) {
+                return match.group(0)!;
+              }
+              return '<html lang="hu"$attrs>';
+            },
+          );
+        } else {
+          // Ha nincs html tag, hozzáadjuk
+          htmlWithLang = '<html lang="hu">$htmlContent</html>';
+        }
+        // Hozzáadjuk a body stílust és lang attribútumot
+        styledHtmlContent = htmlWithLang.replaceAll(
           RegExp(r'<body[^>]*>', caseSensitive: false),
-          '<body style="color: #202122 !important; background-color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif !important; font-size: 16px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important;">',
+          '<body lang="hu" style="color: #202122 !important; background-color: #ffffff !important; font-family: Verdana, sans-serif !important; font-size: 13px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important; text-align: justify !important; overflow-wrap: break-word !important; word-break: break-word !important; letter-spacing: 0.3px !important;">',
         );
       }
       
@@ -205,8 +279,8 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
                         child: Text(
                           'Ez a jegyzet nem tartalmaz tartalmat.',
                           style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
                       ),
-                ),
               ),
             ),
             if (data['audioUrl'] != null &&
