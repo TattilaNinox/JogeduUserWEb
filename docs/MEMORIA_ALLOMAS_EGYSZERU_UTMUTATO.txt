@@ -1,0 +1,224 @@
+================================================================================
+MEMÓRIAÁLLOMÁS MEGJELENÍTÉSE - EGYSZERŰ LÉPÉSRŐL LÉPÉSRE ÚTMUTATÓ
+================================================================================
+
+Ez az útmutató lépésről lépésre vezeti végig, hogyan kell megjeleníteni
+a memóriaállomás tartalmát a másik Flutter webalkalmazásban.
+
+================================================================================
+LÉPÉS 1: IMPORT-OK HOZZÁADÁSA
+================================================================================
+
+Nyisd meg azt a fájlt, ahol meg szeretnéd jeleníteni az állomás tartalmát.
+A fájl tetején, az import szekcióban add hozzá ezeket:
+
+import 'package:web/web.dart' as web;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui_web' as ui_web;
+
+(Valószínűleg már van: import 'package:flutter/material.dart';)
+
+================================================================================
+LÉPÉS 2: METÓDUS HOZZÁADÁSA
+================================================================================
+
+A State osztályodban (pl. _MyScreenState) add hozzá ezt a metódust:
+
+void _showAllomasPreview(String cim, String kulcsszo, String tartalom, {int? sorszam}) {
+  if (!kIsWeb) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text(cim, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: SingleChildScrollView(child: Text(tartalom, style: const TextStyle(fontSize: 13, height: 1.5))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
+  final previewViewId = 'allomas-preview-iframe-${DateTime.now().millisecondsSinceEpoch}';
+  final previewIframeElement = web.HTMLIFrameElement()
+    ..style.width = '100%'
+    ..style.height = '100%'
+    ..style.border = 'none';
+
+  String badgeClass = '';
+  if (sorszam != null && sorszam > 0) {
+    final badgeNumber = sorszam > 11 ? ((sorszam - 1) % 11) + 1 : sorszam;
+    badgeClass = 'badge-$badgeNumber';
+  }
+
+  final fullHtml = '''
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; text-align: justify; hyphens: auto; padding: 2em; word-wrap: break-word; max-width: 900px; margin: 0 auto; color: #333; }
+    h1 { font-size: 1.6em; text-align: center; border-bottom: 2px solid #333; padding-bottom: 0.5em; margin-bottom: 1.5em; }
+    h2 { font-size: 1.3em; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 2em; color: #2c3e50; }
+    h3 { font-size: 1.1em; margin-top: 1.2em; font-weight: 600; }
+    p { margin-bottom: 0.8em; }
+    ul, ol { padding-left: 20px; margin-bottom: 1em; }
+    li { margin-bottom: 0.5em; }
+    .allomas-badge { display: inline-block; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; vertical-align: middle; font-weight: bold; min-width: 20px; text-align: center; }
+    .badge-1 { background-color: #D32F2F; } .badge-2 { background-color: #1976D2; } .badge-3 { background-color: #388E3C; }
+    .badge-4 { background-color: #E64A19; } .badge-5 { background-color: #7B1FA2; } .badge-6 { background-color: #0097A7; }
+    .badge-7 { background-color: #C2185B; } .badge-8 { background-color: #5D4037; } .badge-9 { background-color: #FBC02D; color: #333; }
+    .badge-10 { background-color: #455A64; } .badge-11 { background-color: #303F9F; }
+    .kulcsszo { font-style: italic; color: #555; margin-bottom: 1em; display: block; border-left: 3px solid #ccc; padding-left: 10px; }
+    .szin-piros { color: #D32F2F; font-weight: bold; }
+    .szin-zold { color: #388E3C; font-weight: bold; }
+    .szin-kek { color: #1976D2; font-weight: bold; }
+    .hatter-sarga { background-color: #FFF59D; padding: 0.1em 0.3em; border-radius: 3px; }
+    strong { font-weight: bold; }
+    .jogszabaly-doboz { background-color: #f0f4f8; border-left: 4px solid #2c3e50; padding: 10px 15px; margin: 15px 0; font-style: italic; font-size: 0.95em; color: #444; }
+    .jogszabaly-cimke { font-weight: bold; font-style: normal; display: block; margin-bottom: 5px; color: #2c3e50; font-size: 0.9em; text-transform: uppercase; }
+    @media screen and (max-width: 768px) { body { padding: 1em; } }
+  </style>
+</head>
+<body>
+  <h2>${sorszam != null && sorszam > 0 ? '<span class="allomas-badge $badgeClass">$sorszam.</span>' : ''}$cim</h2>
+  ${kulcsszo.isNotEmpty ? '<span class="kulcsszo">Kulcsszó: $kulcsszo</span>' : ''}
+  $tartalom
+</body>
+</html>
+''';
+
+  previewIframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(fullHtml)}';
+
+  ui_web.platformViewRegistry.registerViewFactory(
+    previewViewId,
+    (int viewId) => previewIframeElement,
+  );
+
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.85,
+        height: MediaQuery.of(context).size.height * 0.85,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text(cim, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+              ],
+            ),
+            const Divider(),
+            Expanded(child: HtmlElementView(viewType: previewViewId)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+================================================================================
+LÉPÉS 3: METÓDUS HÍVÁSA
+================================================================================
+
+Most már hívhatod a metódust bárhonnan, ahol van hozzáférésed az adatokhoz.
+
+Példa ListTile-ban:
+
+ListTile(
+  title: Text(allomasData['cim']),
+  onTap: () {
+    _showAllomasPreview(
+      allomasData['cim'] as String,
+      allomasData['kulcsszo'] as String? ?? '',
+      allomasData['tartalom'] as String,
+      sorszam: allomasData['sorszam'] as int?,
+    );
+  },
+)
+
+VAGY gombon:
+
+ElevatedButton(
+  onPressed: () {
+    _showAllomasPreview(
+      'Cím',
+      'kulcsszó',
+      '<p>Tartalom</p>',
+      sorszam: 1,
+    );
+  },
+  child: Text('Megjelenítés'),
+)
+
+================================================================================
+LÉPÉS 4: TESZTELÉS
+================================================================================
+
+1. Mentsd el a fájlt
+2. Futtasd az alkalmazást: flutter run -d chrome
+3. Kattints rá egy állomásra vagy gombra
+4. Ellenőrizd, hogy megjelenik-e a dialog
+5. Ellenőrizd, hogy a tartalom helyesen formázott-e
+
+================================================================================
+PROBLÉMÁK ESETÉN
+================================================================================
+
+Ha hibát kapsz:
+
+1. "The name 'HtmlElementView' isn't defined"
+   → Ellenőrizd, hogy van-e: import 'package:flutter/widgets.dart';
+
+2. "The name 'web' isn't defined"
+   → Ellenőrizd, hogy van-e: import 'package:web/web.dart' as web;
+
+3. "The name 'ui_web' isn't defined"
+   → Ellenőrizd, hogy van-e: import 'dart:ui_web' as ui_web;
+
+4. Az iframe üres
+   → Ellenőrizd a böngésző konzolt (F12)
+   → Ellenőrizd, hogy a registerViewFactory-t AZ iframe src UTÁN hívod-e meg
+
+5. A CSS nem működik
+   → Ellenőrizd, hogy a CSS pontosan ugyanaz, mint a fenti példában
+   → Ne módosítsd a CSS-t!
+
+================================================================================
+FONTOS TUDNIVALÓK
+================================================================================
+
+✓ A CSS-t NE módosítsd! Pontosan ugyanaz kell legyen, mint a fenti példában.
+✓ A badge színezés automatikus (1-11, majd újra kezdődik).
+✓ A tartalom HTML formátumú, és tartalmazhat CSS osztályokat.
+✓ Mindig egyedi view ID-t generálj (DateTime.now().millisecondsSinceEpoch).
+✓ Mindig kódold a HTML-t Uri.encodeComponent()-tel.
+
+================================================================================
+KÉSZ!
+================================================================================
+
+Ha ezeket a lépéseket követed, működnie kellene. Ha még mindig nem működik,
+küldd el a pontos hibaüzenetet, és segítek!
+

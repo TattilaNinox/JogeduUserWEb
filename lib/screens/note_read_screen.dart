@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
 import 'dart:ui_web' as ui_web;
+import 'dart:html' as html;
+import 'dart:convert' as convert;
 import '../widgets/audio_preview_player.dart';
 import '../utils/filter_storage.dart';
 
@@ -32,24 +34,35 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
   }
 
   Future<void> _loadNote() async {
+    debugPrint('🔵 [_loadNote] START - noteId: ${widget.noteId}');
+    
     final snapshot = await FirebaseFirestore.instance
         .collection('notes')
         .doc(widget.noteId)
         .get();
 
-    if (!mounted) return;
+    if (!mounted) {
+      debugPrint('🔴 [_loadNote] NOT MOUNTED - returning');
+      return;
+    }
 
     final data = snapshot.data();
     String? htmlContent;
     if (data != null) {
-    final pages = data['pages'] as List<dynamic>? ?? [];
-    if (pages.isNotEmpty) {
+      final pages = data['pages'] as List<dynamic>? ?? [];
+      debugPrint('🔵 [_loadNote] Pages count: ${pages.length}');
+      if (pages.isNotEmpty) {
         htmlContent = pages[_currentPageIndex] as String? ?? '';
+        debugPrint('🔵 [_loadNote] HTML content length: ${htmlContent.length}');
+        debugPrint('🔵 [_loadNote] HTML preview (first 1000 chars): ${htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent}');
       }
     }
     
     if (htmlContent != null && htmlContent.isNotEmpty) {
+      debugPrint('🟢 [_loadNote] Calling _setupIframe');
       _setupIframe(htmlContent);
+    } else {
+      debugPrint('🔴 [_loadNote] No HTML content - NOT calling _setupIframe');
     }
     
     setState(() {
@@ -59,8 +72,59 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
   }
 
   void _setupIframe(String htmlContent) {
+    debugPrint('🟢 [_setupIframe] START - HTML length: ${htmlContent.length}');
+    // #region agent log
+    try {
+      html.HttpRequest.request(
+        'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
+        method: 'POST',
+        requestHeaders: {'Content-Type': 'application/json'},
+        sendData: convert.jsonEncode({
+          'location': 'note_read_screen.dart:61',
+          'message': '_setupIframe called',
+          'data': {
+            'htmlLength': htmlContent.length,
+            'hasStyleTag': htmlContent.toLowerCase().contains('<style'),
+            'htmlPreview': htmlContent.length > 500 ? htmlContent.substring(0, 500) : htmlContent,
+          },
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'sessionId': 'debug-session',
+          'runId': 'run1',
+          'hypothesisId': 'A',
+        }),
+      ).then((_) {}, onError: (_) {});
+    } catch (_) {}
+    // #endregion
+    
     // Minden alkalommal új view ID-t generálunk, amikor a tartalom változik
     _viewId = 'note-read-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
+    
+    // #region agent log
+    try {
+      html.HttpRequest.request(
+        'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
+        method: 'POST',
+        requestHeaders: {'Content-Type': 'application/json'},
+        sendData: convert.jsonEncode({
+          'location': 'note_read_screen.dart:65',
+          'message': 'HTML content analysis',
+          'data': {
+            'containsKulcsszo': htmlContent.toLowerCase().contains('kulcsszo'),
+            'containsJogszabaly': htmlContent.toLowerCase().contains('jogszabaly'),
+            'containsSzekcio': htmlContent.toLowerCase().contains('szekcio'),
+            'containsSectionNumber': RegExp(r'<span[^>]*style[^>]*background[^>]*>', caseSensitive: false).hasMatch(htmlContent),
+            'hasKulcsszoClass': htmlContent.contains('class') && htmlContent.contains('kulcsszo'),
+            'hasJogszabalyClass': htmlContent.contains('class') && htmlContent.contains('jogszabaly-doboz'),
+            'hasSzekcioClass': htmlContent.contains('class') && (htmlContent.contains('szekcio-piros') || htmlContent.contains('szekcio-kek')),
+          },
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'sessionId': 'debug-session',
+          'runId': 'run1',
+          'hypothesisId': 'B',
+        }),
+      ).then((_) {}, onError: (_) {});
+    } catch (_) {}
+    // #endregion
     
     // Iframe elem létrehozása
     final iframeElement = web.HTMLIFrameElement()
@@ -76,11 +140,41 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
     // HTML tartalom CSS-szel ellátva - sötét szöveg, jól olvasható mobil eszközön is
     String styledHtmlContent = htmlContent;
     if (htmlContent.isNotEmpty) {
+      // #region agent log
+      try {
+        html.HttpRequest.request(
+          'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
+          method: 'POST',
+          requestHeaders: {'Content-Type': 'application/json'},
+          sendData: convert.jsonEncode({
+            'location': 'note_read_screen.dart:78',
+            'message': 'Before CSS processing',
+            'data': {
+              'hasStyleTag': htmlContent.toLowerCase().contains('<style'),
+              'htmlSample': htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent,
+            },
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+            'sessionId': 'debug-session',
+            'runId': 'run1',
+            'hypothesisId': 'C',
+          }),
+        ).then((_) {}, onError: (_) {});
+      } catch (_) {}
+      // #endregion
+      
       // Ellenőrizzük, hogy van-e már <style> tag
       if (!htmlContent.toLowerCase().contains('<style')) {
         // CSS hozzáadása a szöveg sötét színéhez és olvashatóságához
         const cssStyle = '''
         <style>
+          * {
+            box-sizing: border-box;
+          }
+          /* Teszt stílus - ha ez látszik, akkor a CSS betöltődik */
+          body::before {
+            content: "CSS loaded" !important;
+            display: none !important;
+          }
           body {
             color: #202122 !important;
             background-color: #ffffff !important;
@@ -108,9 +202,205 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             overflow-wrap: break-word !important;
             word-break: break-word !important;
             letter-spacing: 0.3px !important;
+            margin-top: 1.5em !important;
+            margin-bottom: 0.5em !important;
           }
-          * {
-            color: inherit !important;
+          h1 {
+            font-size: 24px !important;
+          }
+          h2 {
+            font-size: 20px !important;
+          }
+          h3 {
+            font-size: 18px !important;
+          }
+          /* UNIVERZÁLIS SZELEKTOROK - Szekció számok színes dobozokban - piros */
+          /* Minden lehetséges kombinációt kezelünk */
+          span[style*="#dc3545"],
+          span[style*="220, 53, 69"],
+          span[style*="rgb(220"],
+          span[style*="rgba(220"],
+          div[style*="#dc3545"],
+          div[style*="220, 53, 69"],
+          div[style*="rgb(220"],
+          div[style*="rgba(220"],
+          span[style*="background-color: #dc3545"],
+          span[style*="background-color:rgb(220, 53, 69)"],
+          span[style*="background-color: rgb(220, 53, 69)"],
+          span[style*="background-color:#dc3545"],
+          div[style*="background-color: #dc3545"],
+          div[style*="background-color:rgb(220, 53, 69)"],
+          div[style*="background-color: rgb(220, 53, 69)"],
+          div[style*="background-color:#dc3545"],
+          .szekcio-piros,
+          [class*="szekcio"][class*="piros"] {
+            display: inline-block !important;
+            background-color: #dc3545 !important;
+            color: white !important;
+            padding: 4px 10px !important;
+            border-radius: 4px !important;
+            font-weight: bold !important;
+            margin-right: 8px !important;
+            font-size: 14px !important;
+            min-width: 32px !important;
+            text-align: center !important;
+          }
+          /* Szekció számok színes dobozokban - kék */
+          span[style*="background-color: #1976d2"],
+          span[style*="background-color:rgb(25, 118, 210)"],
+          span[style*="background-color: rgb(25, 118, 210)"],
+          span[style*="background-color:#1976d2"],
+          div[style*="background-color: #1976d2"],
+          div[style*="background-color:rgb(25, 118, 210)"],
+          div[style*="background-color: rgb(25, 118, 210)"],
+          div[style*="background-color:#1976d2"],
+          .szekcio-kek,
+          [class*="szekcio"][class*="kek"] {
+            display: inline-block !important;
+            background-color: #1976d2 !important;
+            color: white !important;
+            padding: 4px 10px !important;
+            border-radius: 4px !important;
+            font-weight: bold !important;
+            margin-right: 8px !important;
+            font-size: 14px !important;
+            min-width: 32px !important;
+            text-align: center !important;
+          }
+          /* Kulcsszavak */
+          .kulcsszo,
+          [class*="kulcsszo"],
+          div.kulcsszo,
+          span.kulcsszo {
+            display: inline-block !important;
+            background-color: #e3f2fd !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            font-weight: 500 !important;
+            margin-bottom: 10px !important;
+            color: #1976d2 !important;
+          }
+          /* Színezés */
+          .szin-kek {
+            color: #1976d2 !important;
+            font-weight: 500 !important;
+          }
+          .szin-zold {
+            color: #388e3c !important;
+            font-weight: 500 !important;
+          }
+          .hatter-sarga {
+            background-color: #fff9c4 !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+          }
+          /* Idézet dobozok */
+          .jogszabaly-doboz,
+          [class*="jogszabaly-doboz"],
+          [class*="jogszabaly"],
+          div[style*="background-color: #f5f5f5"],
+          div[style*="background-color:#f5f5f5"],
+          div[style*="background-color: rgb(245, 245, 245)"],
+          div[style*="background-color:rgb(245, 245, 245)"] {
+            background-color: #f5f5f5 !important;
+            border-left: 4px solid #1976d2 !important;
+            padding: 12px !important;
+            margin: 16px 0 !important;
+            border-radius: 4px !important;
+          }
+          .jogszabaly-cimke,
+          [class*="jogszabaly-cimke"] {
+            font-weight: bold !important;
+            color: #1976d2 !important;
+            display: block !important;
+            margin-bottom: 8px !important;
+          }
+          /* Listák */
+          ul, ol {
+            margin-bottom: 12px !important;
+            padding-left: 24px !important;
+          }
+          li {
+            margin-bottom: 6px !important;
+          }
+          /* Táblázatok */
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            margin-bottom: 16px !important;
+          }
+          table, th, td {
+            border: 1px solid #ddd !important;
+          }
+          th, td {
+            padding: 8px !important;
+            text-align: left !important;
+          }
+          /* Képek */
+          img {
+            max-width: 100% !important;
+            height: auto !important;
+          }
+          /* Reszponzív stílusok */
+          @media (max-width: 768px) {
+            body {
+              font-size: 13px !important;
+              padding: 12px !important;
+            }
+            h1 {
+              font-size: 20px !important;
+            }
+            h2 {
+              font-size: 18px !important;
+            }
+            h3 {
+              font-size: 16px !important;
+            }
+            .jogszabaly-doboz {
+              padding: 10px !important;
+              margin: 12px 0 !important;
+            }
+            ul, ol {
+              padding-left: 20px !important;
+            }
+            table {
+              font-size: 12px !important;
+            }
+            th, td {
+              padding: 6px !important;
+            }
+          }
+          @media (max-width: 480px) {
+            body {
+              font-size: 12px !important;
+              padding: 10px !important;
+            }
+            h1 {
+              font-size: 18px !important;
+            }
+            h2 {
+              font-size: 16px !important;
+            }
+            h3 {
+              font-size: 14px !important;
+            }
+            .kulcsszo {
+              padding: 3px 6px !important;
+              font-size: 11px !important;
+            }
+            .jogszabaly-doboz {
+              padding: 8px !important;
+              margin: 10px 0 !important;
+            }
+            ul, ol {
+              padding-left: 18px !important;
+            }
+            table {
+              font-size: 11px !important;
+            }
+            th, td {
+              padding: 4px !important;
+            }
           }
         </style>
         ''';
@@ -159,8 +449,51 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           htmlWithLang = '<html lang="hu"><body lang="hu">$htmlContent</body></html>';
         }
         styledHtmlContent = cssStyle + htmlWithLang;
+        
+        // #region agent log
+        try {
+          html.HttpRequest.request(
+            'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
+            method: 'POST',
+            requestHeaders: {'Content-Type': 'application/json'},
+            sendData: convert.jsonEncode({
+              'location': 'note_read_screen.dart:324',
+              'message': 'After CSS added (no existing style tag)',
+              'data': {
+                'finalHtmlLength': styledHtmlContent.length,
+                'cssAdded': true,
+              },
+              'timestamp': DateTime.now().millisecondsSinceEpoch,
+              'sessionId': 'debug-session',
+              'runId': 'run1',
+              'hypothesisId': 'D',
+            }),
+          ).then((_) {}, onError: (_) {});
+        } catch (_) {}
+        // #endregion
       } else {
         // Ha már van style tag, hozzáadjuk a body stílust és az html lang attribútumot
+        
+        // #region agent log
+        try {
+          html.HttpRequest.request(
+            'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
+            method: 'POST',
+            requestHeaders: {'Content-Type': 'application/json'},
+            sendData: convert.jsonEncode({
+              'location': 'note_read_screen.dart:326',
+              'message': 'Existing style tag found',
+              'data': {
+                'htmlSample': htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent,
+              },
+              'timestamp': DateTime.now().millisecondsSinceEpoch,
+              'sessionId': 'debug-session',
+              'runId': 'run1',
+              'hypothesisId': 'E',
+            }),
+          ).then((_) {}, onError: (_) {});
+        } catch (_) {}
+        // #endregion
         String htmlWithLang = htmlContent;
         // Hozzáadjuk a lang attribútumot az html taghez
         if (htmlContent.toLowerCase().contains('<html')) {
@@ -179,13 +512,148 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           htmlWithLang = '<html lang="hu">$htmlContent</html>';
         }
         // Hozzáadjuk a body stílust és lang attribútumot
-        styledHtmlContent = htmlWithLang.replaceAll(
+        htmlWithLang = htmlWithLang.replaceAll(
           RegExp(r'<body[^>]*>', caseSensitive: false),
           '<body lang="hu" style="color: #202122 !important; background-color: #ffffff !important; font-family: Verdana, sans-serif !important; font-size: 13px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important; text-align: justify !important; overflow-wrap: break-word !important; word-break: break-word !important; letter-spacing: 0.3px !important;">',
         );
+        
+        // Hozzáadjuk a hiányzó CSS stílusokat a meglévő style tag után
+        const additionalCss = '''
+          /* Szekció számok színes dobozokban - piros */
+          span[style*="background-color: #dc3545"],
+          span[style*="background-color:rgb(220, 53, 69)"],
+          span[style*="background-color: rgb(220, 53, 69)"],
+          span[style*="background-color:#dc3545"],
+          div[style*="background-color: #dc3545"],
+          div[style*="background-color:rgb(220, 53, 69)"],
+          div[style*="background-color: rgb(220, 53, 69)"],
+          div[style*="background-color:#dc3545"],
+          .szekcio-piros,
+          [class*="szekcio"][class*="piros"] {
+            display: inline-block !important;
+            background-color: #dc3545 !important;
+            color: white !important;
+            padding: 4px 10px !important;
+            border-radius: 4px !important;
+            font-weight: bold !important;
+            margin-right: 8px !important;
+            font-size: 14px !important;
+            min-width: 32px !important;
+            text-align: center !important;
+          }
+          /* Szekció számok színes dobozokban - kék */
+          span[style*="background-color: #1976d2"],
+          span[style*="background-color:rgb(25, 118, 210)"],
+          span[style*="background-color: rgb(25, 118, 210)"],
+          span[style*="background-color:#1976d2"],
+          div[style*="background-color: #1976d2"],
+          div[style*="background-color:rgb(25, 118, 210)"],
+          div[style*="background-color: rgb(25, 118, 210)"],
+          div[style*="background-color:#1976d2"],
+          .szekcio-kek,
+          [class*="szekcio"][class*="kek"] {
+            display: inline-block !important;
+            background-color: #1976d2 !important;
+            color: white !important;
+            padding: 4px 10px !important;
+            border-radius: 4px !important;
+            font-weight: bold !important;
+            margin-right: 8px !important;
+            font-size: 14px !important;
+            min-width: 32px !important;
+            text-align: center !important;
+          }
+          /* Kulcsszavak */
+          .kulcsszo,
+          [class*="kulcsszo"],
+          div.kulcsszo,
+          span.kulcsszo {
+            display: inline-block !important;
+            background-color: #e3f2fd !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            font-weight: 500 !important;
+            margin-bottom: 10px !important;
+            color: #1976d2 !important;
+          }
+          /* Színezés */
+          .szin-kek {
+            color: #1976d2 !important;
+            font-weight: 500 !important;
+          }
+          .szin-zold {
+            color: #388e3c !important;
+            font-weight: 500 !important;
+          }
+          .hatter-sarga {
+            background-color: #fff9c4 !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+          }
+          /* Idézet dobozok */
+          .jogszabaly-doboz,
+          [class*="jogszabaly-doboz"],
+          [class*="jogszabaly"],
+          div[style*="background-color: #f5f5f5"],
+          div[style*="background-color:#f5f5f5"],
+          div[style*="background-color: rgb(245, 245, 245)"],
+          div[style*="background-color:rgb(245, 245, 245)"] {
+            background-color: #f5f5f5 !important;
+            border-left: 4px solid #1976d2 !important;
+            padding: 12px !important;
+            margin: 16px 0 !important;
+            border-radius: 4px !important;
+          }
+          .jogszabaly-cimke,
+          [class*="jogszabaly-cimke"] {
+            font-weight: bold !important;
+            color: #1976d2 !important;
+            display: block !important;
+            margin-bottom: 8px !important;
+          }
+        ''';
+        
+        // Hozzáadjuk a CSS-t a meglévő </style> tag elé
+        if (htmlWithLang.toLowerCase().contains('</style>')) {
+          styledHtmlContent = htmlWithLang.replaceAll(
+            RegExp(r'</style>', caseSensitive: false),
+            '$additionalCss</style>',
+          );
+        } else {
+          // Ha nincs </style> tag, hozzáadjuk a head végéhez
+          if (htmlWithLang.toLowerCase().contains('</head>')) {
+            styledHtmlContent = htmlWithLang.replaceAll(
+              RegExp(r'</head>', caseSensitive: false),
+              '<style>$additionalCss</style></head>',
+            );
+          } else {
+            // Ha nincs head tag sem, hozzáadjuk a html elejéhez
+            styledHtmlContent = htmlWithLang.replaceAll(
+              RegExp(r'<html[^>]*>', caseSensitive: false),
+              '<html lang="hu"><head><style>$additionalCss</style></head>',
+            );
+          }
+        }
       }
       
       iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(styledHtmlContent)}';
+      
+      // #region agent log - HTML tartalom konzolba írása
+      debugPrint('=== HTML CONTENT DEBUG ===');
+      debugPrint('HTML Length: ${htmlContent.length}');
+      debugPrint('HTML Preview (first 3000 chars):');
+      final preview = htmlContent.length > 3000 ? htmlContent.substring(0, 3000) : htmlContent;
+      debugPrint(preview);
+      debugPrint('=== Checking for key elements ===');
+      debugPrint('Contains "kulcsszo": ${htmlContent.toLowerCase().contains('kulcsszo')}');
+      debugPrint('Contains "jogszabaly": ${htmlContent.toLowerCase().contains('jogszabaly')}');
+      debugPrint('Contains style with #1976d2: ${htmlContent.contains('#1976d2')}');
+      debugPrint('Contains style with #dc3545: ${htmlContent.contains('#dc3545')}');
+      debugPrint('Contains style with rgb(25, 118, 210): ${htmlContent.contains('rgb(25, 118, 210)')}');
+      debugPrint('Contains style with rgb(220, 53, 69): ${htmlContent.contains('rgb(220, 53, 69)')}');
+      debugPrint('Final styled HTML length: ${styledHtmlContent.length}');
+      debugPrint('========================');
+      // #endregion
     }
     
     // Platform view regisztrálása

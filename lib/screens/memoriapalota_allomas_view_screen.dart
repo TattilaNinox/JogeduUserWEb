@@ -173,7 +173,7 @@ class _MemoriapalotaAllomasViewScreenState
     _loadAllomasok();
   }
 
-  void _setupIframe(String tartalom) {
+  void _setupIframe(String cim, String kulcsszo, String tartalom, {int? sorszam}) {
     // FONTOS: Ellenőrizzük, hogy web platformon vagyunk-e!
     if (!kIsWeb) {
       // Ha nem web platform, nem hozunk létre iframe-et
@@ -196,192 +196,315 @@ class _MemoriapalotaAllomasViewScreenState
     iframeElement.sandbox.add('allow-popups');
     
     // FONTOS: Teljes HTML dokumentum létrehozása CSS stílusokkal
-    // MEGJEGYZÉS: A cím és kulcsszó már az AppBar-ban megjelenik, ezért nem tesszük ide
+    // PONTOSAN a dokumentumban leírt CSS-t használjuk (docs/MEMORIA_ALLOMAS_MEGJELENITES_WEB_USER_BEMUTATO.txt)
     final fullHtml = '''
 <!DOCTYPE html>
-<html>
+<html lang="hu">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    * {
-      box-sizing: border-box;
-    }
-    html {
-      background-color: transparent;
-    }
+    /* ALAP STÍLUSOK */
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 14px;
       line-height: 1.6;
-      color: #333;
-      padding: 20px;
-      margin: 0;
-      background-color: transparent;
       text-align: justify;
-    }
-    .content-wrapper {
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      max-width: 100%;
+      hyphens: auto;
+      padding: 2em;
+      word-wrap: break-word;
+      max-width: 900px;
       margin: 0 auto;
+      color: #333;
+      background-color: transparent;
     }
-    h1, h2, h3 {
-      color: #1976d2;
-      margin-top: 1.5em;
+
+    /* CÍMEK */
+    h1 {
+      font-size: 1.6em;
+      text-align: center;
+      border-bottom: 2px solid #333;
+      padding-bottom: 0.5em;
+      margin-bottom: 1.5em;
+    }
+
+    h2 {
+      font-size: 1.3em;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 5px;
+      margin-top: 2em;
+      color: #2c3e50;
+    }
+
+    h3 {
+      font-size: 1.1em;
+      margin-top: 1.2em;
+      font-weight: 600;
+    }
+
+    /* SZÖVEG ELEMEK */
+    p {
+      margin-bottom: 0.8em;
+    }
+
+    ul, ol {
+      padding-left: 20px;
+      margin-bottom: 1em;
+    }
+
+    li {
       margin-bottom: 0.5em;
     }
-    h1 {
-      font-size: 24px;
-    }
-    h2 {
-      font-size: 20px;
-    }
-    h3 {
-      font-size: 18px;
-    }
-    .kulcsszo {
-      display: inline-block;
-      background-color: #e3f2fd;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: 500;
-      margin-bottom: 10px;
-    }
-    .szin-kek {
-      color: #1976d2;
-      font-weight: 500;
-    }
-    .szin-zold {
-      color: #388e3c;
-      font-weight: 500;
-    }
-    .hatter-sarga {
-      background-color: #fff9c4;
-      padding: 2px 4px;
-      border-radius: 3px;
-    }
-    .jogszabaly-doboz {
-      background-color: #f5f5f5;
-      border-left: 4px solid #1976d2;
-      padding: 12px;
-      margin: 16px 0;
-      border-radius: 4px;
-    }
-    .jogszabaly-cimke {
-      font-weight: bold;
-      color: #1976d2;
-      display: block;
-      margin-bottom: 8px;
-    }
+
+    /* ÁLLOMÁS BADGE (SORSZÁM JELVÉNY) */
     .allomas-badge {
       display: inline-block;
-      background-color: #1976d2;
       color: white;
-      padding: 4px 10px;
-      border-radius: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      margin-right: 10px;
+      vertical-align: middle;
       font-weight: bold;
-      margin-right: 8px;
+      min-width: 20px;
+      text-align: center;
     }
-    p {
-      margin-bottom: 12px;
+
+    /* EGYEDI SZÍNEK AZ ÁLLOMÁSOKHOZ (1-11, majd ciklikusan) */
+    .badge-1 { background-color: #D32F2F; }  /* Piros */
+    .badge-2 { background-color: #1976D2; }    /* Kék */
+    .badge-3 { background-color: #388E3C; }  /* Zöld */
+    .badge-4 { background-color: #E64A19; }  /* Narancs */
+    .badge-5 { background-color: #7B1FA2; }  /* Lila */
+    .badge-6 { background-color: #0097A7; }  /* Cián */
+    .badge-7 { background-color: #C2185B; }  /* Rózsaszín */
+    .badge-8 { background-color: #5D4037; }  /* Barna */
+    .badge-9 { background-color: #FBC02D; color: #333; }  /* Sárga (sötét szöveg) */
+    .badge-10 { background-color: #455A64; } /* Szürke-kék */
+    .badge-11 { background-color: #303F9F; } /* Sötétkék */
+
+    /* KULCSSZÓ STÍLUS */
+    .kulcsszo {
+      font-style: italic;
+      color: #555;
+      margin-bottom: 1em;
+      display: block;
+      border-left: 3px solid #ccc;
+      padding-left: 10px;
     }
-    ul, ol {
-      margin-bottom: 12px;
-      padding-left: 24px;
+
+    /* SZÖVEG KIEMELÉSEK */
+    .szin-piros {
+      color: #D32F2F;
+      font-weight: bold;
     }
-    li {
-      margin-bottom: 6px;
+
+    .szin-zold {
+      color: #388E3C;
+      font-weight: bold;
     }
+
+    .szin-kek {
+      color: #1976D2;
+      font-weight: bold;
+    }
+
+    .hatter-sarga {
+      background-color: #FFF59D;
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+    }
+
+    strong {
+      font-weight: bold;
+    }
+
+    /* JOGSZABÁLY DOBOZ STÍLUS */
+    .jogszabaly-doboz {
+      background-color: #f0f4f8;
+      border-left: 4px solid #2c3e50;
+      padding: 10px 15px;
+      margin: 15px 0;
+      font-style: italic;
+      font-size: 0.95em;
+      color: #444;
+    }
+
+    .jogszabaly-cimke {
+      font-weight: bold;
+      font-style: normal;
+      display: block;
+      margin-bottom: 5px;
+      color: #2c3e50;
+      font-size: 0.9em;
+      text-transform: uppercase;
+    }
+
+    /* SZEKCIÓ SZÁMOK FORMÁZÁSA - inline style támogatás */
+    span[style*="background-color: #dc3545"],
+    span[style*="background-color:#dc3545"],
+    span[style*="background-color:rgb(220, 53, 69)"],
+    span[style*="background-color: rgb(220, 53, 69)"],
+    div[style*="background-color: #dc3545"],
+    div[style*="background-color:#dc3545"],
+    div[style*="background-color:rgb(220, 53, 69)"],
+    div[style*="background-color: rgb(220, 53, 69)"],
+    .szekcio-piros,
+    [class*="szekcio"][class*="piros"] {
+      display: inline-block !important;
+      background-color: #D32F2F !important;
+      color: white !important;
+      padding: 4px 10px !important;
+      border-radius: 4px !important;
+      font-weight: bold !important;
+      margin-right: 8px !important;
+      font-size: 14px !important;
+      min-width: 32px !important;
+      text-align: center !important;
+    }
+
+    span[style*="background-color: #1976d2"],
+    span[style*="background-color:#1976d2"],
+    span[style*="background-color:rgb(25, 118, 210)"],
+    span[style*="background-color: rgb(25, 118, 210)"],
+    div[style*="background-color: #1976d2"],
+    div[style*="background-color:#1976d2"],
+    div[style*="background-color:rgb(25, 118, 210)"],
+    div[style*="background-color: rgb(25, 118, 210)"],
+    .szekcio-kek,
+    [class*="szekcio"][class*="kek"] {
+      display: inline-block !important;
+      background-color: #1976D2 !important;
+      color: white !important;
+      padding: 4px 10px !important;
+      border-radius: 4px !important;
+      font-weight: bold !important;
+      margin-right: 8px !important;
+      font-size: 14px !important;
+      min-width: 32px !important;
+      text-align: center !important;
+    }
+
     img {
       max-width: 100%;
       height: auto;
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 16px;
     }
+
     table, th, td {
       border: 1px solid #ddd;
     }
+
     th, td {
       padding: 8px;
       text-align: left;
     }
-    /* Reszponzív stílusok */
-    @media (max-width: 768px) {
+
+    /* RESPONZÍV DESIGN */
+    @media screen and (max-width: 768px) {
       body {
-        font-size: 13px;
-        padding: 12px;
-      }
-      h1 {
-        font-size: 20px;
-      }
-      h2 {
-        font-size: 18px;
-      }
-      h3 {
-        font-size: 16px;
-      }
-      .jogszabaly-doboz {
-        padding: 10px;
-        margin: 12px 0;
-      }
-      ul, ol {
-        padding-left: 20px;
-      }
-      table {
-        font-size: 12px;
-      }
-      th, td {
-        padding: 6px;
-      }
-    }
-    @media (max-width: 480px) {
-      body {
-        font-size: 12px;
-        padding: 10px;
-      }
-      h1 {
-        font-size: 18px;
-      }
-      h2 {
-        font-size: 16px;
-      }
-      h3 {
-        font-size: 14px;
-      }
-      .kulcsszo {
-        padding: 3px 6px;
-        font-size: 11px;
-      }
-      .allomas-badge {
-        padding: 3px 8px;
-        font-size: 11px;
-      }
-      .jogszabaly-doboz {
-        padding: 8px;
-        margin: 10px 0;
-      }
-      ul, ol {
-        padding-left: 18px;
-      }
-      table {
-        font-size: 11px;
-      }
-      th, td {
-        padding: 4px;
+        padding: 1em;
       }
     }
   </style>
 </head>
 <body>
-  <div class="content-wrapper">
-    $tartalom
-  </div>
+  <h2>${sorszam != null && sorszam > 0 ? '<span class="allomas-badge badge-${sorszam > 11 ? ((sorszam - 1) % 11) + 1 : sorszam}">$sorszam.</span>' : ''}$cim</h2>
+  ${kulcsszo.isNotEmpty ? '<span class="kulcsszo">Kulcsszó: $kulcsszo</span>' : ''}
+  ${tartalom.isNotEmpty ? tartalom : '<p>Nincs tartalom.</p>'}
+  <script>
+    // Automatikus formázás hozzáadása, ha hiányzik
+    (function() {
+      function formatContent() {
+        console.log('Formatting content...');
+        
+        // Szekció számok keresése és formázása
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+          null,
+          false
+        );
+        
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+          textNodes.push(node);
+        }
+        
+        textNodes.forEach(function(textNode) {
+          const text = textNode.textContent;
+          const parent = textNode.parentElement;
+          
+          if (!text || !parent) return;
+          if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') return;
+          if (parent.classList.contains('szekcio-piros') || parent.classList.contains('szekcio-kek') || parent.classList.contains('allomas-badge')) return;
+          
+          // Keresünk szekció számokat (pl. "1.", "2.") a szöveg elején
+          const trimmed = text.trim();
+          const sectionMatch = trimmed.match(/^(\\d+)\\./);
+          if (sectionMatch) {
+            const sectionNumber = parseInt(sectionMatch[1]);
+            const badgeNumber = sectionNumber > 11 ? ((sectionNumber - 1) % 11) + 1 : sectionNumber;
+            const badgeClass = 'badge-' + badgeNumber;
+            
+            // Ellenőrizzük, hogy már nincs-e formázva
+            if (parent.querySelector('.allomas-badge')) return;
+            
+            // Létrehozunk egy span elemet a szekció számhoz
+            const span = document.createElement('span');
+            span.className = 'allomas-badge ' + badgeClass;
+            span.textContent = sectionNumber + '.';
+            
+            // Cseréljük le a szöveget
+            const remainingText = text.replace(/^\\s*\\d+\\.\\s*/, '');
+            textNode.textContent = remainingText;
+            parent.insertBefore(span, textNode);
+            console.log('Formatted section number:', sectionNumber);
+          }
+        });
+        
+        // Kulcsszavak keresése és formázása
+        const allElements = document.querySelectorAll('p, div, span, h1, h2, h3');
+        allElements.forEach(function(el) {
+          if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return;
+          const text = el.textContent || '';
+          if (text.includes('Kulcsszó:') && !el.classList.contains('kulcsszo')) {
+            el.classList.add('kulcsszo');
+            console.log('Formatted keyword:', text);
+          }
+        });
+        
+        // Idézet dobozok keresése és formázása
+        const divs = document.querySelectorAll('div');
+        divs.forEach(function(div) {
+          if (div.classList.contains('jogszabaly-doboz')) return;
+          const text = div.textContent || '';
+          // Ha tartalmaz jogszabály számot vagy idézetet
+          if (text.match(/\\d+[:\\.]\\s*\\d+/) || text.includes('§') || text.includes('Ptk.') || text.includes('Btk.') || text.includes('Mt.')) {
+            div.classList.add('jogszabaly-doboz');
+            console.log('Formatted quote box:', text.substring(0, 50));
+          }
+        });
+        
+        console.log('Content formatting completed');
+      }
+      
+      // Várunk egy kicsit, hogy a DOM betöltődjön
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', formatContent);
+      } else {
+        setTimeout(formatContent, 100);
+        setTimeout(formatContent, 500);
+        setTimeout(formatContent, 1000);
+      }
+    })();
+  </script>
 </body>
 </html>
 ''';
@@ -450,16 +573,14 @@ class _MemoriapalotaAllomasViewScreenState
     final currentAllomas = _allomasok[_currentIndex];
     final data = currentAllomas.data() as Map<String, dynamic>;
     
-    // Az állomások tartalma
+    // Az állomások adatai
+    final cim = data['cim'] as String? ?? 'Állomás';
+    final kulcsszo = data['kulcsszo'] as String? ?? '';
     final tartalom = data['tartalom'] as String? ?? '';
-    
-    // Ha nincs tartalom, alapértelmezett üzenet
-    final content = tartalom.isNotEmpty 
-        ? tartalom 
-        : '<p>Nincs tartalom.</p>';
+    final sorszam = data['allomasSorszam'] as int?;
     
     // Új iframe-et hozunk létre az új tartalommal (teljes HTML dokumentummal)
-    _setupIframe(content);
+    _setupIframe(cim, kulcsszo, tartalom, sorszam: sorszam);
     
     // Betöltjük a felhasználó képét az aktuális állomáshoz és megvárjuk
     await _loadUserImage();
@@ -467,7 +588,7 @@ class _MemoriapalotaAllomasViewScreenState
     // Frissítjük a tartalmat és újraépítjük a view-t
     if (mounted) {
       setState(() {
-        _currentHtmlContent = content;
+        _currentHtmlContent = tartalom.isNotEmpty ? tartalom : '<p>Nincs tartalom.</p>';
       });
     }
   }

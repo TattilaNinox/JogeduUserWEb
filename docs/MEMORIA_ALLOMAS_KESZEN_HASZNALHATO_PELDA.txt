@@ -1,0 +1,368 @@
+================================================================================
+MEMÓRIAÁLLOMÁS MEGJELENÍTÉSE - KÉSZEN HASZNÁLHATÓ PÉLDA
+KÖZVETLENÜL MÁSOLHATÓ KÓD - FLUTTER WEB
+================================================================================
+
+Ez a fájl tartalmazza a TELJES, KÉSZEN HASZNÁLHATÓ kódot, amit közvetlenül
+be lehet másolni a másik Flutter webalkalmazásba. Minden szükséges rész benne van.
+
+================================================================================
+1. SZÜKSÉGES IMPORT-OK
+================================================================================
+
+Másold be ezeket az import-okat a fájl tetejére:
+
+import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui_web' as ui_web;
+
+================================================================================
+2. TELJES METÓDUS - MÁSOLHATÓ KÓD
+================================================================================
+
+Másold be ezt a teljes metódust a State osztályodba:
+
+void _showAllomasPreview(
+  String cim,           // Állomás címe
+  String kulcsszo,      // Kulcsszó (lehet üres string)
+  String tartalom,      // HTML tartalom
+  {int? sorszam}        // Állomás sorszáma (opcionális)
+) {
+  // FONTOS: Ellenőrizzük, hogy web platformon vagyunk-e!
+  if (!kIsWeb) {
+    // Ha nem web platform, egyszerű szöveges megjelenítés
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cim,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (kulcsszo.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              'Kulcsszó: $kulcsszo',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    tartalom,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return; // FONTOS: Kilépünk, ha nem web platform!
+  }
+
+  // ============================================================================
+  // WEB PLATFORM: HTML MEGJELENÍTÉS IFRAME-MEL
+  // ============================================================================
+
+  // FONTOS: Minden alkalommal egyedi view ID-t kell generálni!
+  final previewViewId =
+      'allomas-preview-iframe-${DateTime.now().millisecondsSinceEpoch}';
+
+  // Iframe elem létrehozása
+  final previewIframeElement = web.HTMLIFrameElement()
+    ..style.width = '100%'
+    ..style.height = '100%'
+    ..style.border = 'none';
+
+  // Badge osztály számítása (ciklikus színezés 1-11)
+  String badgeClass = '';
+  if (sorszam != null && sorszam > 0) {
+    final badgeNumber = sorszam > 11 ? ((sorszam - 1) % 11) + 1 : sorszam;
+    badgeClass = 'badge-$badgeNumber';
+  }
+
+  // Teljes HTML dokumentum létrehozása - PONTOSAN EZT A CSS-T HASZNÁLD!
+  final fullHtml = '''
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; text-align: justify; hyphens: auto; padding: 2em; word-wrap: break-word; max-width: 900px; margin: 0 auto; color: #333; }
+    h1 { font-size: 1.6em; text-align: center; border-bottom: 2px solid #333; padding-bottom: 0.5em; margin-bottom: 1.5em; }
+    h2 { font-size: 1.3em; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 2em; color: #2c3e50; }
+    h3 { font-size: 1.1em; margin-top: 1.2em; font-weight: 600; }
+    p { margin-bottom: 0.8em; }
+    ul, ol { padding-left: 20px; margin-bottom: 1em; }
+    li { margin-bottom: 0.5em; }
+    
+    /* CÍMKÉK ÉS JELVÉNYEK */
+    .allomas-badge { display: inline-block; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-right: 10px; vertical-align: middle; font-weight: bold; min-width: 20px; text-align: center; }
+    /* EGYEDI SZÍNEK AZ ÁLLOMÁSOKHOZ */
+    .badge-1 { background-color: #D32F2F; } .badge-2 { background-color: #1976D2; } .badge-3 { background-color: #388E3C; }
+    .badge-4 { background-color: #E64A19; } .badge-5 { background-color: #7B1FA2; } .badge-6 { background-color: #0097A7; }
+    .badge-7 { background-color: #C2185B; } .badge-8 { background-color: #5D4037; } .badge-9 { background-color: #FBC02D; color: #333; }
+    .badge-10 { background-color: #455A64; } .badge-11 { background-color: #303F9F; }
+
+    .kulcsszo { font-style: italic; color: #555; margin-bottom: 1em; display: block; border-left: 3px solid #ccc; padding-left: 10px; }
+    
+    /* SZÖVEG KIEMELÉSEK */
+    .szin-piros { color: #D32F2F; font-weight: bold; }
+    .szin-zold { color: #388E3C; font-weight: bold; }
+    .szin-kek { color: #1976D2; font-weight: bold; }
+    .hatter-sarga { background-color: #FFF59D; padding: 0.1em 0.3em; border-radius: 3px; }
+    strong { font-weight: bold; }
+    
+    /* JOGSZABÁLY DOBOZ STÍLUS */
+    .jogszabaly-doboz { background-color: #f0f4f8; border-left: 4px solid #2c3e50; padding: 10px 15px; margin: 15px 0; font-style: italic; font-size: 0.95em; color: #444; }
+    .jogszabaly-cimke { font-weight: bold; font-style: normal; display: block; margin-bottom: 5px; color: #2c3e50; font-size: 0.9em; text-transform: uppercase; }
+    
+    @media screen and (max-width: 768px) { body { padding: 1em; } }
+  </style>
+</head>
+<body>
+  <h2>${sorszam != null && sorszam > 0 ? '<span class="allomas-badge $badgeClass">$sorszam.</span>' : ''}$cim</h2>
+  ${kulcsszo.isNotEmpty ? '<span class="kulcsszo">Kulcsszó: $kulcsszo</span>' : ''}
+  $tartalom
+</body>
+</html>
+''';
+
+  // FONTOS: Az iframe src-jét data URI formátumban kell beállítani!
+  // FONTOS: A HTML tartalmat MINDIG Uri.encodeComponent()-tel kell kódolni!
+  previewIframeElement.src =
+      'data:text/html;charset=utf-8,${Uri.encodeComponent(fullHtml)}';
+
+  // FONTOS: Platform view regisztrálása MINDIG az iframe src beállítása UTÁN!
+  // ignore: undefined_prefixed_name
+  ui_web.platformViewRegistry.registerViewFactory(
+    previewViewId,
+    (int viewId) => previewIframeElement,
+  );
+
+  // Dialog megjelenítése
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.85,
+        height: MediaQuery.of(context).size.height * 0.85,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    cim,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const Divider(),
+            Expanded(
+              // FONTOS: HtmlElementView használata a view ID-val!
+              child: HtmlElementView(viewType: previewViewId),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+================================================================================
+3. HASZNÁLATI PÉLDA
+================================================================================
+
+Példa hívás egy ListTile onTap eseményben vagy gombon:
+
+// Firestore dokumentumból kiolvasott adatokkal:
+final cim = allomasData['cim'] as String? ?? 'Névtelen állomás';
+final kulcsszo = allomasData['kulcsszo'] as String? ?? '';
+final tartalom = allomasData['tartalom'] as String? ?? '';
+final sorszam = allomasData['sorszam'] as int?;
+
+// Metódus hívása:
+_showAllomasPreview(cim, kulcsszo, tartalom, sorszam: sorszam);
+
+VAGY egyszerűbb példa:
+
+_showAllomasPreview(
+  'A személyiségi jogok alapjai',
+  'személyiségi jogok',
+  '<p>A <span class="szin-kek">személyiségi jogok</span> az emberi méltóságból erednek.</p>',
+  sorszam: 1,
+);
+
+================================================================================
+4. PUBSPEC.YAML FÜGGŐSÉGEK
+================================================================================
+
+Ellenőrizd, hogy a pubspec.yaml fájlban szerepelnek-e ezek a függőségek:
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # ... egyéb függőségek
+
+A `web` package a Flutter SDK része, nem kell külön hozzáadni.
+A `dart:ui_web` is a Flutter SDK része.
+
+Ha hibát kapsz, hogy nincs `web` package, akkor:
+1. Ellenőrizd, hogy Flutter Web-et használsz (flutter run -d chrome)
+2. Frissítsd a Flutter SDK-t: flutter upgrade
+
+================================================================================
+5. GYAKORI HIBAOK ÉS MEGOLDÁSAIK
+================================================================================
+
+HIBA: "The name 'HtmlElementView' isn't defined"
+MEGOLDÁS: Importáld: import 'package:flutter/widgets.dart';
+
+HIBA: "The name 'web' isn't defined"
+MEGOLDÁS: Importáld: import 'package:web/web.dart' as web;
+
+HIBA: "The name 'ui_web' isn't defined"
+MEGOLDÁS: Importáld: import 'dart:ui_web' as ui_web;
+
+HIBA: "The name 'kIsWeb' isn't defined"
+MEGOLDÁS: Importáld: import 'package:flutter/foundation.dart' show kIsWeb;
+
+HIBA: Az iframe üres marad
+MEGOLDÁS: 
+1. Ellenőrizd, hogy a registerViewFactory-t AZ iframe src beállítása UTÁN hívod-e meg
+2. Ellenőrizd, hogy Uri.encodeComponent()-et használod-e
+3. Ellenőrizd a böngésző konzolt (F12) - vannak-e hibák?
+
+HIBA: A CSS nem működik
+MEGOLDÁS:
+1. Ellenőrizd, hogy teljes HTML dokumentumot hozol-e létre (<!DOCTYPE html>...)
+2. Ellenőrizd, hogy a CSS pontosan ugyanaz, mint a fenti példában
+3. Ellenőrizd, hogy nincs-e más CSS, ami felülírja ezeket
+
+HIBA: A badge színe rossz
+MEGOLDÁS:
+1. Ellenőrizd a badge osztály számítását: sorszam > 11 ? ((sorszam - 1) % 11) + 1 : sorszam
+2. Ellenőrizd, hogy a badge CSS osztályok mind a 11 szín definiálva vannak-e
+
+================================================================================
+6. TELJES PÉLDA FÁJL (OPCIONÁLIS)
+================================================================================
+
+Ha szeretnéd, hogy egy külön fájlban legyen, akkor hozz létre egy új fájlt:
+
+lib/widgets/allomas_preview_dialog.dart
+
+És másold be ezt:
+
+import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui_web' as ui_web;
+
+class AllomasPreviewDialog {
+  static void show(
+    BuildContext context, {
+    required String cim,
+    required String kulcsszo,
+    required String tartalom,
+    int? sorszam,
+  }) {
+    // Itt másold be a teljes _showAllomasPreview metódus kódját,
+    // de a 'context' paramétert vedd ki, mert már a show metódusban van
+  }
+}
+
+Akkor így hívod meg:
+
+AllomasPreviewDialog.show(
+  context,
+  cim: 'Cím',
+  kulcsszo: 'kulcsszó',
+  tartalom: '<p>Tartalom</p>',
+  sorszam: 1,
+);
+
+================================================================================
+7. ELLENŐRZÉSI LISTA
+================================================================================
+
+Mielőtt futtatod, ellenőrizd:
+
+[✓] Van-e importálva: 'package:flutter/material.dart';
+[✓] Van-e importálva: 'package:web/web.dart' as web;
+[✓] Van-e importálva: 'package:flutter/foundation.dart' show kIsWeb;
+[✓] Van-e importálva: 'dart:ui_web' as ui_web;
+[✓] A metódus a State osztályodban van-e?
+[✓] A context elérhető-e a metódusban?
+[✓] A CSS pontosan ugyanaz, mint a fenti példában?
+[✓] A badge osztály számítása helyes-e?
+
+================================================================================
+8. TESZTELÉS
+================================================================================
+
+1. Futtasd az alkalmazást: flutter run -d chrome
+2. Hívd meg a metódust egy gombra kattintva
+3. Ellenőrizd, hogy megjelenik-e a dialog
+4. Ellenőrizd, hogy az iframe betöltődik-e
+5. Ellenőrizd, hogy a CSS stílusok helyesen működnek-e
+6. Ellenőrizd, hogy a badge színe helyes-e
+
+Ha minden működik, akkor kész vagy! 🎉
+
+================================================================================
+VÉGE
+================================================================================
+
+Ha még mindig nem működik, küldd el a pontos hibaüzenetet, és segítek!
+

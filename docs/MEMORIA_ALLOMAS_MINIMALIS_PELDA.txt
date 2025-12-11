@@ -1,0 +1,84 @@
+================================================================================
+MEMÓRIAÁLLOMÁS MEGJELENÍTÉSE - MINIMÁLIS PÉLDA
+Csak a lényeg - másold be és működik!
+================================================================================
+
+1. IMPORT-OK (fájl tetején):
+   import 'package:web/web.dart' as web;
+   import 'package:flutter/foundation.dart' show kIsWeb;
+   import 'dart:ui_web' as ui_web;
+
+2. METÓDUS (State osztályban):
+
+void _showAllomas(String cim, String kulcsszo, String tartalom, {int? sorszam}) {
+  if (!kIsWeb) return;
+  
+  final id = 'allomas-${DateTime.now().millisecondsSinceEpoch}';
+  final iframe = web.HTMLIFrameElement()
+    ..style.width = '100%'
+    ..style.height = '100%'
+    ..style.border = 'none';
+  
+  final badgeNum = sorszam != null && sorszam > 0 
+    ? (sorszam > 11 ? ((sorszam - 1) % 11) + 1 : sorszam) 
+    : null;
+  
+  final html = '''
+<!DOCTYPE html><html lang="hu"><head><meta charset="UTF-8"><style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;text-align:justify;padding:2em;max-width:900px;margin:0 auto;color:#333}
+h2{font-size:1.3em;border-bottom:1px solid #ccc;padding-bottom:5px;margin-top:2em;color:#2c3e50}
+.allomas-badge{display:inline-block;color:white;padding:2px 8px;border-radius:4px;font-size:0.8em;margin-right:10px;font-weight:bold}
+.badge-1{background-color:#D32F2F}.badge-2{background-color:#1976D2}.badge-3{background-color:#388E3C}
+.badge-4{background-color:#E64A19}.badge-5{background-color:#7B1FA2}.badge-6{background-color:#0097A7}
+.badge-7{background-color:#C2185B}.badge-8{background-color:#5D4037}.badge-9{background-color:#FBC02D;color:#333}
+.badge-10{background-color:#455A64}.badge-11{background-color:#303F9F}
+.kulcsszo{font-style:italic;color:#555;margin-bottom:1em;display:block;border-left:3px solid #ccc;padding-left:10px}
+.szin-piros{color:#D32F2F;font-weight:bold}.szin-zold{color:#388E3C;font-weight:bold}
+.szin-kek{color:#1976D2;font-weight:bold}.hatter-sarga{background-color:#FFF59D;padding:0.1em 0.3em;border-radius:3px}
+.jogszabaly-doboz{background-color:#f0f4f8;border-left:4px solid #2c3e50;padding:10px 15px;margin:15px 0;font-style:italic;font-size:0.95em;color:#444}
+.jogszabaly-cimke{font-weight:bold;font-style:normal;display:block;margin-bottom:5px;color:#2c3e50;font-size:0.9em;text-transform:uppercase}
+</style></head><body>
+<h2>${badgeNum != null ? '<span class="allomas-badge badge-$badgeNum">$sorszam.</span>' : ''}$cim</h2>
+${kulcsszo.isNotEmpty ? '<span class="kulcsszo">Kulcsszó: $kulcsszo</span>' : ''}
+$tartalom
+</body></html>
+''';
+  
+  iframe.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(html)}';
+  ui_web.platformViewRegistry.registerViewFactory(id, (int viewId) => iframe);
+  
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.85,
+        height: MediaQuery.of(context).size.height * 0.85,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text(cim, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+            const Divider(),
+            Expanded(child: HtmlElementView(viewType: id)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+3. HASZNÁLAT:
+   _showAllomas(
+     allomasData['cim'] as String,
+     allomasData['kulcsszo'] as String? ?? '',
+     allomasData['tartalom'] as String,
+     sorszam: allomasData['sorszam'] as int?,
+   );
+
+KESZ! 🎉
+
