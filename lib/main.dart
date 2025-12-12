@@ -23,6 +23,7 @@ import 'screens/flashcard_study_screen.dart';
 import 'screens/interactive_note_view_screen.dart';
 import 'screens/dynamic_quiz_view_screen.dart';
 import 'screens/memoriapalota_allomas_view_screen.dart';
+import 'screens/memoriapalota_fajl_view_screen.dart';
 import 'core/session_guard.dart';
 import 'screens/guard_splash_screen.dart';
 import 'screens/account_screen.dart';
@@ -69,8 +70,9 @@ final _router = GoRouter(
     // SimplePay callback check - KORÁBBAN, mielőtt az auth check fut
     final paymentParam = qp['payment'] ?? baseQp['payment'];
     if (paymentParam != null) {
-      debugPrint('[Router] SimplePay payment callback detected: payment=$paymentParam');
-      
+      debugPrint(
+          '[Router] SimplePay payment callback detected: payment=$paymentParam');
+
       // Payment callback esetén MINDIG engedélyezzük az account oldalt,
       // még akkor is, ha nincs currentUser (mert lehet, hogy még betöltődik)
       // Az account_screen StreamBuilder-rel várja a user-t
@@ -276,6 +278,14 @@ final _router = GoRouter(
       builder: (context, state) {
         final noteId = state.pathParameters['noteId']!;
         return MemoriapalotaAllomasViewScreen(noteId: noteId);
+      },
+    ),
+    // Memóriapalota fájlok megtekintése
+    GoRoute(
+      path: '/memoriapalota-fajl/:noteId',
+      builder: (context, state) {
+        final noteId = state.pathParameters['noteId']!;
+        return MemoriapalotaFajlViewScreen(noteId: noteId);
       },
     ),
     GoRoute(

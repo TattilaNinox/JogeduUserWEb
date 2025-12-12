@@ -49,6 +49,8 @@ class NoteListTile extends StatelessWidget {
         return Icons.source;
       case 'memoriapalota_allomasok':
         return Icons.train;
+      case 'memoriapalota_fajlok':
+        return Icons.audiotrack;
       default:
         return Icons.menu_book;
     }
@@ -97,6 +99,8 @@ class NoteListTile extends StatelessWidget {
       context.go('/deck/$id/view');
     } else if (type == 'memoriapalota_allomasok') {
       context.go('/memoriapalota-allomas/$id');
+    } else if (type == 'memoriapalota_fajlok') {
+      context.go('/memoriapalota-fajl/$id');
     } else {
       context.go('/note/$id');
     }
@@ -263,40 +267,39 @@ class NoteListTile extends StatelessWidget {
                       );
                     }
 
-                    final Widget titleAndMeta = Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w400,
-                                    fontSize: 14,
-                                    color: Color(0xFF202122),
-                                    height: 1.5,
-                                    letterSpacing: 0,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                    final Widget titleAndMeta = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title.isEmpty ? '(Cím nélkül)' : title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 14,
+                                  color: Color(0xFF202122),
+                                  height: 1.5,
+                                  letterSpacing: 0,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              // Lakatos ikon zárt jegyzetek esetén
-                              if (isLocked) ...[
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.lock_outline,
-                                  size: 16,
-                                  color: Color(0xFF54595D),
-                                ),
-                              ],
+                            ),
+                            // Lakatos ikon zárt jegyzetek esetén
+                            if (isLocked) ...[
+                              const SizedBox(width: 8),
+                              const Icon(
+                                Icons.lock_outline,
+                                size: 16,
+                                color: Color(0xFF54595D),
+                              ),
                             ],
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     );
 
                     if (isNarrow) {
@@ -332,21 +335,21 @@ class NoteListTile extends StatelessWidget {
                           size: 16,
                         ),
                         const SizedBox(width: 12),
-                        // Bal oldali cím/meta
-                        titleAndMeta,
-                        // Középre igazított lejátszó a sor közepén
-                        if (hasAudio)
-                          Expanded(
-                            child: Center(
-                              child: SizedBox(
-                                width: 150,
-                                child: MiniAudioPlayer(
-                                  audioUrl: audioUrl!,
-                                  compact: true,
-                                ),
-                              ),
+                        // Bal oldali cím/meta - mindig látható
+                        Expanded(
+                          child: titleAndMeta,
+                        ),
+                        // Jobb oldali lejátszó
+                        if (hasAudio) ...[
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: 150,
+                            child: MiniAudioPlayer(
+                              audioUrl: audioUrl!,
+                              compact: true,
                             ),
                           ),
+                        ],
                       ],
                     );
                   },
