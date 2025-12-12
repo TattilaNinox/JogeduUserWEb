@@ -243,121 +243,122 @@ class NoteListTile extends StatelessWidget {
             splashColor: const Color(0xFF3366CC).withValues(alpha: 0.1),
             highlightColor: const Color(0xFF3366CC).withValues(alpha: 0.05),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final bool isNarrow = constraints.maxWidth < 520;
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isNarrow = constraints.maxWidth < 520;
 
-                    Widget audioWidget = const SizedBox.shrink();
-                    if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
-                      audioWidget = Align(
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: isNarrow ? double.infinity : 150,
-                          child: MiniAudioPlayer(
-                              audioUrl: audioUrl!, compact: true),
-                        ),
-                      );
-                    } else if (hasAudio) {
-                      audioWidget = const Tooltip(
-                        message: 'Hangjegyzet elérhető',
-                        child: Icon(Icons.audiotrack,
-                            size: 16, color: Colors.green),
-                      );
-                    }
+                  Widget audioWidget = const SizedBox.shrink();
+                  if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
+                    audioWidget = Align(
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: isNarrow ? double.infinity : 150,
+                        child:
+                            MiniAudioPlayer(audioUrl: audioUrl!, compact: true),
+                      ),
+                    );
+                  } else if (hasAudio) {
+                    audioWidget = const Tooltip(
+                      message: 'Hangjegyzet elérhető',
+                      child:
+                          Icon(Icons.audiotrack, size: 16, color: Colors.green),
+                    );
+                  }
 
-                    final Widget titleAndMeta = Column(
+                  final Widget titleAndMeta = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title.isEmpty ? '(Cím nélkül)' : title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w400,
+                                fontSize: 14,
+                                color: Color(0xFF202122),
+                                height: 1.5,
+                                letterSpacing: 0,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Lakatos ikon zárt jegyzetek esetén
+                          if (isLocked) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.lock_outline,
+                              size: 16,
+                              color: Color(0xFF54595D),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Flexible(
-                              child: Text(
-                                title.isEmpty ? '(Cím nélkül)' : title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 14,
-                                  color: Color(0xFF202122),
-                                  height: 1.5,
-                                  letterSpacing: 0,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            Icon(
+                              _typeIcon(),
+                              color: const Color(0xFF54595D),
+                              size: 16,
                             ),
-                            // Lakatos ikon zárt jegyzetek esetén
-                            if (isLocked) ...[
-                              const SizedBox(width: 8),
-                              const Icon(
-                                Icons.lock_outline,
-                                size: 16,
-                                color: Color(0xFF54595D),
-                              ),
-                            ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: titleAndMeta,
+                            ),
                           ],
                         ),
-                      ],
-                    );
-
-                    if (isNarrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _typeIcon(),
-                                color: const Color(0xFF54595D),
-                                size: 16,
-                              ),
-                              const SizedBox(width: 12),
-                              titleAndMeta,
-                            ],
-                          ),
-                          if (hasAudio) ...[
-                            const SizedBox(height: 12),
-                            audioWidget,
-                          ],
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _typeIcon(),
-                          color: const Color(0xFF54595D),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 12),
-                        // Bal oldali cím/meta - mindig látható
-                        Expanded(
-                          child: titleAndMeta,
-                        ),
-                        // Jobb oldali lejátszó
                         if (hasAudio) ...[
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            width: 150,
-                            child: MiniAudioPlayer(
-                              audioUrl: audioUrl!,
-                              compact: true,
-                            ),
-                          ),
+                          const SizedBox(height: 12),
+                          audioWidget,
                         ],
                       ],
                     );
-                  },
-                ),
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _typeIcon(),
+                        color: const Color(0xFF54595D),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 12),
+                      // Bal oldali cím/meta - mindig látható
+                      Expanded(
+                        child: titleAndMeta,
+                      ),
+                      // Jobb oldali lejátszó - fix szélesség
+                      if (hasAudio) ...[
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 150,
+                          child: MiniAudioPlayer(
+                            audioUrl: audioUrl!,
+                            compact: true,
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 }
