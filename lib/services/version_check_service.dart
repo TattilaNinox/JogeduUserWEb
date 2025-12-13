@@ -234,4 +234,9 @@ class VersionCheckService {
   Future<void> checkNow() async {
     await _checkVersion();
   }
+
+  /// Aktivitás rögzítése (külső komponensek számára, pl. audio player)
+  void recordActivity() {
+    _lastActivityTime = DateTime.now();
+  }
 }

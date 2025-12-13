@@ -147,7 +147,7 @@ class _CategoryManagerScreenState extends State<CategoryManagerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              initialValue: currentScience,
+              value: currentScience,
               items: _sciences
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                   .toList(),
@@ -223,7 +223,7 @@ class _CategoryManagerScreenState extends State<CategoryManagerScreen> {
                             Expanded(
                               flex: 1,
                               child: DropdownButtonFormField<String>(
-                                initialValue: _selectedScience,
+                                value: _selectedScience,
                                 items: _sciences
                                     .map((s) => DropdownMenuItem(
                                         value: s, child: Text(s)))

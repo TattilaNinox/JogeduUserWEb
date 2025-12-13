@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../services/version_check_service.dart';
 
 /// Egy kompakt, beágyazható audiolejátszó widget.
 ///
@@ -42,6 +44,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
   bool _expanded = false; // Ha igaz, a teljes kezelőfelület látszik
   bool _isLooping =
       false; // Folyamatos lejátszás kapcsoló (nem mentjük tartósan)
+  Timer? _activityTimer; // Timer az aktivitás szimulálásához
 
   bool get _isPlaying => _playerState == PlayerState.playing;
 
@@ -72,6 +75,8 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
       _audioPlayer.onPlayerStateChanged.listen((state) {
         if (!mounted) return;
         setState(() => _playerState = state);
+        // Timer kezelése: indítás playing állapotban, leállítás egyébként
+        _manageActivityTimer(state);
       });
 
       _audioPlayer.onDurationChanged.listen((duration) {
@@ -127,8 +132,24 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
     ));
   }
 
+  /// Timer kezelése az aktivitás szimulálásához
+  void _manageActivityTimer(PlayerState state) {
+    _activityTimer?.cancel();
+    _activityTimer = null;
+
+    if (state == PlayerState.playing) {
+      // Timer indítása: 30 másodpercenként aktivitást rögzít
+      _activityTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        VersionCheckService().recordActivity();
+      });
+    }
+  }
+
   @override
   void dispose() {
+    // Timer törlése
+    _activityTimer?.cancel();
+    _activityTimer = null;
     // A dispose() metódus automatikusan meghívja a stop() metódust is.
     _audioPlayer.dispose();
     super.dispose();

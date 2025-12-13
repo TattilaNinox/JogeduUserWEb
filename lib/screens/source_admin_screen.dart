@@ -426,7 +426,7 @@ class _SourceAdminScreenState extends State<SourceAdminScreen> {
 
   Widget _buildCategoryDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: _selectedCategory,
+      value: _selectedCategory,
       items: _categories
           .map((c) => DropdownMenuItem(value: c, child: Text(c)))
           .toList(),

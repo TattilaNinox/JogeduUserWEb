@@ -429,7 +429,7 @@ class _NoteCreateScreenState extends State<NoteCreateScreen>
 
   Widget _buildTypeDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: _selectedType,
+      value: _selectedType,
       items: const [
         DropdownMenuItem(value: 'text', child: Text('Szöveges')),
         DropdownMenuItem(value: 'interactive', child: Text('Interaktív')),
@@ -456,7 +456,7 @@ class _NoteCreateScreenState extends State<NoteCreateScreen>
 
   Widget _buildCategoryDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: _selectedCategory,
+      value: _selectedCategory,
       items: _categories.map((String category) {
         return DropdownMenuItem<String>(
           value: category,
@@ -481,7 +481,7 @@ class _NoteCreateScreenState extends State<NoteCreateScreen>
 
   Widget _buildScienceDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: _selectedScience,
+      value: _selectedScience,
       items: _sciences.map((String sc) {
         return DropdownMenuItem<String>(
           value: sc,
