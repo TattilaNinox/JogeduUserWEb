@@ -543,6 +543,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
     GoRouter.of(context).go(uri.toString());
   }
 
+  bool get _hasActiveFilters {
+    return _searchText.isNotEmpty ||
+        _selectedStatus != null ||
+        _selectedCategory != null ||
+        _selectedTag != null ||
+        _selectedType != null;
+    // _selectedScience-t nem vesszük figyelembe, mert az fix
+  }
+
   Widget buildContent({
     required bool showSideFilters,
     required bool includeHeader,
@@ -599,6 +608,66 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 Header(
                   onSearchChanged: _onSearchChanged,
                   showActions: showHeaderActions,
+                ),
+              if (!showSideFilters && _hasActiveFilters)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        if (_selectedStatus != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Chip(
+                              label: Text('Státusz: $_selectedStatus'),
+                              onDeleted: () => _onStatusChanged(null),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                        if (_selectedType != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Chip(
+                              label: Text(
+                                  'Típus: ${_selectedType == "memoriapalota_allomasok" ? "Memóriapalota" : _selectedType}'),
+                              onDeleted: () => _onTypeChanged(null),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                        if (_selectedCategory != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Chip(
+                              label: Text(_selectedCategory!),
+                              onDeleted: () => _onCategoryChanged(null),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                        if (_selectedTag != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Chip(
+                              label: Text('Címke: $_selectedTag'),
+                              onDeleted: () => _onTagChanged(null),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                        TextButton.icon(
+                          onPressed: _onClearFilters,
+                          icon: const Icon(Icons.clear, size: 18),
+                          label: const Text('Szűrők törlése'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               Expanded(
                 child: NoteCardGrid(
