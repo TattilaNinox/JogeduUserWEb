@@ -207,13 +207,16 @@ final _router = GoRouter(
       path: '/notes',
       builder: (context, state) {
         final qp = state.uri.queryParameters;
+        // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra már itt, az URL-ből
+        final type = qp['type'];
+        final normalizedType = type == 'MP' ? 'memoriapalota_allomasok' : type;
         return NoteListScreen(
           initialSearch: qp['q'],
           initialStatus: qp['status'],
           initialCategory: qp['category'],
           initialScience: qp['science'],
           initialTag: qp['tag'],
-          initialType: qp['type'],
+          initialType: normalizedType,
         );
       },
     ),
@@ -226,7 +229,8 @@ final _router = GoRouter(
       path: '/read/note/:noteId',
       builder: (context, state) {
         final noteId = state.pathParameters['noteId']!;
-        return NoteReadScreen(noteId: noteId);
+        final from = state.uri.queryParameters['from'];
+        return NoteReadScreen(noteId: noteId, from: from);
       },
     ),
     // Kompatibilitási útvonal: /note/:noteId -> felhasználói olvasó nézet
@@ -234,7 +238,8 @@ final _router = GoRouter(
       path: '/note/:noteId',
       builder: (context, state) {
         final noteId = state.pathParameters['noteId']!;
-        return NoteReadScreen(noteId: noteId);
+        final from = state.uri.queryParameters['from'];
+        return NoteReadScreen(noteId: noteId, from: from);
       },
     ),
     // Interaktív jegyzet megtekintése
@@ -242,7 +247,8 @@ final _router = GoRouter(
       path: '/interactive-note/:noteId',
       builder: (context, state) {
         final noteId = state.pathParameters['noteId']!;
-        return InteractiveNoteViewScreen(noteId: noteId, from: null);
+        final from = state.uri.queryParameters['from'];
+        return InteractiveNoteViewScreen(noteId: noteId, from: from);
       },
     ),
     GoRoute(
@@ -277,7 +283,8 @@ final _router = GoRouter(
       path: '/memoriapalota-allomas/:noteId',
       builder: (context, state) {
         final noteId = state.pathParameters['noteId']!;
-        return MemoriapalotaAllomasViewScreen(noteId: noteId);
+        final from = state.uri.queryParameters['from'];
+        return MemoriapalotaAllomasViewScreen(noteId: noteId, from: from);
       },
     ),
     // Memóriapalota fájlok megtekintése
@@ -285,7 +292,8 @@ final _router = GoRouter(
       path: '/memoriapalota-fajl/:noteId',
       builder: (context, state) {
         final noteId = state.pathParameters['noteId']!;
-        return MemoriapalotaFajlViewScreen(noteId: noteId);
+        final from = state.uri.queryParameters['from'];
+        return MemoriapalotaFajlViewScreen(noteId: noteId, from: from);
       },
     ),
     GoRoute(

@@ -420,6 +420,10 @@ class _NoteTableState extends State<NoteTable> {
                       type: widget.selectedType,
                     );
 
+                    // Az aktuális URL-t query paraméterként adjuk át (visszalépéshez)
+                    final currentUri = GoRouterState.of(context).uri;
+                    final fromParam = Uri.encodeComponent(currentUri.toString());
+
                     if (noteType == 'dynamic_quiz' ||
                         noteType == 'dynamic_quiz_dual') {
                       final questionBankId = data['questionBankId'] as String?;
@@ -431,11 +435,11 @@ class _NoteTableState extends State<NoteTable> {
                       _showQuizPreviewDialog(context, questionBankId,
                           dualMode: noteType == 'dynamic_quiz_dual');
                     } else if (noteType == 'interactive') {
-                      context.go('/interactive-note/${doc.id}');
+                      context.go('/interactive-note/${doc.id}?from=$fromParam');
                     } else if (noteType == 'memoriapalota_allomasok') {
-                      context.go('/memoriapalota-allomas/${doc.id}');
+                      context.go('/memoriapalota-allomas/${doc.id}?from=$fromParam');
                     } else {
-                      context.go('/note/${doc.id}');
+                      context.go('/note/${doc.id}?from=$fromParam');
                     }
                   }),
                 ],

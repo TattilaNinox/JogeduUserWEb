@@ -94,6 +94,19 @@ class _NoteListScreenState extends State<NoteListScreen> {
         widget.initialScience != null ||
         widget.initialTag != null ||
         widget.initialType != null) {
+      // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
+      final normalizedType = widget.initialType == 'MP' ? 'memoriapalota_allomasok' : widget.initialType;
+      
+      // FONTOS: Ha van címke az URL-ben, de nincs a listában, hozzáadjuk!
+      if (widget.initialTag != null && 
+          widget.initialTag!.isNotEmpty && 
+          !_tags.contains(widget.initialTag)) {
+        setState(() {
+          _tags = [..._tags, widget.initialTag!]..sort();
+        });
+        debugPrint('🔵 Címke hozzáadva a listához: ${widget.initialTag}');
+      }
+      
       setState(() {
         _searchText = widget.initialSearch ?? '';
         _searchController.text = _searchText;
@@ -105,8 +118,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
           _selectedScience = widget.initialScience;
         }
         _selectedTag = widget.initialTag;
-        _selectedType = widget.initialType;
+        _selectedType = normalizedType;
       });
+      
+      // FONTOS: Beállítjuk a FilterStorage értékeit is, hogy a breadcrumb és visszalépés működjön!
+      FilterStorage.searchText = widget.initialSearch;
+      FilterStorage.status = widget.initialStatus;
+      FilterStorage.category = widget.initialCategory;
+      FilterStorage.science = widget.initialScience;
+      FilterStorage.tag = widget.initialTag;
+      FilterStorage.type = normalizedType;
     }
   }
 
@@ -226,35 +247,118 @@ class _NoteListScreenState extends State<NoteListScreen> {
       // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
       const userScience = 'Jogász';
 
-      // Admin esetén Draft státuszú jegyzeteket is betöltjük
-      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
-          .collection('notes')
-          .where('science', isEqualTo: userScience);
-      
-      if (isAdmin) {
-        query = query.where('status', whereIn: ['Published', 'Public', 'Draft']);
-      } else {
-        query = query.where('status', whereIn: ['Published', 'Public']);
-      }
-      
-      final notesSnapshot = await query.get();
       final allTags = <String>{};
 
-      for (final doc in notesSnapshot.docs) {
-        final data = doc.data();
-        if (data.containsKey('tags') && data['tags'] is List) {
-          final tags = List<String>.from(data['tags']);
-          allTags.addAll(tags);
+      // 1. Betöltjük a címkéket a notes kollekcióból
+      try {
+        Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
+            .collection('notes')
+            .where('science', isEqualTo: userScience);
+        
+        if (isAdmin) {
+          notesQuery = notesQuery.where('status', whereIn: ['Published', 'Public', 'Draft']);
+        } else {
+          notesQuery = notesQuery.where('status', whereIn: ['Published', 'Public']);
         }
+        
+        final notesSnapshot = await notesQuery.get();
+
+        for (final doc in notesSnapshot.docs) {
+          final data = doc.data();
+          if (data.containsKey('tags') && data['tags'] is List) {
+            final tags = List<String>.from(data['tags']);
+            allTags.addAll(tags);
+          }
+        }
+      } catch (e) {
+        debugPrint('🔴 Hiba a notes kollekció címkéinek betöltésekor: $e');
+      }
+
+      // 2. Betöltjük a címkéket a memoriapalota_allomasok kollekcióból (science="Jogász" szűréssel)
+      try {
+        Query<Map<String, dynamic>> mpAllomasQuery = FirebaseConfig.firestore
+            .collection('memoriapalota_allomasok')
+            .where('science', isEqualTo: userScience);
+        // Státusz szűrés: üzleti logika miatt fontos (Published/Public/Draft)
+        if (isAdmin) {
+          mpAllomasQuery = mpAllomasQuery.where(
+            'status',
+            whereIn: ['Published', 'Public', 'Draft'],
+          );
+        } else {
+          mpAllomasQuery = mpAllomasQuery.where(
+            'status',
+            whereIn: ['Published', 'Public'],
+          );
+        }
+        
+        final mpAllomasSnapshot = await mpAllomasQuery.get();
+
+        for (final doc in mpAllomasSnapshot.docs) {
+          final data = doc.data();
+          if (data.containsKey('tags') && data['tags'] is List) {
+            final tags = List<String>.from(data['tags']);
+            allTags.addAll(tags);
+          }
+        }
+        debugPrint('🔵 Memoriapalota_allomasok címkék betöltve: ${mpAllomasSnapshot.docs.length} dokumentum');
+      } catch (e) {
+        debugPrint('🔴 Hiba a memoriapalota_allomasok kollekció címkéinek betöltésekor: $e');
+      }
+
+      // 3. Betöltjük a címkéket a memoriapalota_fajlok kollekcióból (science="Jogász" szűréssel)
+      try {
+        Query<Map<String, dynamic>> mpFajlQuery = FirebaseConfig.firestore
+            .collection('memoriapalota_fajlok')
+            .where('science', isEqualTo: userScience);
+        // Státusz szűrés: üzleti logika miatt fontos (Published/Public/Draft)
+        if (isAdmin) {
+          mpFajlQuery = mpFajlQuery.where(
+            'status',
+            whereIn: ['Published', 'Public', 'Draft'],
+          );
+        } else {
+          mpFajlQuery = mpFajlQuery.where(
+            'status',
+            whereIn: ['Published', 'Public'],
+          );
+        }
+        
+        final mpFajlSnapshot = await mpFajlQuery.get();
+
+        for (final doc in mpFajlSnapshot.docs) {
+          final data = doc.data();
+          if (data.containsKey('tags') && data['tags'] is List) {
+            final tags = List<String>.from(data['tags']);
+            allTags.addAll(tags);
+          }
+        }
+        debugPrint('🔵 Memoriapalota_fajlok címkék betöltve: ${mpFajlSnapshot.docs.length} dokumentum');
+      } catch (e) {
+        debugPrint('🔴 Hiba a memoriapalota_fajlok kollekció címkéinek betöltésekor: $e');
+      }
+
+      // Biztonsági háló: ha az URL/aktuális kiválasztott címke nem volt a lekérdezésekben, adjuk hozzá.
+      final forcedTag = (_selectedTag != null && _selectedTag!.isNotEmpty)
+          ? _selectedTag
+          : (widget.initialTag != null && widget.initialTag!.isNotEmpty)
+              ? widget.initialTag
+              : null;
+      if (forcedTag != null && !allTags.contains(forcedTag)) {
+        allTags.add(forcedTag);
+        debugPrint('🔵 _loadTags: forced tag added: $forcedTag');
       }
 
       if (mounted) {
         setState(() {
           _tags = allTags.toList()..sort();
         });
+        debugPrint('🔵 ÖSSZESEN betöltött címkék száma: ${_tags.length}');
+        debugPrint('🔵 Címkék listája: ${_tags.join(", ")}');
       }
     } catch (e) {
       // Ha jogosultság/lekérdezési hiba, ne akassza meg az oldalt
+      debugPrint('🔴 Hiba a címkék betöltésekor: $e');
       if (mounted) {
         setState(() {
           _tags = const [];
@@ -353,16 +457,18 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   /// Frissíti a kiválasztott típust.
   void _onTypeChanged(String? value) {
-    setState(() => _selectedType = value);
-    // Menti a típus szűrőt a FilterStorage-ba
-    FilterStorage.type = value;
-    // Menti a CategoryState-be is
+    // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
+    final normalizedValue = value == 'MP' ? 'memoriapalota_allomasok' : value;
+    setState(() => _selectedType = normalizedValue);
+    // Menti a típus szűrőt a FilterStorage-ba (normalizált értékkel)
+    FilterStorage.type = normalizedValue;
+    // Menti a CategoryState-be is (normalizált értékkel)
     CategoryState.setCategoryState(
       searchText: _searchText.isNotEmpty ? _searchText : null,
       category: _selectedCategory,
       science: _selectedScience,
       tag: _selectedTag,
-      type: value,
+      type: normalizedValue,
     );
     _pushFiltersToUrl();
   }

@@ -13,6 +13,8 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:async';
 import '../core/firebase_config.dart';
+import '../widgets/breadcrumb_navigation.dart';
+import '../utils/filter_storage.dart';
 
 // Top-level függvény a compute-hoz - gyorsított, egyszerűsített verzió
 Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
@@ -136,10 +138,12 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
 
 class MemoriapalotaAllomasViewScreen extends StatefulWidget {
   final String noteId;
+  final String? from;
 
   const MemoriapalotaAllomasViewScreen({
     super.key,
     required this.noteId,
+    this.from,
   });
 
   @override
@@ -166,11 +170,99 @@ class _MemoriapalotaAllomasViewScreenState
   
   // Tananyag megnyitás state
   bool _isContentOpen = false;
+  
+  // Jegyzet adatok breadcrumb-hoz
+  String? _noteTitle;
+  String? _noteCategory;
+  String? _noteTag;
 
   @override
   void initState() {
     super.initState();
+    // FONTOS: Betöltjük a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
+    _loadFiltersFromUrl();
+    _loadNoteData();
     _loadAllomasok();
+  }
+  
+  /// Betölti a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
+  /// Ez biztosítja, hogy a breadcrumb és visszalépés gombok működjenek
+  void _loadFiltersFromUrl() {
+    if (widget.from != null && widget.from!.isNotEmpty) {
+      try {
+        final fromUri = Uri.parse(Uri.decodeComponent(widget.from!));
+        final queryParams = fromUri.queryParameters;
+        
+        // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
+        final type = queryParams['type'];
+        final normalizedType = type == 'MP' ? 'memoriapalota_allomasok' : type;
+        
+        // Beállítjuk a FilterStorage értékeit az URL query paramétereiből
+        FilterStorage.searchText = queryParams['q'];
+        FilterStorage.status = queryParams['status'];
+        FilterStorage.category = queryParams['category'];
+        FilterStorage.science = queryParams['science'];
+        FilterStorage.tag = queryParams['tag'];
+        FilterStorage.type = normalizedType;
+        
+        debugPrint('🔵 MemoriapalotaAllomasViewScreen _loadFiltersFromUrl:');
+        debugPrint('   from=${widget.from}');
+        debugPrint('   tag=${FilterStorage.tag}');
+        debugPrint('   category=${FilterStorage.category}');
+        debugPrint('   type=${FilterStorage.type}');
+      } catch (e) {
+        debugPrint('🔴 Hiba a FilterStorage betöltésekor az URL-ből: $e');
+      }
+    }
+  }
+  
+  /// Betölti a jegyzet adatait breadcrumb-hoz
+  /// Először a notes kollekcióból próbálja, ha nem találja, akkor a memoriapalota_allomasok kollekcióból
+  Future<void> _loadNoteData() async {
+    try {
+      // Először próbáljuk a notes kollekcióból
+      var noteDoc = await FirebaseConfig.firestore
+          .collection('notes')
+          .doc(widget.noteId)
+          .get();
+      
+      // Ha nem található a notes kollekcióban, próbáljuk a memoriapalota_allomasok kollekcióból
+      if (!noteDoc.exists) {
+        noteDoc = await FirebaseConfig.firestore
+            .collection('memoriapalota_allomasok')
+            .doc(widget.noteId)
+            .get();
+      }
+      
+      if (noteDoc.exists && mounted) {
+        final data = noteDoc.data();
+        if (data != null) {
+          final title = data['title'] as String?;
+          final category = data['category'] as String?;
+          final tags = data['tags'] as List<dynamic>?;
+          final tag = tags != null && tags.isNotEmpty ? tags.first.toString() : null;
+          
+          // Debug: ellenőrizzük, hogy milyen adatokat kaptunk
+          debugPrint('🔵 MemoriapalotaAllomasViewScreen _loadNoteData:');
+          debugPrint('   noteId=${widget.noteId}');
+          debugPrint('   title=$title');
+          debugPrint('   category=$category');
+          debugPrint('   tags=$tags');
+          debugPrint('   tag=$tag');
+          
+            setState(() {
+              _noteTitle = title;
+              _noteCategory = category;
+              _noteTag = tag;
+            });
+        }
+      } else {
+        debugPrint('🔴 MemoriapalotaAllomasViewScreen: A jegyzet nem található sem a notes, sem a memoriapalota_allomasok kollekcióban (noteId=${widget.noteId})');
+      }
+    } catch (e) {
+      // Csendben kezeljük a hibát, nem akadályozza meg az oldal betöltését
+      debugPrint('🔴 Hiba a jegyzet adatainak betöltésekor: $e');
+    }
   }
 
   void _setupIframe(String cim, String kulcsszo, String tartalom, {int? sorszam}) {
@@ -1573,7 +1665,18 @@ class _MemoriapalotaAllomasViewScreenState
           title: const Text('Memóriapalota Állomások'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/notes'),
+            onPressed: () {
+              // Ha van from paraméter, oda navigálunk vissza (ez az előző oldal URL-je)
+              if (widget.from != null && widget.from!.isNotEmpty) {
+                context.go(Uri.decodeComponent(widget.from!));
+              } else if (context.canPop()) {
+                // Ha nincs from paraméter, de van előző oldal a veremben, akkor pop
+                context.pop();
+              } else {
+                // Ha nincs előző oldal, akkor a főoldalra navigálunk
+                context.go('/notes');
+              }
+            },
           ),
         ),
         body: const Center(child: CircularProgressIndicator()),
@@ -1620,7 +1723,65 @@ class _MemoriapalotaAllomasViewScreenState
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/notes'),
+          onPressed: () {
+            // Breadcrumb navigációval visszalépünk
+            // CSAK FilterStorage-ban tárolt előző oldal szűrőit használjuk, SOHA ne a jegyzet aktuális értékeit!
+            final effectiveTag = FilterStorage.tag;
+            final effectiveCategory = FilterStorage.category;
+            
+            if (effectiveTag != null && effectiveTag.isNotEmpty) {
+              // Először próbáljuk a címkére, ha van
+              final uri = Uri(
+                path: '/notes',
+                queryParameters: {
+                  if (FilterStorage.searchText != null &&
+                      FilterStorage.searchText!.isNotEmpty)
+                    'q': FilterStorage.searchText!,
+                  if (FilterStorage.status != null)
+                    'status': FilterStorage.status!,
+                  if (effectiveCategory != null) 'category': effectiveCategory,
+                  if (FilterStorage.science != null)
+                    'science': FilterStorage.science!,
+                  'tag': effectiveTag,
+                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                },
+              );
+              context.go(uri.toString());
+            } else if (effectiveCategory != null && effectiveCategory.isNotEmpty) {
+              // Ha nincs címke, de van kategória, akkor a kategóriára lépünk vissza
+              final uri = Uri(
+                path: '/notes',
+                queryParameters: {
+                  if (FilterStorage.searchText != null &&
+                      FilterStorage.searchText!.isNotEmpty)
+                    'q': FilterStorage.searchText!,
+                  if (FilterStorage.status != null)
+                    'status': FilterStorage.status!,
+                  'category': effectiveCategory,
+                  if (FilterStorage.science != null)
+                    'science': FilterStorage.science!,
+                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                },
+              );
+              context.go(uri.toString());
+            } else {
+              // Ha nincs sem kategória, sem címke, akkor a főoldalra
+              final uri = Uri(
+                path: '/notes',
+                queryParameters: {
+                  if (FilterStorage.searchText != null &&
+                      FilterStorage.searchText!.isNotEmpty)
+                    'q': FilterStorage.searchText!,
+                  if (FilterStorage.status != null)
+                    'status': FilterStorage.status!,
+                  if (FilterStorage.science != null)
+                    'science': FilterStorage.science!,
+                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                },
+              );
+              context.go(uri.toString());
+            }
+          },
         ),
         actions: [
           // Bezárás gomb (csak ha van kép és a tananyag nyitva van)
@@ -1662,9 +1823,22 @@ class _MemoriapalotaAllomasViewScreenState
             ),
         ],
       ),
-      body: Stack(
+      body: Column(
         children: [
-          // Kép háttérben (ha van)
+          // Breadcrumb navigáció
+          // Prioritás: 1. FilterStorage-ban tárolt előző oldal szűrői, 2. Jegyzet aktuális értékei
+          // A breadcrumb a jegyzet aktuális kategóriáját és címkéjét mutatja
+          BreadcrumbNavigation(
+            category: _noteCategory,
+            tag: _noteTag,
+            noteTitle: _noteTitle,
+            noteId: widget.noteId,
+          ),
+          // Tartalom
+          Expanded(
+            child: Stack(
+              children: [
+                // Kép háttérben (ha van)
           if (_currentImageUrl != null)
             Positioned.fill(
               child: Container(
@@ -1915,6 +2089,9 @@ class _MemoriapalotaAllomasViewScreenState
                   ),
                 ],
               ),
+            ),
+          ),
+              ],
             ),
           ),
         ],

@@ -87,22 +87,26 @@ class NoteListTile extends StatelessWidget {
 
     final isMobile = MediaQuery.of(context).size.width < 600;
 
+    // Az aktuális URL-t query paraméterként adjuk át (visszalépéshez)
+    final currentUri = GoRouterState.of(context).uri;
+    final fromParam = Uri.encodeComponent(currentUri.toString());
+
     if (type == 'interactive') {
-      context.go('/interactive-note/$id');
+      context.go('/interactive-note/$id?from=$fromParam');
     } else if (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual') {
       if (isMobile) {
-        context.go('/quiz/$id');
+        context.go('/quiz/$id?from=$fromParam');
       } else {
         _openQuiz(context, dualMode: type == 'dynamic_quiz_dual');
       }
     } else if (type == 'deck') {
-      context.go('/deck/$id/view');
+      context.go('/deck/$id/view?from=$fromParam');
     } else if (type == 'memoriapalota_allomasok') {
-      context.go('/memoriapalota-allomas/$id');
+      context.go('/memoriapalota-allomas/$id?from=$fromParam');
     } else if (type == 'memoriapalota_fajlok') {
-      context.go('/memoriapalota-fajl/$id');
+      context.go('/memoriapalota-fajl/$id?from=$fromParam');
     } else {
-      context.go('/note/$id');
+      context.go('/note/$id?from=$fromParam');
     }
   }
 

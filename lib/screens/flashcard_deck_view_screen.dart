@@ -182,24 +182,29 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
               size: isMobile ? 20 : 22,
             ),
             onPressed: () {
-              // URL paraméterekkel vissza navigálás a szűrők megőrzéséhez
-              final uri = Uri(
-                path: '/notes',
-                queryParameters: {
-                  if (FilterStorage.searchText != null &&
-                      FilterStorage.searchText!.isNotEmpty)
-                    'q': FilterStorage.searchText!,
-                  if (FilterStorage.status != null)
-                    'status': FilterStorage.status!,
-                  if (FilterStorage.category != null)
-                    'category': FilterStorage.category!,
-                  if (FilterStorage.science != null)
-                    'science': FilterStorage.science!,
-                  if (FilterStorage.tag != null) 'tag': FilterStorage.tag!,
-                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
-                },
-              );
-              context.go(uri.toString());
+              // Egy szinttel visszalépés, ha van előző oldal a veremben
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Ha nincs előző oldal, akkor a főoldalra navigálunk szűrőkkel
+                final uri = Uri(
+                  path: '/notes',
+                  queryParameters: {
+                    if (FilterStorage.searchText != null &&
+                        FilterStorage.searchText!.isNotEmpty)
+                      'q': FilterStorage.searchText!,
+                    if (FilterStorage.status != null)
+                      'status': FilterStorage.status!,
+                    if (FilterStorage.category != null)
+                      'category': FilterStorage.category!,
+                    if (FilterStorage.science != null)
+                      'science': FilterStorage.science!,
+                    if (FilterStorage.tag != null) 'tag': FilterStorage.tag!,
+                    if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                  },
+                );
+                context.go(uri.toString());
+              }
             },
           ),
         ),
@@ -352,24 +357,29 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
               size: isMobile ? 20 : 22,
             ),
             onPressed: () {
-              // URL paraméterekkel vissza navigálás a szűrők megőrzéséhez
-              final uri = Uri(
-                path: '/notes',
-                queryParameters: {
-                  if (FilterStorage.searchText != null &&
-                      FilterStorage.searchText!.isNotEmpty)
-                    'q': FilterStorage.searchText!,
-                  if (FilterStorage.status != null)
-                    'status': FilterStorage.status!,
-                  if (FilterStorage.category != null)
-                    'category': FilterStorage.category!,
-                  if (FilterStorage.science != null)
-                    'science': FilterStorage.science!,
-                  if (FilterStorage.tag != null) 'tag': FilterStorage.tag!,
-                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
-                },
-              );
-              context.go(uri.toString());
+              // Egy szinttel visszalépés, ha van előző oldal a veremben
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Ha nincs előző oldal, akkor a főoldalra navigálunk szűrőkkel
+                final uri = Uri(
+                  path: '/notes',
+                  queryParameters: {
+                    if (FilterStorage.searchText != null &&
+                        FilterStorage.searchText!.isNotEmpty)
+                      'q': FilterStorage.searchText!,
+                    if (FilterStorage.status != null)
+                      'status': FilterStorage.status!,
+                    if (FilterStorage.category != null)
+                      'category': FilterStorage.category!,
+                    if (FilterStorage.science != null)
+                      'science': FilterStorage.science!,
+                    if (FilterStorage.tag != null) 'tag': FilterStorage.tag!,
+                    if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                  },
+                );
+                context.go(uri.toString());
+              }
             },
           ),
           actions: [

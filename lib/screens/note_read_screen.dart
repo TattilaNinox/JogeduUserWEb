@@ -6,6 +6,7 @@ import 'dart:ui_web' as ui_web;
 import 'dart:html' as html;
 import 'dart:convert' as convert;
 import '../widgets/audio_preview_player.dart';
+import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
 
 /// Felhasználói (csak olvasás) nézet szöveges jegyzetekhez.
@@ -14,8 +15,9 @@ import '../utils/filter_storage.dart';
 /// - Nincsenek admin műveletek
 class NoteReadScreen extends StatefulWidget {
   final String noteId;
+  final String? from;
 
-  const NoteReadScreen({super.key, required this.noteId});
+  const NoteReadScreen({super.key, required this.noteId, this.from});
 
   @override
   State<NoteReadScreen> createState() => _NoteReadScreenState();
@@ -674,6 +676,13 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
 
     final data = _noteSnapshot!.data() as Map<String, dynamic>;
     final title = data['title'] as String? ?? 'Cím nélkül';
+    final category = data['category'] as String?;
+    final tags = data['tags'] as List<dynamic>?;
+    final tag = tags != null && tags.isNotEmpty ? tags.first.toString() : null;
+    
+    // Debug: ellenőrizzük, hogy milyen adatokat kaptunk
+    debugPrint('🔵 NoteReadScreen: title=$title, category=$category, tag=$tag');
+    
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -696,74 +705,129 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             size: isMobile ? 20 : 22,
           ),
           onPressed: () {
-            // URL paraméterekkel vissza navigálás a szűrők megőrzéséhez
-            final uri = Uri(
-              path: '/notes',
-              queryParameters: {
-                if (FilterStorage.searchText != null &&
-                    FilterStorage.searchText!.isNotEmpty)
-                  'q': FilterStorage.searchText!,
-                if (FilterStorage.status != null)
-                  'status': FilterStorage.status!,
-                if (FilterStorage.category != null)
-                  'category': FilterStorage.category!,
-                if (FilterStorage.science != null)
-                  'science': FilterStorage.science!,
-                if (FilterStorage.tag != null) 'tag': FilterStorage.tag!,
-                if (FilterStorage.type != null) 'type': FilterStorage.type!,
-              },
-            );
-            context.go(uri.toString());
+            // Breadcrumb navigációval visszalépünk
+            // CSAK FilterStorage-ban tárolt előző oldal szűrőit használjuk, SOHA ne a jegyzet aktuális értékeit!
+            final effectiveTag = FilterStorage.tag;
+            final effectiveCategory = FilterStorage.category;
+            
+            if (effectiveTag != null && effectiveTag.isNotEmpty) {
+              // Először próbáljuk a címkére, ha van
+              final uri = Uri(
+                path: '/notes',
+                queryParameters: {
+                  if (FilterStorage.searchText != null &&
+                      FilterStorage.searchText!.isNotEmpty)
+                    'q': FilterStorage.searchText!,
+                  if (FilterStorage.status != null)
+                    'status': FilterStorage.status!,
+                  if (effectiveCategory != null) 'category': effectiveCategory,
+                  if (FilterStorage.science != null)
+                    'science': FilterStorage.science!,
+                  'tag': effectiveTag,
+                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                },
+              );
+              context.go(uri.toString());
+            } else if (effectiveCategory != null && effectiveCategory.isNotEmpty) {
+              // Ha nincs címke, de van kategória, akkor a kategóriára lépünk vissza
+              final uri = Uri(
+                path: '/notes',
+                queryParameters: {
+                  if (FilterStorage.searchText != null &&
+                      FilterStorage.searchText!.isNotEmpty)
+                    'q': FilterStorage.searchText!,
+                  if (FilterStorage.status != null)
+                    'status': FilterStorage.status!,
+                  'category': effectiveCategory,
+                  if (FilterStorage.science != null)
+                    'science': FilterStorage.science!,
+                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                },
+              );
+              context.go(uri.toString());
+            } else {
+              // Ha nincs sem kategória, sem címke, akkor a főoldalra
+              final uri = Uri(
+                path: '/notes',
+                queryParameters: {
+                  if (FilterStorage.searchText != null &&
+                      FilterStorage.searchText!.isNotEmpty)
+                    'q': FilterStorage.searchText!,
+                  if (FilterStorage.status != null)
+                    'status': FilterStorage.status!,
+                  if (FilterStorage.science != null)
+                    'science': FilterStorage.science!,
+                  if (FilterStorage.type != null) 'type': FilterStorage.type!,
+                },
+              );
+              context.go(uri.toString());
+            }
           },
         ),
         actions: const [],
       ),
-      body: Container(
-        color: const Color(0xFFF8F9FA),
-        child: Column(
-          children: [
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.all(isMobile ? 0 : 16),
-                decoration: isMobile
-                    ? null
-                    : BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+      body: Column(
+        children: [
+          // Breadcrumb navigáció
+          // Prioritás: 1. FilterStorage-ban tárolt előző oldal szűrői, 2. Jegyzet aktuális értékei
+          // A breadcrumb a jegyzet aktuális kategóriáját és címkéjét mutatja
+          BreadcrumbNavigation(
+            category: category,
+            tag: tag,
+            noteTitle: title,
+            noteId: widget.noteId,
+          ),
+          // Tartalom
+          Expanded(
+            child: Container(
+              color: const Color(0xFFF8F9FA),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      margin: EdgeInsets.all(isMobile ? 0 : 16),
+                      decoration: isMobile
+                          ? null
+                          : BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                      child: _hasContent && _viewId.isNotEmpty
+                          ? HtmlElementView(
+                              key: ValueKey('iframe_$_viewId'),
+                              viewType: _viewId,
+                            )
+                          : const Center(
+                              child: Text(
+                                'Ez a jegyzet nem tartalmaz tartalmat.',
+                                style: TextStyle(color: Colors.grey, fontSize: 16),
+                              ),
+                            ),
+                    ),
+                  ),
+                  if (data['audioUrl'] != null &&
+                      data['audioUrl'].toString().isNotEmpty)
+                    Container(
+                      margin: EdgeInsets.fromLTRB(
+                        isMobile ? 0 : 16,
+                        0,
+                        isMobile ? 0 : 16,
+                        isMobile ? 0 : 16,
                       ),
-                child: _hasContent && _viewId.isNotEmpty
-                    ? HtmlElementView(
-                        key: ValueKey('iframe_$_viewId'),
-                        viewType: _viewId,
-                      )
-                    : const Center(
-                        child: Text(
-                          'Ez a jegyzet nem tartalmaz tartalmat.',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      ),
+                      child: AudioPreviewPlayer(audioUrl: data['audioUrl']),
+                    ),
+                ],
               ),
             ),
-            if (data['audioUrl'] != null &&
-                data['audioUrl'].toString().isNotEmpty)
-              Container(
-                margin: EdgeInsets.fromLTRB(
-                  isMobile ? 0 : 16,
-                  0,
-                  isMobile ? 0 : 16,
-                  isMobile ? 0 : 16,
-                ),
-                child: AudioPreviewPlayer(audioUrl: data['audioUrl']),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

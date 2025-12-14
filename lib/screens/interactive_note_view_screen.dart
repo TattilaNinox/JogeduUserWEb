@@ -228,9 +228,14 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
             size: isMobile ? 20 : 22,
           ),
           onPressed: () {
-            if (widget.from != null && widget.from!.isNotEmpty) {
+            // Egy szinttel visszalépés, ha van előző oldal a veremben
+            if (context.canPop()) {
+              context.pop();
+            } else if (widget.from != null && widget.from!.isNotEmpty) {
+              // Ha nincs előző oldal, de van from paraméter, akkor oda navigálunk
               context.go(widget.from!);
             } else {
+              // Ha nincs előző oldal és nincs from paraméter, akkor a főoldalra navigálunk
               context.go('/notes');
             }
           },

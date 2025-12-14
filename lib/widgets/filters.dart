@@ -68,7 +68,8 @@ class _FiltersState extends State<Filters> {
     _category = widget.selectedCategory;
     _science = widget.selectedScience;
     _tag = widget.selectedTag;
-    _type = widget.selectedType;
+    // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
+    _type = widget.selectedType == 'MP' ? 'memoriapalota_allomasok' : widget.selectedType;
   }
 
   @override
@@ -87,7 +88,8 @@ class _FiltersState extends State<Filters> {
       _tag = widget.selectedTag;
     }
     if (widget.selectedType != oldWidget.selectedType) {
-      _type = widget.selectedType;
+      // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
+      _type = widget.selectedType == 'MP' ? 'memoriapalota_allomasok' : widget.selectedType;
     }
   }
 
@@ -111,8 +113,10 @@ class _FiltersState extends State<Filters> {
         value: _type,
         items: _noteTypes,
         onChanged: (v) {
-          setState(() => _type = v);
-          widget.onTypeChanged(v);
+          // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
+          final normalizedValue = v == 'MP' ? 'memoriapalota_allomasok' : v;
+          setState(() => _type = normalizedValue);
+          widget.onTypeChanged(normalizedValue);
         },
         isExpanded: widget.vertical,
       ));
@@ -201,6 +205,11 @@ class _FiltersState extends State<Filters> {
     required ValueChanged<T?> onChanged,
     bool isExpanded = false,
   }) {
+    // Crash-proof: ha a value nincs benne az items listában, akkor null-ra állítjuk,
+    // különben a DropdownButtonFormField assertel és összeomlik.
+    final T? effectiveValue =
+        ((value != null && items.any((e) => e == value)) ? value : null) as T?;
+
     return Theme(
       data: Theme.of(context).copyWith(
         dropdownMenuTheme: DropdownMenuThemeData(
@@ -219,7 +228,7 @@ class _FiltersState extends State<Filters> {
         ),
       ),
       child: DropdownButtonFormField<T>(
-        initialValue: value,
+        value: effectiveValue,
         decoration: InputDecoration(
           labelText: hint,
           filled: true,

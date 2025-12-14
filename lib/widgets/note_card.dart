@@ -57,16 +57,20 @@ class NoteCard extends StatelessWidget {
             type: FilterStorage.type,
           );
 
+          // Az aktuális URL-t query paraméterként adjuk át (visszalépéshez)
+          final currentUri = GoRouterState.of(context).uri;
+          final fromParam = Uri.encodeComponent(currentUri.toString());
+
           if (type == 'interactive' ||
               type == 'dynamic_quiz' ||
               type == 'dynamic_quiz_dual') {
-            context.go('/interactive-note/$id');
+            context.go('/interactive-note/$id?from=$fromParam');
           } else if (type == 'deck') {
-            context.go('/deck/$id/view');
+            context.go('/deck/$id/view?from=$fromParam');
           } else if (type == 'memoriapalota_allomasok') {
-            context.go('/memoriapalota-allomas/$id');
+            context.go('/memoriapalota-allomas/$id?from=$fromParam');
           } else {
-            context.go('/note/$id');
+            context.go('/note/$id?from=$fromParam');
           }
         },
         child: Padding(
