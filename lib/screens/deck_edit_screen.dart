@@ -384,7 +384,7 @@ class _DeckEditScreenState extends State<DeckEditScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _selectedScience,
+                          initialValue: _selectedScience,
                           items: _sciences
                               .map((String science) => DropdownMenuItem<String>(
                                   value: science, child: Text(science)))
@@ -403,7 +403,7 @@ class _DeckEditScreenState extends State<DeckEditScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value:
+                          initialValue:
                               _categories.containsKey(_selectedCategory)
                                   ? _selectedCategory
                                   : null,

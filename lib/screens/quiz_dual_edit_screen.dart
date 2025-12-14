@@ -280,7 +280,7 @@ class _QuizDualEditScreenState extends State<QuizDualEditScreen> {
                           const InputDecoration(labelText: 'Kvíz címe')),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _selectedScience,
+                    initialValue: _selectedScience,
                     items: _sciences
                         .map((String science) => DropdownMenuItem<String>(
                             value: science, child: Text(science)))
@@ -297,7 +297,7 @@ class _QuizDualEditScreenState extends State<QuizDualEditScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     items: _categories
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
@@ -318,7 +318,7 @@ class _QuizDualEditScreenState extends State<QuizDualEditScreen> {
                   const SizedBox(height: 16),
                   if (_selectedCategory != null)
                     DropdownButtonFormField<String>(
-                      value: _selectedQuestionBankId,
+                      initialValue: _selectedQuestionBankId,
                       items: filteredBanks
                           .map((doc) => DropdownMenuItem(
                               value: doc.id, child: Text(doc['name'])))

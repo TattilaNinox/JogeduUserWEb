@@ -223,7 +223,7 @@ class _PublicDocumentEditScreenState extends State<PublicDocumentEditScreen>
 
   Widget _buildCategoryDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedCategory,
+      initialValue: _selectedCategory,
       items: const [
         DropdownMenuItem(value: 'aszf', child: Text('ÁSZF')),
         DropdownMenuItem(value: 'adatvedelmi', child: Text('Adatvédelem')),
@@ -241,7 +241,7 @@ class _PublicDocumentEditScreenState extends State<PublicDocumentEditScreen>
 
   Widget _buildLanguageDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedLanguage,
+      initialValue: _selectedLanguage,
       items: const [
         DropdownMenuItem(value: 'hu', child: Text('Magyar')),
         DropdownMenuItem(value: 'en', child: Text('English')),

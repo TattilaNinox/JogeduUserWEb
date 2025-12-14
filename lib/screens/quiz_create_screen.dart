@@ -235,7 +235,7 @@ class _QuizCreateScreenState extends State<QuizCreateScreen> {
                           const InputDecoration(labelText: 'Kvíz címe')),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _selectedScience,
+                    initialValue: _selectedScience,
                     items: _sciences
                         .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                         .toList(),
@@ -249,7 +249,7 @@ class _QuizCreateScreenState extends State<QuizCreateScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     items: _categories
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
@@ -270,7 +270,7 @@ class _QuizCreateScreenState extends State<QuizCreateScreen> {
                   const SizedBox(height: 16),
                   if (_selectedCategory != null)
                     DropdownButtonFormField<String>(
-                      value: _selectedQuestionBankId,
+                      initialValue: _selectedQuestionBankId,
                       items: filteredBanks
                           .map((doc) => DropdownMenuItem(
                               value: doc.id, child: Text(doc['name'])))

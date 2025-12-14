@@ -341,7 +341,7 @@ class _QuestionBankEditScreenState extends State<QuestionBankEditScreen> {
                 children: [
                   // Mód kiválasztása (1 vagy 2 helyes válasz)
                   DropdownButtonFormField<String>(
-                    value: _selectedMode,
+                    initialValue: _selectedMode,
                     items: _modes
                         .map((m) => DropdownMenuItem(
                               value: m,
@@ -368,7 +368,7 @@ class _QuestionBankEditScreenState extends State<QuestionBankEditScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _selectedScience,
+                          initialValue: _selectedScience,
                           items: _sciences
                               .map((String science) => DropdownMenuItem<String>(
                                   value: science, child: Text(science)))
@@ -387,7 +387,7 @@ class _QuestionBankEditScreenState extends State<QuestionBankEditScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _selectedCategory,
+                          initialValue: _selectedCategory,
                           items: _categories
                               .map((String category) =>
                                   DropdownMenuItem<String>(

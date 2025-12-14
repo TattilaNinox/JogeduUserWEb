@@ -396,7 +396,7 @@ class _InteractiveNoteCreateScreenState
 
   Widget _buildCategoryDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedCategory,
+      initialValue: _selectedCategory,
       items: _categories.map((String category) {
         return DropdownMenuItem<String>(
           value: category,
@@ -421,7 +421,7 @@ class _InteractiveNoteCreateScreenState
 
   Widget _buildScienceDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedScience,
+      initialValue: _selectedScience,
       items: _sciences.map((String sc) {
         return DropdownMenuItem<String>(
           value: sc,
