@@ -611,62 +611,57 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 ),
               if (!showSideFilters && _hasActiveFilters)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0.0),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        if (_selectedStatus != null)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Chip(
-                              label: Text('Státusz: $_selectedStatus'),
-                              onDeleted: () => _onStatusChanged(null),
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Colors.grey.shade300),
-                            ),
-                          ),
-                        if (_selectedType != null)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Chip(
-                              label: Text(
-                                  'Típus: ${_selectedType == "memoriapalota_allomasok" ? "Memóriapalota" : _selectedType}'),
-                              onDeleted: () => _onTypeChanged(null),
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Colors.grey.shade300),
-                            ),
-                          ),
-                        if (_selectedCategory != null)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Chip(
-                              label: Text(_selectedCategory!),
-                              onDeleted: () => _onCategoryChanged(null),
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Colors.grey.shade300),
-                            ),
-                          ),
-                        if (_selectedTag != null)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Chip(
-                              label: Text('Címke: $_selectedTag'),
-                              onDeleted: () => _onTagChanged(null),
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Colors.grey.shade300),
-                            ),
-                          ),
-                        TextButton.icon(
-                          onPressed: _onClearFilters,
-                          icon: const Icon(Icons.clear, size: 18),
-                          label: const Text('Szűrők törlése'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red,
-                          ),
+                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
+                  child: Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _onClearFilters,
+                        icon: const Icon(Icons.clear, size: 18),
+                        label: const Text('Szűrők törlése'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                      ],
-                    ),
+                      ),
+                      if (_selectedStatus != null)
+                        Chip(
+                          label: Text('Státusz: $_selectedStatus'),
+                          onDeleted: () => _onStatusChanged(null),
+                          backgroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey.shade300),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (_selectedType != null)
+                        Chip(
+                          label: Text(
+                              'Típus: ${_selectedType == "memoriapalota_allomasok" ? "Memóriapalota" : _selectedType}'),
+                          onDeleted: () => _onTypeChanged(null),
+                          backgroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey.shade300),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (_selectedCategory != null)
+                        Chip(
+                          label: Text(_selectedCategory!),
+                          onDeleted: () => _onCategoryChanged(null),
+                          backgroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey.shade300),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (_selectedTag != null)
+                        Chip(
+                          label: Text('Címke: $_selectedTag'),
+                          onDeleted: () => _onTagChanged(null),
+                          backgroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey.shade300),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
                   ),
                 ),
               Expanded(
