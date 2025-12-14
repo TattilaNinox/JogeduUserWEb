@@ -613,7 +613,58 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             display: block !important;
             margin-bottom: 8px !important;
           }
+
+          /* Másolás/kijelölés tiltása (nehezítés) */
+          html, body, body * {
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            -khtml-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+          }
+          input, textarea, [contenteditable="true"] {
+            -webkit-user-select: text !important;
+            -khtml-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+            -webkit-touch-callout: default !important;
+          }
         ''';
+
+        const additionalJs = '''
+<script>
+  (function () {
+    function isEditableTarget(target) {
+      if (!target) return false;
+      if (target.closest) {
+        return !!target.closest('input, textarea, [contenteditable="true"]');
+      }
+      return false;
+    }
+
+    document.addEventListener('contextmenu', function (e) {
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+    }, true);
+
+    document.addEventListener('keydown', function (e) {
+      if (isEditableTarget(e.target)) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      var k = (e.key || '').toLowerCase();
+      if (k === 'c' || k === 'a') {
+        e.preventDefault();
+      }
+    }, true);
+
+    document.addEventListener('copy', function (e) {
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+    }, true);
+  })();
+</script>
+''';
         
         // Hozzáadjuk a CSS-t a meglévő </style> tag elé
         if (htmlWithLang.toLowerCase().contains('</style>')) {
@@ -635,6 +686,22 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
               '<html lang="hu"><head><style>$additionalCss</style></head>',
             );
           }
+        }
+
+        // Hozzáadjuk a JS tiltásokat is (iframe dokumentumon belül)
+        if (styledHtmlContent.toLowerCase().contains('</head>')) {
+          styledHtmlContent = styledHtmlContent.replaceAll(
+            RegExp(r'</head>', caseSensitive: false),
+            '$additionalJs</head>',
+          );
+        } else if (styledHtmlContent.toLowerCase().contains('<html')) {
+          // Ha nincs head, próbáljuk beilleszteni a html tag után
+          styledHtmlContent = styledHtmlContent.replaceAllMapped(
+            RegExp(r'<html[^>]*>', caseSensitive: false),
+            (m) => '${m.group(0)}<head>$additionalJs</head>',
+          );
+        } else {
+          styledHtmlContent = '<head>$additionalJs</head>$styledHtmlContent';
         }
       }
       

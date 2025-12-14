@@ -31,8 +31,62 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>Jogedu.hu</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Kijelölés tiltása a teljes appban (nehezítés) -->
+  <style>
+    html, body, body * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    /* Kivétel: input mezőkben maradjon a kijelölés/beillesztés */
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text;
+      -khtml-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+  </style>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- Másolás nehezítése: context menu + Ctrl/Cmd+A/C blokkolása (input/textarea kivétellel) -->
+  <script>
+    (function () {
+      function isEditableTarget(target) {
+        if (!target) return false;
+        const el = target.closest
+          ? target.closest('input, textarea, [contenteditable="true"]')
+          : null;
+        return !!el;
+      }
+
+      document.addEventListener('contextmenu', function (e) {
+        if (isEditableTarget(e.target)) return;
+        e.preventDefault();
+      }, true);
+
+      document.addEventListener('keydown', function (e) {
+        if (isEditableTarget(e.target)) return;
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const k = (e.key || '').toLowerCase();
+        if (k === 'c' || k === 'a') {
+          e.preventDefault();
+        }
+      }, true);
+
+      document.addEventListener('copy', function (e) {
+        if (isEditableTarget(e.target)) return;
+        e.preventDefault();
+      }, true);
+    })();
+  </script>
 </body>
 </html>

@@ -68,7 +68,74 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
     
     // Iframe src beállítása data URI-val
     if (htmlContent.isNotEmpty) {
-      iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(htmlContent)}';
+      // Másolás/kijelölés tiltása iframe-en belül is (nehezítés)
+      const noCopyCss = '''
+        html, body, body * {
+          -webkit-touch-callout: none !important;
+          -webkit-user-select: none !important;
+          -khtml-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+          user-select: none !important;
+        }
+        input, textarea, [contenteditable="true"] {
+          -webkit-user-select: text !important;
+          -khtml-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+          user-select: text !important;
+          -webkit-touch-callout: default !important;
+        }
+      ''';
+
+      const noCopyJs = '''
+        <script>
+          (function () {
+            function isEditableTarget(target) {
+              if (!target) return false;
+              if (target.closest) {
+                return !!target.closest('input, textarea, [contenteditable="true"]');
+              }
+              return false;
+            }
+            document.addEventListener('contextmenu', function (e) {
+              if (isEditableTarget(e.target)) return;
+              e.preventDefault();
+            }, true);
+            document.addEventListener('keydown', function (e) {
+              if (isEditableTarget(e.target)) return;
+              if (!(e.ctrlKey || e.metaKey)) return;
+              var k = (e.key || '').toLowerCase();
+              if (k === 'c' || k === 'a') e.preventDefault();
+            }, true);
+            document.addEventListener('copy', function (e) {
+              if (isEditableTarget(e.target)) return;
+              e.preventDefault();
+            }, true);
+          })();
+        </script>
+      ''';
+
+      String protectedHtml = htmlContent;
+      final lower = protectedHtml.toLowerCase();
+      if (lower.contains('</head>')) {
+        protectedHtml = protectedHtml.replaceAll(
+          RegExp(r'</head>', caseSensitive: false),
+          '<style>$noCopyCss</style>$noCopyJs</head>',
+        );
+      } else if (lower.contains('<html')) {
+        // Ha nincs head, adjunk hozzá
+        protectedHtml = protectedHtml.replaceAllMapped(
+          RegExp(r'<html[^>]*>', caseSensitive: false),
+          (m) => '${m.group(0)}<head><style>$noCopyCss</style>$noCopyJs</head>',
+        );
+      } else {
+        protectedHtml =
+            '<!DOCTYPE html><html lang="hu"><head><meta charset="utf-8"><style>$noCopyCss</style>$noCopyJs</head><body>$protectedHtml</body></html>';
+      }
+
+      iframeElement.src =
+          'data:text/html;charset=utf-8,${Uri.encodeComponent(protectedHtml)}';
     }
     
     // Platform view regisztrálása

@@ -251,20 +251,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
       // 1. Betöltjük a címkéket a notes kollekcióból
       try {
-        Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
+        // Indexelési problémák/hibák elkerülése végett a status szűrést kliens oldalon végezzük
+        // Így biztosabb, hogy kapunk adatot, ha a science egyezik.
+        final notesQuery = FirebaseConfig.firestore
             .collection('notes')
             .where('science', isEqualTo: userScience);
-        
-        if (isAdmin) {
-          notesQuery = notesQuery.where('status', whereIn: ['Published', 'Public', 'Draft']);
-        } else {
-          notesQuery = notesQuery.where('status', whereIn: ['Published', 'Public']);
-        }
         
         final notesSnapshot = await notesQuery.get();
 
         for (final doc in notesSnapshot.docs) {
           final data = doc.data();
+          if (data['deletedAt'] != null) continue;
+
+          // Kliens oldali status szűrés
+          final status = data['status'] as String?;
+          if (isAdmin) {
+             if (status != 'Published' && status != 'Draft') continue;
+          } else {
+             if (status != 'Published' && status != 'Public') continue;
+          }
+
           if (data.containsKey('tags') && data['tags'] is List) {
             final tags = List<String>.from(data['tags']);
             allTags.addAll(tags);
@@ -274,28 +280,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
         debugPrint('🔴 Hiba a notes kollekció címkéinek betöltésekor: $e');
       }
 
-      // 2. Betöltjük a címkéket a memoriapalota_allomasok kollekcióból (science="Jogász" szűréssel)
+      // 2. Betöltjük a címkéket a memoriapalota_allomasok kollekcióból
       try {
-        Query<Map<String, dynamic>> mpAllomasQuery = FirebaseConfig.firestore
+        final mpAllomasQuery = FirebaseConfig.firestore
             .collection('memoriapalota_allomasok')
             .where('science', isEqualTo: userScience);
-        // Státusz szűrés: üzleti logika miatt fontos (Published/Public/Draft)
-        if (isAdmin) {
-          mpAllomasQuery = mpAllomasQuery.where(
-            'status',
-            whereIn: ['Published', 'Public', 'Draft'],
-          );
-        } else {
-          mpAllomasQuery = mpAllomasQuery.where(
-            'status',
-            whereIn: ['Published', 'Public'],
-          );
-        }
         
         final mpAllomasSnapshot = await mpAllomasQuery.get();
 
         for (final doc in mpAllomasSnapshot.docs) {
           final data = doc.data();
+          if (data['deletedAt'] != null) continue;
+
+          // Kliens oldali status szűrés
+          final status = data['status'] as String?;
+          if (isAdmin) {
+             if (status != 'Published' && status != 'Draft' && status != 'Public') continue;
+          } else {
+             if (status != 'Published' && status != 'Public') continue;
+          }
+
           if (data.containsKey('tags') && data['tags'] is List) {
             final tags = List<String>.from(data['tags']);
             allTags.addAll(tags);
@@ -306,28 +310,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
         debugPrint('🔴 Hiba a memoriapalota_allomasok kollekció címkéinek betöltésekor: $e');
       }
 
-      // 3. Betöltjük a címkéket a memoriapalota_fajlok kollekcióból (science="Jogász" szűréssel)
+      // 3. Betöltjük a címkéket a memoriapalota_fajlok kollekcióból
       try {
-        Query<Map<String, dynamic>> mpFajlQuery = FirebaseConfig.firestore
+        final mpFajlQuery = FirebaseConfig.firestore
             .collection('memoriapalota_fajlok')
             .where('science', isEqualTo: userScience);
-        // Státusz szűrés: üzleti logika miatt fontos (Published/Public/Draft)
-        if (isAdmin) {
-          mpFajlQuery = mpFajlQuery.where(
-            'status',
-            whereIn: ['Published', 'Public', 'Draft'],
-          );
-        } else {
-          mpFajlQuery = mpFajlQuery.where(
-            'status',
-            whereIn: ['Published', 'Public'],
-          );
-        }
         
         final mpFajlSnapshot = await mpFajlQuery.get();
 
         for (final doc in mpFajlSnapshot.docs) {
           final data = doc.data();
+          if (data['deletedAt'] != null) continue;
+
+          // Kliens oldali status szűrés
+          final status = data['status'] as String?;
+          if (isAdmin) {
+             if (status != 'Published' && status != 'Draft' && status != 'Public') continue;
+          } else {
+             if (status != 'Published' && status != 'Public') continue;
+          }
+
           if (data.containsKey('tags') && data['tags'] is List) {
             final tags = List<String>.from(data['tags']);
             allTags.addAll(tags);
@@ -336,6 +338,36 @@ class _NoteListScreenState extends State<NoteListScreen> {
         debugPrint('🔵 Memoriapalota_fajlok címkék betöltve: ${mpFajlSnapshot.docs.length} dokumentum');
       } catch (e) {
         debugPrint('🔴 Hiba a memoriapalota_fajlok kollekció címkéinek betöltésekor: $e');
+      }
+
+      // 4. Betöltjük a címkéket a jogesetek kollekcióból
+      try {
+        final jogesetekQuery = FirebaseConfig.firestore
+            .collection('jogesetek')
+            .where('science', isEqualTo: userScience);
+
+        final jogesetekSnapshot = await jogesetekQuery.get();
+        for (final doc in jogesetekSnapshot.docs) {
+          final data = doc.data();
+          if (data['deletedAt'] != null) continue;
+
+          // Kliens oldali status szűrés
+          final status = data['status'] as String?;
+          if (isAdmin) {
+             if (status != 'Published' && status != 'Draft') continue;
+          } else {
+             if (status != 'Published') continue;
+          }
+
+          if (data.containsKey('tags') && data['tags'] is List) {
+            final tags = List<String>.from(data['tags']);
+            allTags.addAll(tags);
+          }
+        }
+        debugPrint(
+            '🔵 Jogesetek címkék betöltve: ${jogesetekSnapshot.docs.length} dokumentum');
+      } catch (e) {
+        debugPrint('🔴 Hiba a jogesetek kollekció címkéinek betöltésekor: $e');
       }
 
       // Biztonsági háló: ha az URL/aktuális kiválasztott címke nem volt a lekérdezésekben, adjuk hozzá.

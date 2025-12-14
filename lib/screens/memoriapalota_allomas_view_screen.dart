@@ -296,6 +296,24 @@ class _MemoriapalotaAllomasViewScreenState
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    /* Másolás/kijelölés tiltása (nehezítés) */
+    html, body, body * {
+      -webkit-touch-callout: none !important;
+      -webkit-user-select: none !important;
+      -khtml-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+    }
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text !important;
+      -khtml-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
+
     /* ALAP STÍLUSOK */
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -506,6 +524,36 @@ class _MemoriapalotaAllomasViewScreenState
   </style>
 </head>
 <body>
+  <script>
+    (function () {
+      function isEditableTarget(target) {
+        if (!target) return false;
+        if (target.closest) {
+          return !!target.closest('input, textarea, [contenteditable="true"]');
+        }
+        return false;
+      }
+
+      document.addEventListener('contextmenu', function (e) {
+        if (isEditableTarget(e.target)) return;
+        e.preventDefault();
+      }, true);
+
+      document.addEventListener('keydown', function (e) {
+        if (isEditableTarget(e.target)) return;
+        if (!(e.ctrlKey || e.metaKey)) return;
+        var k = (e.key || '').toLowerCase();
+        if (k === 'c' || k === 'a') {
+          e.preventDefault();
+        }
+      }, true);
+
+      document.addEventListener('copy', function (e) {
+        if (isEditableTarget(e.target)) return;
+        e.preventDefault();
+      }, true);
+    })();
+  </script>
   <h2>${sorszam != null && sorszam > 0 ? '<span class="allomas-badge badge-${sorszam > 11 ? ((sorszam - 1) % 11) + 1 : sorszam}">$sorszam.</span>' : ''}$cim</h2>
   ${kulcsszo.isNotEmpty ? '<span class="kulcsszo">Kulcsszó: $kulcsszo</span>' : ''}
   ${tartalom.isNotEmpty ? tartalom : '<p>Nincs tartalom.</p>'}

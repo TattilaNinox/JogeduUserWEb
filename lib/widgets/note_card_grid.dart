@@ -143,18 +143,54 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
         // Fő útvonal dokumentumok lekérdezése a memoriapalota_allomasok kollekcióból
         // Ezek a fő dokumentumok, amelyek az utvonalId-val rendelkeznek
-        final allomasQuery = shouldLoadAllomasok
+        Query<Map<String, dynamic>>? allomasQuery = shouldLoadAllomasok
             ? FirebaseConfig.firestore
                 .collection('memoriapalota_allomasok')
                 .where('science', isEqualTo: userScience)
             : null;
 
         // Fájl dokumentumok lekérdezése a memoriapalota_fajlok kollekcióból
-        final fajlokQuery = shouldLoadFajlok
+        Query<Map<String, dynamic>>? fajlokQuery = shouldLoadFajlok
             ? FirebaseConfig.firestore
                 .collection('memoriapalota_fajlok')
                 .where('science', isEqualTo: userScience)
             : null;
+
+        if (allomasQuery != null) {
+          // status
+          if (widget.selectedStatus != null &&
+              widget.selectedStatus!.isNotEmpty) {
+            allomasQuery =
+                allomasQuery.where('status', isEqualTo: widget.selectedStatus);
+          } else {
+            allomasQuery = isAdmin
+                ? allomasQuery.where('status', whereIn: ['Published', 'Draft'])
+                : allomasQuery.where('status', isEqualTo: 'Published');
+          }
+          // tag
+          if (widget.selectedTag != null && widget.selectedTag!.isNotEmpty) {
+            allomasQuery =
+                allomasQuery.where('tags', arrayContains: widget.selectedTag);
+          }
+        }
+
+        if (fajlokQuery != null) {
+          // status
+          if (widget.selectedStatus != null &&
+              widget.selectedStatus!.isNotEmpty) {
+            fajlokQuery =
+                fajlokQuery.where('status', isEqualTo: widget.selectedStatus);
+          } else {
+            fajlokQuery = isAdmin
+                ? fajlokQuery.where('status', whereIn: ['Published', 'Draft'])
+                : fajlokQuery.where('status', isEqualTo: 'Published');
+          }
+          // tag
+          if (widget.selectedTag != null && widget.selectedTag!.isNotEmpty) {
+            fajlokQuery =
+                fajlokQuery.where('tags', arrayContains: widget.selectedTag);
+          }
+        }
 
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: query.snapshots(),
