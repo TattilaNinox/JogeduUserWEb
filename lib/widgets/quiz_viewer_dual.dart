@@ -505,7 +505,7 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                               child: Text(
                                 option.text,
                                 style: TextStyle(
-                                  fontSize: isMobile ? 15.0 : 16.0,
+                                  fontSize: isMobile ? 13.0 : 16.0,
                                   fontWeight: _selectedIndices.contains(index)
                                       ? FontWeight.bold
                                       : FontWeight.normal,
