@@ -128,138 +128,149 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
   void _showRationaleForOption(Option option) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Magyarázat'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              option.text,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            if (option.rationale.isNotEmpty)
+      builder: (context) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        return AlertDialog(
+          title: const Text('Magyarázat'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
               Text(
-                option.rationale,
-                style: const TextStyle(fontSize: 14),
-                textAlign: TextAlign.center,
-              )
-            else
-              Text(
-                'Nincs elérhető magyarázat ehhez a válaszopcióhoz.',
+                option.text,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.bold,
+                  fontSize: isMobile ? 13 : 16,
                 ),
                 textAlign: TextAlign.center,
               ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Bezárás'),
+              const SizedBox(height: 12),
+              if (option.rationale.isNotEmpty)
+                Text(
+                  option.rationale,
+                  style: TextStyle(fontSize: isMobile ? 11 : 14),
+                  textAlign: TextAlign.center,
+                )
+              else
+                Text(
+                  'Nincs elérhető magyarázat ehhez a válaszopcióhoz.',
+                  style: TextStyle(
+                    fontSize: isMobile ? 11 : 14,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+            ],
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Bezárás'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _showRationaleDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Magyarázat'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                _currentQuestion.question,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ..._currentQuestion.options.asMap().entries.map((entry) {
-                final index = entry.key;
-                final option = entry.value;
-                final isSelected = _selectedIndices.contains(index);
-                final isCorrect = option.isCorrect;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isCorrect
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : isSelected
-                            ? Colors.red.withValues(alpha: 0.1)
-                            : Colors.grey.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isCorrect
-                          ? Colors.green
-                          : isSelected
-                              ? Colors.red
-                              : Colors.grey,
-                    ),
+      builder: (context) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        return AlertDialog(
+          title: const Text('Magyarázat'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  _currentQuestion.question,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 11 : 14,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isCorrect ? Icons.check_circle : Icons.cancel,
-                            color: isCorrect ? Colors.green : Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              option.text,
-                              style: TextStyle(
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isCorrect
-                                    ? Colors.green.shade700
-                                    : Colors.red.shade700,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ..._currentQuestion.options.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final option = entry.value;
+                  final isSelected = _selectedIndices.contains(index);
+                  final isCorrect = option.isCorrect;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isCorrect
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : isSelected
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : Colors.grey.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isCorrect
+                            ? Colors.green
+                            : isSelected
+                                ? Colors.red
+                                : Colors.grey,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (!isMobile)
+                              Icon(
+                                isCorrect ? Icons.check_circle : Icons.cancel,
+                                color: isCorrect ? Colors.green : Colors.red,
+                                size: 20,
+                              ),
+                            if (!isMobile) const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                option.text,
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  fontSize: isMobile ? 11 : 14,
+                                  color: isCorrect
+                                      ? Colors.green.shade700
+                                      : Colors.red.shade700,
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                        if (option.rationale.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            option.rationale,
+                            style: TextStyle(fontSize: isMobile ? 11 : 14),
+                            textAlign: TextAlign.center,
                           ),
                         ],
-                      ),
-                      if (option.rationale.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          option.rationale,
-                          style: const TextStyle(fontSize: 14),
-                          textAlign: TextAlign.center,
-                        ),
                       ],
-                    ],
-                  ),
-                );
-              }),
-            ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Bezárás'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Bezárás'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -335,6 +346,7 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
   }
 
   Widget _buildMobileView() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Column(
       children: [
         // Progress bar
@@ -370,8 +382,8 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
               color: Colors.black87,
               height: 1.3,
             ),
-            maxLines: _isQuestionCollapsed ? 2 : 5,
-            overflow: TextOverflow.ellipsis,
+            maxLines: _isQuestionCollapsed ? 2 : null,
+            overflow: _isQuestionCollapsed ? TextOverflow.ellipsis : null,
             textAlign: TextAlign.center,
           ),
         ),
@@ -511,19 +523,21 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                             ),
                           ),
                           if (_isAnswered) ...[
-                            if (option.isCorrect)
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                                size: 24,
-                              ),
-                            if (_selectedIndices.contains(index) &&
-                                !option.isCorrect)
-                              const Icon(
-                                Icons.cancel,
-                                color: Colors.red,
-                                size: 24,
-                              ),
+                            if (!isMobile) ...[
+                              if (option.isCorrect)
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 24,
+                                ),
+                              if (_selectedIndices.contains(index) &&
+                                  !option.isCorrect)
+                                const Icon(
+                                  Icons.cancel,
+                                  color: Colors.red,
+                                  size: 24,
+                                ),
+                            ],
                             if (option.isCorrect ||
                                 _selectedIndices.contains(index))
                               IconButton(
