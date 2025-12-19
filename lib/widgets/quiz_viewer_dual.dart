@@ -297,6 +297,8 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -309,31 +311,36 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
             ),
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.all(
-          MediaQuery.of(context).size.width < 600 ? 12.0 : 16.0,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Progress bar
-            LinearProgressIndicator(
+      body: isMobile ? _buildMobileView() : _buildDesktopView(),
+    );
+  }
+
+  Widget _buildMobileView() {
+    return CustomScrollView(
+      slivers: [
+        // Progress bar
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: LinearProgressIndicator(
               value: (_currentQuestionIndex + 1) / widget.questions.length,
               backgroundColor: Colors.grey.withValues(alpha: 0.3),
               valueColor:
                   AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
             ),
-            const SizedBox(height: 24),
+          ),
+        ),
 
-            // Note content preview (if available)
-            if (_currentQuestion.noteId != null) ...[
-              Card(
+        // Note preview (if available)
+        if (_currentQuestion.noteId != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Card(
                 elevation: 2,
                 color: Colors.grey[50],
                 child: Padding(
-                  padding: EdgeInsets.all(
-                    MediaQuery.of(context).size.width < 600 ? 12.0 : 16.0,
-                  ),
+                  padding: const EdgeInsets.all(12.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -341,18 +348,14 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                         children: [
                           Icon(
                             Icons.note,
-                            size: MediaQuery.of(context).size.width < 600
-                                ? 18
-                                : 20,
+                            size: 18,
                             color: Colors.grey[600],
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Kapcsolódó jegyzet',
                             style: TextStyle(
-                              fontSize: MediaQuery.of(context).size.width < 600
-                                  ? 13
-                                  : 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
                               color: Colors.grey[700],
                             ),
@@ -379,19 +382,13 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                       else if (_noteContentPreview != null)
                         Text(
                           _noteContentPreview!,
-                          style: TextStyle(
-                            fontSize: MediaQuery.of(context).size.width < 600
-                                ? 13
-                                : 14,
+                          style: const TextStyle(
+                            fontSize: 13,
                             color: Colors.black87,
                             height: 1.4,
                           ),
-                          maxLines: MediaQuery.of(context).size.width < 600
-                              ? 3
-                              : null,
-                          overflow: MediaQuery.of(context).size.width < 600
-                              ? TextOverflow.ellipsis
-                              : null,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         )
                       else
                         Text(
@@ -406,159 +403,152 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                   ),
                 ),
               ),
-              SizedBox(
-                  height: MediaQuery.of(context).size.width < 600 ? 12 : 16),
-            ],
+            ),
+          ),
 
-            // Question
-            MediaQuery.of(context).size.width < 600
-                ? Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0,
-                      vertical: 12.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _currentQuestion.question,
-                      style: const TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4,
-                        color: Colors.black87,
+        // Collapsible Question Header
+        SliverAppBar(
+          expandedHeight: 100,
+          collapsedHeight: 56,
+          pinned: true,
+          automaticallyImplyLeading: false,
+          backgroundColor: Colors.blue.shade50,
+          flexibleSpace: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCollapsed = constraints.maxHeight <= 56 + 20;
+              return FlexibleSpaceBar(
+                centerTitle: true,
+                titlePadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: isCollapsed ? 8 : 12,
+                ),
+                title: Text(
+                  _currentQuestion.question,
+                  style: TextStyle(
+                    fontSize: isCollapsed ? 12.0 : 14.0,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                    height: 1.3,
+                  ),
+                  maxLines: isCollapsed ? 1 : 4,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              );
+            },
+          ),
+        ),
+
+        // Answer options
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final option = _currentQuestion.options[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: InkWell(
+                    onTap: () => _selectOption(index),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : Card(
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Text(
-                        _currentQuestion.question,
-                        style: const TextStyle(
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
+                      constraints: const BoxConstraints(
+                        minHeight: 56,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getOptionColor(index),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _getOptionBorderColor(index),
+                          width: 2,
                         ),
-                        textAlign: TextAlign.center,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _getOptionBorderColor(index),
+                                width: 2,
+                              ),
+                              color: _selectedIndices.contains(index)
+                                  ? _getOptionBorderColor(index)
+                                  : Colors.transparent,
+                            ),
+                            child: _selectedIndices.contains(index)
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 16,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              option.text,
+                              style: const TextStyle(
+                                fontSize: 13.0,
+                                fontWeight: FontWeight.normal,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          if (_isAnswered) ...[
+                            if (option.isCorrect)
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 24,
+                              ),
+                            if (_selectedIndices.contains(index) &&
+                                !option.isCorrect)
+                              const Icon(
+                                Icons.cancel,
+                                color: Colors.red,
+                                size: 24,
+                              ),
+                            if (option.isCorrect ||
+                                _selectedIndices.contains(index))
+                              IconButton(
+                                onPressed: () =>
+                                    _showRationaleForOption(option),
+                                icon: const Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                tooltip: 'Magyarázat',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 24,
+                                  minHeight: 24,
+                                ),
+                              ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
-            SizedBox(height: MediaQuery.of(context).size.width < 600 ? 16 : 24),
-
-            // Options
-            Expanded(
-              child: ListView.builder(
-                itemCount: _currentQuestion.options.length,
-                itemBuilder: (context, index) {
-                  final option = _currentQuestion.options[index];
-                  final isMobile = MediaQuery.of(context).size.width < 600;
-                  return Container(
-                    margin: EdgeInsets.only(bottom: isMobile ? 16 : 12),
-                    child: InkWell(
-                      onTap: () => _selectOption(index),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 16 : 20,
-                          vertical: isMobile ? 16 : 16,
-                        ),
-                        constraints: BoxConstraints(
-                          minHeight: isMobile ? 56 : 48,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getOptionColor(index),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _getOptionBorderColor(index),
-                            width: 2,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _getOptionBorderColor(index),
-                                  width: 2,
-                                ),
-                                color: _selectedIndices.contains(index)
-                                    ? _getOptionBorderColor(index)
-                                    : Colors.transparent,
-                              ),
-                              child: _selectedIndices.contains(index)
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 16,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                option.text,
-                                style: TextStyle(
-                                  fontSize: isMobile ? 13.0 : 16.0,
-                                  fontWeight: _selectedIndices.contains(index)
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ),
-                            if (_isAnswered) ...[
-                              // Show check/cancel icons
-                              if (option.isCorrect)
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                  size: 24,
-                                ),
-                              if (_selectedIndices.contains(index) &&
-                                  !option.isCorrect)
-                                const Icon(
-                                  Icons.cancel,
-                                  color: Colors.red,
-                                  size: 24,
-                                ),
-                              // Show info icon for rationale (if option is correct OR was selected)
-                              if (option.isCorrect ||
-                                  _selectedIndices.contains(index))
-                                IconButton(
-                                  onPressed: () =>
-                                      _showRationaleForOption(option),
-                                  icon: const Icon(
-                                    Icons.info_outline,
-                                    color: Colors.blue,
-                                    size: 20,
-                                  ),
-                                  tooltip: 'Magyarázat',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 24,
-                                    minHeight: 24,
-                                  ),
-                                ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+                );
+              },
+              childCount: _currentQuestion.options.length,
             ),
+          ),
+        ),
 
-            // Action buttons
-            SizedBox(height: MediaQuery.of(context).size.width < 600 ? 20 : 16),
-            Row(
+        // Action buttons
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
               children: [
                 if (_isAnswered) ...[
                   IconButton(
@@ -573,10 +563,7 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                   child: ElevatedButton(
                     onPressed: _canCheck ? _checkAnswer : null,
                     style: ElevatedButton.styleFrom(
-                      minimumSize: Size(
-                        double.infinity,
-                        MediaQuery.of(context).size.width < 600 ? 52 : 48,
-                      ),
+                      minimumSize: const Size(double.infinity, 52),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 14,
@@ -596,10 +583,7 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                     child: ElevatedButton(
                       onPressed: _nextQuestion,
                       style: ElevatedButton.styleFrom(
-                        minimumSize: Size(
-                          double.infinity,
-                          MediaQuery.of(context).size.width < 600 ? 52 : 48,
-                        ),
+                        minimumSize: const Size(double.infinity, 52),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
@@ -614,8 +598,267 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                 ],
               ],
             ),
-          ],
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopView() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Progress bar
+          LinearProgressIndicator(
+            value: (_currentQuestionIndex + 1) / widget.questions.length,
+            backgroundColor: Colors.grey.withValues(alpha: 0.3),
+            valueColor:
+                AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+          ),
+          const SizedBox(height: 24),
+
+          // Note content preview (if available)
+          if (_currentQuestion.noteId != null) ...[
+            Card(
+              elevation: 2,
+              color: Colors.grey[50],
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.note,
+                          size: 20,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Kapcsolódó jegyzet',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_isLoadingPreview)
+                      const Row(
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Betöltés...',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      )
+                    else if (_noteContentPreview != null)
+                      Text(
+                        _noteContentPreview!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.4,
+                        ),
+                      )
+                    else
+                      Text(
+                        'Nem sikerült betölteni a jegyzet tartalmát',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Question
+          Card(
+            elevation: 4,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                _currentQuestion.question,
+                style: const TextStyle(
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.bold,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Options
+          Expanded(
+            child: ListView.builder(
+              itemCount: _currentQuestion.options.length,
+              itemBuilder: (context, index) {
+                final option = _currentQuestion.options[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () => _selectOption(index),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      constraints: const BoxConstraints(
+                        minHeight: 48,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getOptionColor(index),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _getOptionBorderColor(index),
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _getOptionBorderColor(index),
+                                width: 2,
+                              ),
+                              color: _selectedIndices.contains(index)
+                                  ? _getOptionBorderColor(index)
+                                  : Colors.transparent,
+                            ),
+                            child: _selectedIndices.contains(index)
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 16,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              option.text,
+                              style: const TextStyle(
+                                fontSize: 16.0,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          if (_isAnswered) ...[
+                            if (option.isCorrect)
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 24,
+                              ),
+                            if (_selectedIndices.contains(index) &&
+                                !option.isCorrect)
+                              const Icon(
+                                Icons.cancel,
+                                color: Colors.red,
+                                size: 24,
+                              ),
+                            if (option.isCorrect ||
+                                _selectedIndices.contains(index))
+                              IconButton(
+                                onPressed: () =>
+                                    _showRationaleForOption(option),
+                                icon: const Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                tooltip: 'Magyarázat',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 24,
+                                  minHeight: 24,
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Action buttons
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              if (_isAnswered) ...[
+                IconButton(
+                  onPressed: _showRationaleDialog,
+                  icon: const Icon(Icons.info_outline),
+                  tooltip: 'Magyarázat',
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _canCheck ? _checkAnswer : null,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  child: Text(
+                    _isAnswered
+                        ? 'Ellenőrizve'
+                        : 'Ellenőrzés (${_selectedIndices.length}/2)',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+              if (_isAnswered) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _nextQuestion,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: Text(
+                      _isLastQuestion ? 'Befejezés' : 'Következő',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
