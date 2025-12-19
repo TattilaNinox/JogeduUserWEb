@@ -25,6 +25,8 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
   final List<QuestionResult> _questionResults = [];
   String? _noteContentPreview;
   bool _isLoadingPreview = false;
+  final ScrollController _scrollController = ScrollController();
+  bool _isQuestionCollapsed = false;
 
   Question get _currentQuestion => widget.questions[_currentQuestionIndex];
   bool get _isLastQuestion =>
@@ -43,6 +45,23 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
     _selectedIndices = [];
     _isAnswered = false;
     _loadNoteContentPreview();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final shouldCollapse = _scrollController.offset > 20;
+    if (shouldCollapse != _isQuestionCollapsed) {
+      setState(() {
+        _isQuestionCollapsed = shouldCollapse;
+      });
+    }
   }
 
   Future<void> _loadNoteContentPreview() async {
@@ -329,10 +348,14 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
           ),
         ),
 
-        // Compact sticky question header
-        Container(
+        // Dynamic question header (expands/collapses on scroll)
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: _isQuestionCollapsed ? 8 : 14,
+          ),
           decoration: BoxDecoration(
             color: Colors.blue.shade50,
             border: Border(
@@ -341,13 +364,13 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
           ),
           child: Text(
             _currentQuestion.question,
-            style: const TextStyle(
-              fontSize: 13.0,
+            style: TextStyle(
+              fontSize: _isQuestionCollapsed ? 12.0 : 14.0,
               fontWeight: FontWeight.w600,
               color: Colors.black87,
               height: 1.3,
             ),
-            maxLines: 2,
+            maxLines: _isQuestionCollapsed ? 2 : 5,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
@@ -356,6 +379,7 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
         // Scrollable content
         Expanded(
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.all(12.0),
             children: [
               // Note preview (if available)
