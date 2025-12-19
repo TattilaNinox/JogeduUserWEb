@@ -6,13 +6,19 @@ class FlippableCard extends StatefulWidget {
   final String backText;
   final Axis flipAxis; // Axis.horizontal (Y) or Axis.vertical (X)
   final bool interactive;
-  const FlippableCard({super.key, required this.frontText, required this.backText, this.flipAxis = Axis.horizontal, this.interactive = true});
+  const FlippableCard(
+      {super.key,
+      required this.frontText,
+      required this.backText,
+      this.flipAxis = Axis.horizontal,
+      this.interactive = true});
 
   @override
   State<FlippableCard> createState() => _FlippableCardState();
 }
 
-class _FlippableCardState extends State<FlippableCard> with SingleTickerProviderStateMixin {
+class _FlippableCardState extends State<FlippableCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   bool _isFront = true;
@@ -20,7 +26,8 @@ class _FlippableCardState extends State<FlippableCard> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
     _animation = Tween<double>(begin: 0, end: 1).animate(_controller);
   }
 
@@ -63,7 +70,8 @@ class _FlippableCardState extends State<FlippableCard> with SingleTickerProvider
                 ? _buildCardSide(widget.frontText, true)
                 : Transform(
                     transform: Matrix4.identity()
-                      ..rotateY(widget.flipAxis == Axis.horizontal ? math.pi : 0)
+                      ..rotateY(
+                          widget.flipAxis == Axis.horizontal ? math.pi : 0)
                       ..rotateX(widget.flipAxis == Axis.vertical ? math.pi : 0),
                     alignment: Alignment.center,
                     child: _buildCardSide(widget.backText, false),
@@ -75,20 +83,23 @@ class _FlippableCardState extends State<FlippableCard> with SingleTickerProvider
   }
 
   Widget _buildCardSide(String text, bool isFront) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: isFront ? Colors.white : const Color(0xFFF5F5F5),
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(28.0),
+          padding: EdgeInsets.all(isMobile ? 12.0 : 28.0),
           child: isFront
               ? Text(
                   text,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.black87,
-                    fontSize: 18,
+                    fontSize: isMobile ? 13 : 18,
                     fontFamily: 'Inter', // Jegyzet betűtípusa
                     fontWeight: FontWeight.bold,
                   ),
@@ -96,12 +107,12 @@ class _FlippableCardState extends State<FlippableCard> with SingleTickerProvider
               : Text(
                   text,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF2D3748), // Jegyzet tartalom színe
-                    fontSize: 16,
+                  style: TextStyle(
+                    color: const Color(0xFF2D3748), // Jegyzet tartalom színe
+                    fontSize: isMobile ? 11 : 16,
                     fontFamily: 'Inter', // Jegyzet betűtípusa
                     fontWeight: FontWeight.w500,
-                    height: 1.6, // Jegyzet sormagasság
+                    height: 1.5, // Jegyzet sormagasság
                   ),
                 ),
         ),
@@ -109,4 +120,3 @@ class _FlippableCardState extends State<FlippableCard> with SingleTickerProvider
     );
   }
 }
-

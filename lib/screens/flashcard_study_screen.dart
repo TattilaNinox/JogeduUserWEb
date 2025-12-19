@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../services/learning_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_html/flutter_html.dart';
 
 class FlashcardStudyScreen extends StatefulWidget {
   final String deckId;
@@ -374,7 +375,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
     if (_dueCardIndices.isEmpty) {
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
-      
+
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -405,7 +406,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
     final currentCardIndex = _dueCardIndices[_currentIndex];
     final currentCard = flashcards[currentCardIndex];
     final totalCards = _dueCardIndices.length;
-    
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -547,6 +548,55 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
                           ),
                           textAlign: TextAlign.center,
                         ),
+                        // Explanation section (if exists)
+                        if (currentCard['explanation'] != null &&
+                            (currentCard['explanation'] as String)
+                                .isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Divider(
+                            color: Colors.grey,
+                            thickness: 1,
+                            indent: 8,
+                            endIndent: 8,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Magyarázat:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Html(
+                                data: currentCard['explanation'] ?? '',
+                                style: {
+                                  "body": Style(
+                                    margin: Margins.zero,
+                                    padding: HtmlPaddings.zero,
+                                    textAlign: TextAlign.justify,
+                                  ),
+                                  "p": Style(
+                                    fontSize: FontSize(12),
+                                    color: Colors.black87,
+                                    lineHeight: LineHeight(1.4),
+                                    textAlign: TextAlign.justify,
+                                    margin: Margins.only(bottom: 8),
+                                  ),
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ] else ...[
                         const SizedBox(height: 24),
                         // Show answer button

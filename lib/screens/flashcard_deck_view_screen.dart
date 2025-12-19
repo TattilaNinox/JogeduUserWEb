@@ -219,11 +219,13 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final isWide = constraints.maxWidth >= 1200;
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
 
       final content = flashcards.isEmpty
           ? const Center(child: Text('Ez a pakli üres.'))
           : GridView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(isMobile ? 8 : 16),
               gridDelegate: isWide
                   ? const SliverGridDelegateWithMaxCrossAxisExtent(
                       maxCrossAxisExtent: 400,
@@ -231,11 +233,11 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
                       crossAxisSpacing: 16,
                       childAspectRatio: 1.6,
                     )
-                  : const SliverGridDelegateWithFixedCrossAxisCount(
+                  : SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 1,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.9,
+                      mainAxisSpacing: isMobile ? 6 : 12,
+                      crossAxisSpacing: isMobile ? 6 : 12,
+                      childAspectRatio: isMobile ? 1.8 : 0.9,
                     ),
               itemCount: flashcards.length,
               itemBuilder: (context, index) {
@@ -330,9 +332,6 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
           ),
         );
       }
-
-      final screenWidth = MediaQuery.of(context).size.width;
-      final isMobile = screenWidth < 600;
 
       return Scaffold(
         appBar: AppBar(
