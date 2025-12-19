@@ -316,146 +316,132 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
   }
 
   Widget _buildMobileView() {
-    return CustomScrollView(
-      slivers: [
+    return Column(
+      children: [
         // Progress bar
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: LinearProgressIndicator(
-              value: (_currentQuestionIndex + 1) / widget.questions.length,
-              backgroundColor: Colors.grey.withValues(alpha: 0.3),
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
-            ),
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: LinearProgressIndicator(
+            value: (_currentQuestionIndex + 1) / widget.questions.length,
+            backgroundColor: Colors.grey.withValues(alpha: 0.3),
+            valueColor:
+                AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
           ),
         ),
 
-        // Note preview (if available)
-        if (_currentQuestion.noteId != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: Card(
-                elevation: 2,
-                color: Colors.grey[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.note,
-                            size: 18,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Kapcsolódó jegyzet',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (_isLoadingPreview)
-                        const Row(
+        // Compact sticky question header
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+            ),
+          ),
+          child: Text(
+            _currentQuestion.question,
+            style: const TextStyle(
+              fontSize: 13.0,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        // Scrollable content
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(12.0),
+            children: [
+              // Note preview (if available)
+              if (_currentQuestion.noteId != null) ...[
+                Card(
+                  elevation: 2,
+                  color: Colors.grey[50],
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                            Icon(
+                              Icons.note,
+                              size: 18,
+                              color: Colors.grey[600],
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
-                              'Betöltés...',
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.grey),
+                              'Kapcsolódó jegyzet',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[700],
+                              ),
                             ),
                           ],
-                        )
-                      else if (_noteContentPreview != null)
-                        Text(
-                          _noteContentPreview!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black87,
-                            height: 1.4,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      else
-                        Text(
-                          'Nem sikerült betölteni a jegyzet tartalmát',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
                         ),
-                    ],
+                        const SizedBox(height: 8),
+                        if (_isLoadingPreview)
+                          const Row(
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Betöltés...',
+                                style:
+                                    TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          )
+                        else if (_noteContentPreview != null)
+                          Text(
+                            _noteContentPreview!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          Text(
+                            'Nem sikerült betölteni a jegyzet tartalmát',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
+                const SizedBox(height: 12),
+              ],
 
-        // Collapsible Question Header
-        SliverAppBar(
-          expandedHeight: 100,
-          collapsedHeight: 56,
-          pinned: true,
-          automaticallyImplyLeading: false,
-          backgroundColor: Colors.blue.shade50,
-          flexibleSpace: LayoutBuilder(
-            builder: (context, constraints) {
-              final isCollapsed = constraints.maxHeight <= 56 + 20;
-              return FlexibleSpaceBar(
-                centerTitle: true,
-                titlePadding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: isCollapsed ? 8 : 12,
-                ),
-                title: Text(
-                  _currentQuestion.question,
-                  style: TextStyle(
-                    fontSize: isCollapsed ? 12.0 : 14.0,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                    height: 1.3,
-                  ),
-                  maxLines: isCollapsed ? 1 : 4,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              );
-            },
-          ),
-        ),
-
-        // Answer options
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final option = _currentQuestion.options[index];
+              // Answer options
+              ..._currentQuestion.options.asMap().entries.map((entry) {
+                final index = entry.key;
+                final option = entry.value;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: InkWell(
                     onTap: () => _selectOption(index),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
+                      padding: const EdgeInsets.all(14),
                       constraints: const BoxConstraints(
                         minHeight: 56,
                       ),
@@ -490,13 +476,12 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                                   )
                                 : null,
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               option.text,
                               style: const TextStyle(
                                 fontSize: 13.0,
-                                fontWeight: FontWeight.normal,
                                 height: 1.3,
                               ),
                             ),
@@ -538,66 +523,72 @@ class _QuizViewerDualState extends State<QuizViewerDual> {
                     ),
                   ),
                 );
-              },
-              childCount: _currentQuestion.options.length,
-            ),
+              }),
+            ],
           ),
         ),
 
         // Action buttons
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                if (_isAnswered) ...[
-                  IconButton(
-                    onPressed: _showRationaleDialog,
-                    icon: const Icon(Icons.info_outline, size: 28),
-                    tooltip: 'Magyarázat',
-                    iconSize: 28,
+        Container(
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              if (_isAnswered) ...[
+                IconButton(
+                  onPressed: _showRationaleDialog,
+                  icon: const Icon(Icons.info_outline, size: 26),
+                  tooltip: 'Magyarázat',
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _canCheck ? _checkAnswer : null,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                ],
+                  child: Text(
+                    _isAnswered
+                        ? 'Ellenőrizve'
+                        : 'Ellenőrzés (${_selectedIndices.length}/2)',
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                ),
+              ),
+              if (_isAnswered) ...[
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _canCheck ? _checkAnswer : null,
+                    onPressed: _nextQuestion,
                     style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 52),
+                      minimumSize: const Size(double.infinity, 48),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 14,
+                        vertical: 12,
                       ),
                     ),
                     child: Text(
-                      _isAnswered
-                          ? 'Ellenőrizve'
-                          : 'Ellenőrzés (${_selectedIndices.length}/2)',
-                      style: const TextStyle(fontSize: 16),
+                      _isLastQuestion ? 'Befejezés' : 'Következő',
+                      style: const TextStyle(fontSize: 15),
                     ),
                   ),
                 ),
-                if (_isAnswered) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _nextQuestion,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 52),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
-                      child: Text(
-                        _isLastQuestion ? 'Befejezés' : 'Következő',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
         ),
       ],
