@@ -90,7 +90,20 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
     );
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        context.go('/notes');
+        // Ellenőrizzük, van-e 'from' query paraméter
+        try {
+          final uri = GoRouterState.of(context).uri;
+          final fromParam = uri.queryParameters['from'];
+
+          if (fromParam != null && fromParam.isNotEmpty) {
+            final decodedFrom = Uri.decodeComponent(fromParam);
+            context.go(decodedFrom);
+          } else {
+            context.go('/notes');
+          }
+        } catch (e) {
+          context.go('/notes');
+        }
       }
     });
   }
@@ -109,8 +122,40 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
     final title =
         (_deck!.data() as Map<String, dynamic>)['title'] ?? 'Névtelen köteg';
 
+    // Ellenőrizzük, van-e 'from' query paraméter
+    final uri = GoRouterState.of(context).uri;
+    final fromParam = uri.queryParameters['from'];
+
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (fromParam != null && fromParam.isNotEmpty) {
+              // Ha van from paraméter, oda navigálunk vissza
+              try {
+                final decodedFrom = Uri.decodeComponent(fromParam);
+                context.go(decodedFrom);
+              } catch (e) {
+                // Ha nem sikerül dekódolni, akkor Navigator.pop vagy /notes
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  context.go('/notes');
+                }
+              }
+            } else {
+              // Ha nincs from paraméter, próbáljuk a Navigator.pop-ot
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                context.go('/notes');
+              }
+            }
+          },
+        ),
+      ),
       body: Row(
         children: [
           const Sidebar(selectedMenu: 'decks'),
