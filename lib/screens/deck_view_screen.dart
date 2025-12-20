@@ -119,12 +119,92 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
           body: const Center(child: Text('A köteg nem található.')));
     }
 
-    final title =
-        (_deck!.data() as Map<String, dynamic>)['title'] ?? 'Névtelen köteg';
+    final deckData = _deck!.data() as Map<String, dynamic>;
+    final title = deckData['title'] ?? 'Névtelen köteg';
+    final category = deckData['category'] as String? ?? '';
+    final tags = (deckData['tags'] as List<dynamic>? ?? []).cast<String>();
 
     // Ellenőrizzük, van-e 'from' query paraméter
     final uri = GoRouterState.of(context).uri;
     final fromParam = uri.queryParameters['from'];
+
+    // Breadcrumb építése
+    Widget buildBreadcrumb() {
+      final items = <Widget>[];
+
+      // Kategória
+      if (category.isNotEmpty) {
+        items.add(
+          InkWell(
+            onTap: () {
+              // Vissza a főoldalra, kategória szűrővel
+              context.go('/notes?category=$category');
+            },
+            child: Text(
+              category,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.blue[700],
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Tags
+      for (int i = 0; i < tags.length; i++) {
+        items.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Icon(Icons.chevron_right, size: 16, color: Colors.grey[600]),
+          ),
+        );
+        items.add(
+          InkWell(
+            onTap: () {
+              // Vissza a főoldalra, kategória és tag szűrővel
+              context.go('/notes?category=$category&tag=${tags[i]}');
+            },
+            child: Text(
+              tags[i],
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.blue[700],
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Deck címe (nem kattintható)
+      if (items.isNotEmpty) {
+        items.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Icon(Icons.chevron_right, size: 16, color: Colors.grey[600]),
+          ),
+        );
+      }
+      items.add(
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      );
+
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: items,
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -133,43 +213,8 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(title),
-            if (fromParam != null && fromParam.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: InkWell(
-                  onTap: () {
-                    try {
-                      final decodedFrom = Uri.decodeComponent(fromParam);
-                      context.go(decodedFrom);
-                    } catch (e) {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      } else {
-                        context.go('/notes');
-                      }
-                    }
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.arrow_back,
-                        size: 14,
-                        color: Colors.blue,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Vissza',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue[700],
-                          fontWeight: FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            const SizedBox(height: 4),
+            buildBreadcrumb(),
           ],
         ),
         leading: IconButton(
