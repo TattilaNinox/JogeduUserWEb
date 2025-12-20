@@ -95,18 +95,20 @@ class _NoteListScreenState extends State<NoteListScreen> {
         widget.initialTag != null ||
         widget.initialType != null) {
       // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
-      final normalizedType = widget.initialType == 'MP' ? 'memoriapalota_allomasok' : widget.initialType;
-      
+      final normalizedType = widget.initialType == 'MP'
+          ? 'memoriapalota_allomasok'
+          : widget.initialType;
+
       // FONTOS: Ha van címke az URL-ben, de nincs a listában, hozzáadjuk!
-      if (widget.initialTag != null && 
-          widget.initialTag!.isNotEmpty && 
+      if (widget.initialTag != null &&
+          widget.initialTag!.isNotEmpty &&
           !_tags.contains(widget.initialTag)) {
         setState(() {
           _tags = [..._tags, widget.initialTag!]..sort();
         });
         debugPrint('🔵 Címke hozzáadva a listához: ${widget.initialTag}');
       }
-      
+
       setState(() {
         _searchText = widget.initialSearch ?? '';
         _searchController.text = _searchText;
@@ -120,7 +122,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         _selectedTag = widget.initialTag;
         _selectedType = normalizedType;
       });
-      
+
       // FONTOS: Beállítjuk a FilterStorage értékeit is, hogy a breadcrumb és visszalépés működjön!
       FilterStorage.searchText = widget.initialSearch;
       FilterStorage.status = widget.initialStatus;
@@ -174,13 +176,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
       Query<Map<String, dynamic>> query = FirebaseConfig.firestore
           .collection('notes')
           .where('science', isEqualTo: userScience);
-      
+
       if (isAdmin) {
         query = query.where('status', whereIn: ['Published', 'Draft']);
       } else {
         query = query.where('status', isEqualTo: 'Published');
       }
-      
+
       final snapshot = await query.get();
 
       // Kinyerjük az egyedi kategóriákat
@@ -256,7 +258,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         final notesQuery = FirebaseConfig.firestore
             .collection('notes')
             .where('science', isEqualTo: userScience);
-        
+
         final notesSnapshot = await notesQuery.get();
 
         for (final doc in notesSnapshot.docs) {
@@ -266,9 +268,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
           // Kliens oldali status szűrés
           final status = data['status'] as String?;
           if (isAdmin) {
-             if (status != 'Published' && status != 'Draft') continue;
+            if (status != 'Published' && status != 'Draft') continue;
           } else {
-             if (status != 'Published' && status != 'Public') continue;
+            if (status != 'Published' && status != 'Public') continue;
           }
 
           if (data.containsKey('tags') && data['tags'] is List) {
@@ -285,7 +287,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         final mpAllomasQuery = FirebaseConfig.firestore
             .collection('memoriapalota_allomasok')
             .where('science', isEqualTo: userScience);
-        
+
         final mpAllomasSnapshot = await mpAllomasQuery.get();
 
         for (final doc in mpAllomasSnapshot.docs) {
@@ -295,9 +297,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
           // Kliens oldali status szűrés
           final status = data['status'] as String?;
           if (isAdmin) {
-             if (status != 'Published' && status != 'Draft' && status != 'Public') continue;
+            if (status != 'Published' &&
+                status != 'Draft' &&
+                status != 'Public') continue;
           } else {
-             if (status != 'Published' && status != 'Public') continue;
+            if (status != 'Published' && status != 'Public') continue;
           }
 
           if (data.containsKey('tags') && data['tags'] is List) {
@@ -305,9 +309,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
             allTags.addAll(tags);
           }
         }
-        debugPrint('🔵 Memoriapalota_allomasok címkék betöltve: ${mpAllomasSnapshot.docs.length} dokumentum');
+        debugPrint(
+            '🔵 Memoriapalota_allomasok címkék betöltve: ${mpAllomasSnapshot.docs.length} dokumentum');
       } catch (e) {
-        debugPrint('🔴 Hiba a memoriapalota_allomasok kollekció címkéinek betöltésekor: $e');
+        debugPrint(
+            '🔴 Hiba a memoriapalota_allomasok kollekció címkéinek betöltésekor: $e');
       }
 
       // 3. Betöltjük a címkéket a memoriapalota_fajlok kollekcióból
@@ -315,7 +321,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         final mpFajlQuery = FirebaseConfig.firestore
             .collection('memoriapalota_fajlok')
             .where('science', isEqualTo: userScience);
-        
+
         final mpFajlSnapshot = await mpFajlQuery.get();
 
         for (final doc in mpFajlSnapshot.docs) {
@@ -325,9 +331,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
           // Kliens oldali status szűrés
           final status = data['status'] as String?;
           if (isAdmin) {
-             if (status != 'Published' && status != 'Draft' && status != 'Public') continue;
+            if (status != 'Published' &&
+                status != 'Draft' &&
+                status != 'Public') continue;
           } else {
-             if (status != 'Published' && status != 'Public') continue;
+            if (status != 'Published' && status != 'Public') continue;
           }
 
           if (data.containsKey('tags') && data['tags'] is List) {
@@ -335,9 +343,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
             allTags.addAll(tags);
           }
         }
-        debugPrint('🔵 Memoriapalota_fajlok címkék betöltve: ${mpFajlSnapshot.docs.length} dokumentum');
+        debugPrint(
+            '🔵 Memoriapalota_fajlok címkék betöltve: ${mpFajlSnapshot.docs.length} dokumentum');
       } catch (e) {
-        debugPrint('🔴 Hiba a memoriapalota_fajlok kollekció címkéinek betöltésekor: $e');
+        debugPrint(
+            '🔴 Hiba a memoriapalota_fajlok kollekció címkéinek betöltésekor: $e');
       }
 
       // 4. Betöltjük a címkéket a jogesetek kollekcióból
@@ -354,9 +364,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
           // Kliens oldali status szűrés
           final status = data['status'] as String?;
           if (isAdmin) {
-             if (status != 'Published' && status != 'Draft') continue;
+            if (status != 'Published' && status != 'Draft') continue;
           } else {
-             if (status != 'Published') continue;
+            if (status != 'Published') continue;
           }
 
           if (data.containsKey('tags') && data['tags'] is List) {
@@ -637,9 +647,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           backgroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey.shade300),
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           padding: const EdgeInsets.all(0),
-                          labelPadding: const EdgeInsets.only(left: 8, right: 4),
+                          labelPadding:
+                              const EdgeInsets.only(left: 8, right: 4),
                         ),
                       if (_selectedType != null)
                         Chip(
@@ -650,9 +662,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           backgroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey.shade300),
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           padding: const EdgeInsets.all(0),
-                          labelPadding: const EdgeInsets.only(left: 8, right: 4),
+                          labelPadding:
+                              const EdgeInsets.only(left: 8, right: 4),
                         ),
                       if (_selectedCategory != null)
                         Chip(
@@ -662,9 +676,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           backgroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey.shade300),
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           padding: const EdgeInsets.all(0),
-                          labelPadding: const EdgeInsets.only(left: 8, right: 4),
+                          labelPadding:
+                              const EdgeInsets.only(left: 8, right: 4),
                         ),
                       if (_selectedTag != null)
                         Chip(
@@ -674,9 +690,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           backgroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey.shade300),
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           padding: const EdgeInsets.all(0),
-                          labelPadding: const EdgeInsets.only(left: 8, right: 4),
+                          labelPadding:
+                              const EdgeInsets.only(left: 8, right: 4),
                         ),
                     ],
                   ),
@@ -733,6 +751,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: buildContent(
                     showSideFilters: false,
@@ -748,12 +767,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
         return Scaffold(
           backgroundColor: const Color(0xFFF8F9FA),
           appBar: AppBar(
-            title: const Text('Jegyzetek'),
+            title: const Text('Tags'),
           ),
           drawer: Drawer(
             child: SafeArea(
               child: Sidebar(
                 selectedMenu: 'notes',
+                isDrawer: true,
                 extraPanel: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

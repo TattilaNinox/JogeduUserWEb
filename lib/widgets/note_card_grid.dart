@@ -537,10 +537,10 @@ class _CategorySectionState extends State<_CategorySection> {
     final totalDocs = _countTotalDocs(widget.tagHierarchy);
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(0),
+        borderRadius: BorderRadius.circular(8),
         side: BorderSide(
           color: Colors.grey.shade200,
           width: 1,
@@ -548,6 +548,7 @@ class _CategorySectionState extends State<_CategorySection> {
       ),
       child: InkWell(
         onTap: () => _navigateToCategoryTags(context),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(

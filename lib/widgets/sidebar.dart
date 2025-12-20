@@ -19,14 +19,22 @@ class Sidebar extends StatelessWidget {
   /// (pl. szűrő űrlap a jegyzetek oldalon).
   final Widget? extraPanel;
 
+  /// Jelezze, hogy a Sidebar Drawer-ben van-e.
+  final bool isDrawer;
+
   /// A `Sidebar` widget konstruktora.
-  const Sidebar({super.key, required this.selectedMenu, this.extraPanel});
+  const Sidebar(
+      {super.key,
+      required this.selectedMenu,
+      this.extraPanel,
+      this.isDrawer = false});
 
   void _navigate(BuildContext context, String path) {
     // Ha a Sidebar egy Drawer-ben van, előbb zárjuk be a Drawert
     final navigator = Navigator.of(context);
     final router = GoRouter.of(context);
-    if (navigator.canPop()) {
+
+    if (isDrawer && navigator.canPop()) {
       navigator.pop();
       // A pop után ütemezzük a navigációt
       Future.microtask(() => router.go(path));
@@ -40,8 +48,12 @@ class Sidebar extends StatelessWidget {
     // Egy fix szélességű konténer, ami a menüsáv alapját képezi.
     // Reszponzív szélesség: nagyobb képernyőkön szélesebb
     final screenWidth = MediaQuery.of(context).size.width;
-    final sidebarWidth = screenWidth >= 1400 ? 320.0 : screenWidth >= 1200 ? 280.0 : 200.0;
-    
+    final sidebarWidth = screenWidth >= 1400
+        ? 280.0
+        : screenWidth >= 1200
+            ? 240.0
+            : 200.0;
+
     return Container(
       width: sidebarWidth,
       color: Colors.white,
@@ -125,7 +137,7 @@ class Sidebar extends StatelessWidget {
               ),
             ),
             _buildMenuItem(
-                context, 'notes', 'Jegyzetek Listája', selectedMenu == 'notes'),
+                context, 'notes', 'Tags Főoldal', selectedMenu == 'notes'),
             if (extraPanel != null) ...[
               const SizedBox(height: 8),
               Padding(

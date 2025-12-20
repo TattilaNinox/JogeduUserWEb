@@ -263,150 +263,131 @@ class NoteListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Wikipedia-stílusú színvilág
-    const Color cardColor = Colors.white;
-    const Color borderColor = Color(0xFFB0D4F1); // Halvány édenkék
-
-    // Ha a jegyzet zárt, halványabb színeket használunk
-    final effectiveCardColor =
-        isLocked ? cardColor.withValues(alpha: 0.7) : cardColor;
-    final effectiveBorderColor =
-        isLocked ? borderColor.withValues(alpha: 0.5) : borderColor;
-
     return Opacity(
-      opacity: isLocked ? 0.6 : 1.0, // Elhalványítás zárt jegyzetek esetén
-      child: Container(
-        decoration: BoxDecoration(
-          color: effectiveCardColor,
-          border: isLast
-              ? null
-              : Border(
-                  bottom: BorderSide(
-                    color: effectiveBorderColor,
-                    width: 1,
-                  ),
-                ),
+      opacity: isLocked ? 0.6 : 1.0,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: isLocked ? Colors.grey.shade300 : Colors.grey.shade200,
+            width: 1,
+          ),
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _open(context),
-            hoverColor: const Color(0xFFF8F9FA),
-            splashColor: const Color(0xFF3366CC).withValues(alpha: 0.1),
-            highlightColor: const Color(0xFF3366CC).withValues(alpha: 0.05),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final bool isNarrow = constraints.maxWidth < 520;
+        child: InkWell(
+          onTap: () => _open(context),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isNarrow = constraints.maxWidth < 520;
 
-                  Widget audioWidget = const SizedBox.shrink();
-                  if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
-                    audioWidget = Align(
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: isNarrow ? double.infinity : 150,
-                        child:
-                            MiniAudioPlayer(audioUrl: audioUrl!, compact: true),
-                      ),
-                    );
-                  } else if (hasAudio) {
-                    audioWidget = const Tooltip(
-                      message: 'Hangjegyzet elérhető',
+                Widget audioWidget = const SizedBox.shrink();
+                if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
+                  audioWidget = Align(
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: isNarrow ? double.infinity : 150,
                       child:
-                          Icon(Icons.audiotrack, size: 16, color: Colors.green),
-                    );
-                  }
+                          MiniAudioPlayer(audioUrl: audioUrl!, compact: true),
+                    ),
+                  );
+                } else if (hasAudio) {
+                  audioWidget = const Tooltip(
+                    message: 'Hangjegyzet elérhető',
+                    child:
+                        Icon(Icons.audiotrack, size: 16, color: Colors.green),
+                  );
+                }
 
-                  final Widget titleAndMeta = Column(
+                final Widget titleAndMeta = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title.isEmpty ? '(Cím nélkül)' : title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w400,
+                              fontSize: 15,
+                              color: Color(0xFF202122),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Lakatos ikon zárt jegyzetek esetén
+                        if (isLocked) ...[
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: Color(0xFF54595D),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                );
+
+                if (isNarrow) {
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Flexible(
-                            child: Text(
-                              title.isEmpty ? '(Cím nélkül)' : title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w400,
-                                fontSize: 14,
-                                color: Color(0xFF202122),
-                                height: 1.5,
-                                letterSpacing: 0,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          Icon(
+                            _typeIcon(),
+                            color: const Color(0xFF1976D2),
+                            size: 24,
                           ),
-                          // Lakatos ikon zárt jegyzetek esetén
-                          if (isLocked) ...[
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.lock_outline,
-                              size: 16,
-                              color: Color(0xFF54595D),
-                            ),
-                          ],
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: titleAndMeta,
+                          ),
                         ],
                       ),
-                    ],
-                  );
-
-                  if (isNarrow) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _typeIcon(),
-                              color: const Color(0xFF54595D),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: titleAndMeta,
-                            ),
-                          ],
-                        ),
-                        if (hasAudio) ...[
-                          const SizedBox(height: 12),
-                          audioWidget,
-                        ],
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _typeIcon(),
-                        color: const Color(0xFF54595D),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 12),
-                      // Bal oldali cím/meta - mindig látható
-                      Expanded(
-                        child: titleAndMeta,
-                      ),
-                      // Jobb oldali lejátszó - fix szélesség
                       if (hasAudio) ...[
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 150,
-                          child: MiniAudioPlayer(
-                            audioUrl: audioUrl!,
-                            compact: true,
-                          ),
-                        ),
+                        const SizedBox(height: 12),
+                        audioWidget,
                       ],
                     ],
                   );
-                },
-              ),
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _typeIcon(),
+                      color: const Color(0xFF1976D2),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 16),
+                    // Bal oldali cím/meta - mindig látható
+                    Expanded(
+                      child: titleAndMeta,
+                    ),
+                    // Jobb oldali lejátszó - fix szélesség
+                    if (hasAudio) ...[
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 150,
+                        child: MiniAudioPlayer(
+                          audioUrl: audioUrl!,
+                          compact: true,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
         ),

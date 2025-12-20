@@ -249,7 +249,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           final hierarchy = _buildHierarchy(docs);
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             children: _buildHierarchyWidgets(hierarchy),
           );
         },
@@ -336,19 +336,6 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           as List<QueryDocumentSnapshot<Map<String, dynamic>>>;
 
       if (directDocs.isNotEmpty) {
-        widgets.add(
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text(
-              'Jegyzetek',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        );
-
         for (var doc in directDocs) {
           widgets.add(_buildNoteWidget(doc));
         }
@@ -364,19 +351,6 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       ..sort((a, b) => a.key.compareTo(b.key));
 
     if (tagEntries.isNotEmpty) {
-      widgets.add(
-        const Padding(
-          padding: EdgeInsets.only(bottom: 8),
-          child: Text(
-            'Alcímkék',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-
       for (var entry in tagEntries) {
         widgets.add(_buildTagWidget(entry.key, entry.value));
       }
@@ -392,9 +366,18 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     final hasChildren = data['hasChildren'] as bool;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
       child: InkWell(
         onTap: () => _navigateToNextLevel(context, tag),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -448,23 +431,20 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     // Egyszerűsített megoldás: visszalépés a /notes főoldalra
     const customFromUrl = '/notes';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: NoteListTile(
-        id: doc.id,
-        title: title,
-        type: type,
-        hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
-        hasAudio: (data['audioUrl'] ?? '').toString().isNotEmpty,
-        audioUrl: (data['audioUrl'] ?? '').toString(),
-        hasVideo: (data['videoUrl'] ?? '').toString().isNotEmpty,
-        deckCount: type == 'deck'
-            ? (data['flashcards'] as List<dynamic>? ?? []).length
-            : null,
-        isLocked: isLocked,
-        isLast: false,
-        customFromUrl: customFromUrl, // Egyedi from URL átadása
-      ),
+    return NoteListTile(
+      id: doc.id,
+      title: title,
+      type: type,
+      hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
+      hasAudio: (data['audioUrl'] ?? '').toString().isNotEmpty,
+      audioUrl: (data['audioUrl'] ?? '').toString(),
+      hasVideo: (data['videoUrl'] ?? '').toString().isNotEmpty,
+      deckCount: type == 'deck'
+          ? (data['flashcards'] as List<dynamic>? ?? []).length
+          : null,
+      isLocked: isLocked,
+      isLast: false,
+      customFromUrl: customFromUrl, // Egyedi from URL átadása
     );
   }
 }

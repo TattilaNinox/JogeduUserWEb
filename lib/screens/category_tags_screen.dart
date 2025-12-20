@@ -125,18 +125,8 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           final sortedTags = tagMap.keys.toList()..sort();
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'Címkék',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
               ...sortedTags.map((tag) => _buildTagCard(tag, tagMap[tag]!)),
             ],
           );
@@ -168,9 +158,18 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
     });
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
       child: InkWell(
         onTap: () => _navigateToTagDrillDown(context, tag),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(

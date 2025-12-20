@@ -137,6 +137,27 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
     Widget buildBreadcrumb() {
       final items = <Widget>[];
 
+      // Főoldal
+      items.add(
+        InkWell(
+          onTap: () => context.go('/notes'),
+          child: Text(
+            'Főoldal',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.blue[700],
+              fontWeight: FontWeight.normal,
+            ),
+          ),
+        ),
+      );
+      items.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(Icons.chevron_right, size: 16, color: Colors.grey[600]),
+        ),
+      );
+
       // Kategória
       if (category.isNotEmpty) {
         items.add(
