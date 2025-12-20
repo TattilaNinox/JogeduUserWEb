@@ -88,25 +88,35 @@ class NoteListTile extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     // Az aktuális URL-t query paraméterként adjuk át (visszalépéshez)
-    final currentUri = GoRouterState.of(context).uri;
-    final fromParam = Uri.encodeComponent(currentUri.toString());
+    // FONTOS: GoRouterState.of(context) csak akkor érhető el, ha GoRouter kontextusban vagyunk
+    // Ha Navigator.push()-sal navigáltunk (pl. TagDrillDownScreen), akkor nincs GoRouterState
+    String fromParam = '';
+    try {
+      final currentUri = GoRouterState.of(context).uri;
+      fromParam = Uri.encodeComponent(currentUri.toString());
+    } catch (e) {
+      // Ha nincs GoRouterState, akkor üres marad a fromParam
+      debugPrint('GoRouterState not available, skipping from parameter');
+    }
+
+    final fromQuery = fromParam.isNotEmpty ? '?from=$fromParam' : '';
 
     if (type == 'interactive') {
-      context.go('/interactive-note/$id?from=$fromParam');
+      context.go('/interactive-note/$id$fromQuery');
     } else if (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual') {
       if (isMobile) {
-        context.go('/quiz/$id?from=$fromParam');
+        context.go('/quiz/$id$fromQuery');
       } else {
         _openQuiz(context, dualMode: type == 'dynamic_quiz_dual');
       }
     } else if (type == 'deck') {
-      context.go('/deck/$id/view?from=$fromParam');
+      context.go('/deck/$id/view$fromQuery');
     } else if (type == 'memoriapalota_allomasok') {
-      context.go('/memoriapalota-allomas/$id?from=$fromParam');
+      context.go('/memoriapalota-allomas/$id$fromQuery');
     } else if (type == 'memoriapalota_fajlok') {
-      context.go('/memoriapalota-fajl/$id?from=$fromParam');
+      context.go('/memoriapalota-fajl/$id$fromQuery');
     } else {
-      context.go('/note/$id?from=$fromParam');
+      context.go('/note/$id$fromQuery');
     }
   }
 
