@@ -393,6 +393,14 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     final isFree = data['isFree'] as bool? ?? false;
     final isLocked = !isFree && !_hasPremiumAccess;
 
+    // Egyedi from URL létrehozása a jelenlegi TagDrillDownScreen-hez való visszalépéshez
+    // Mivel Navigator.push()-sal navigáltunk ide, nincs GoRouter URL
+    // Ezért manuálisan kell létrehozni egy /notes URL-t, amely visszavisz a főoldalra
+    // MEGJEGYZÉS: Ideális esetben itt egy deep link-et kellene létrehozni a TagDrillDownScreen-hez,
+    // de mivel az Navigator.push()-sal van megnyitva, nincs URL-je
+    // Egyszerűsített megoldás: visszalépés a /notes főoldalra
+    final customFromUrl = '/notes';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: NoteListTile(
@@ -408,6 +416,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
             : null,
         isLocked: isLocked,
         isLast: false,
+        customFromUrl: customFromUrl, // Egyedi from URL átadása
       ),
     );
   }

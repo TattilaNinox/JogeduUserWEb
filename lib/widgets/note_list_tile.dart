@@ -19,6 +19,7 @@ class NoteListTile extends StatelessWidget {
   final String? audioUrl;
   final bool isLocked; // Új paraméter a zárt állapot jelzésére
   final bool isLast; // Jelzi, hogy ez az utolsó elem a listában
+  final String? customFromUrl; // Egyedi from URL (pl. TagDrillDownScreen-hez)
 
   const NoteListTile({
     super.key,
@@ -33,6 +34,7 @@ class NoteListTile extends StatelessWidget {
     this.audioUrl,
     this.isLocked = false, // Alapértelmezetten nem zárt
     this.isLast = false, // Alapértelmezetten nem utolsó
+    this.customFromUrl, // Opcionális egyedi from URL
   });
 
   IconData _typeIcon() {
@@ -91,12 +93,19 @@ class NoteListTile extends StatelessWidget {
     // FONTOS: GoRouterState.of(context) csak akkor érhető el, ha GoRouter kontextusban vagyunk
     // Ha Navigator.push()-sal navigáltunk (pl. TagDrillDownScreen), akkor nincs GoRouterState
     String fromParam = '';
-    try {
-      final currentUri = GoRouterState.of(context).uri;
-      fromParam = Uri.encodeComponent(currentUri.toString());
-    } catch (e) {
-      // Ha nincs GoRouterState, akkor üres marad a fromParam
-      debugPrint('GoRouterState not available, skipping from parameter');
+
+    // Ha van customFromUrl, azt használjuk
+    if (customFromUrl != null && customFromUrl!.isNotEmpty) {
+      fromParam = Uri.encodeComponent(customFromUrl!);
+    } else {
+      // Különben próbáljuk meg a GoRouterState-ből kiolvasni
+      try {
+        final currentUri = GoRouterState.of(context).uri;
+        fromParam = Uri.encodeComponent(currentUri.toString());
+      } catch (e) {
+        // Ha nincs GoRouterState, akkor üres marad a fromParam
+        debugPrint('GoRouterState not available, skipping from parameter');
+      }
     }
 
     final fromQuery = fromParam.isNotEmpty ? '?from=$fromParam' : '';
