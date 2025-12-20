@@ -57,7 +57,8 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
         // Sorba rendezés a card_ids lista alapján
         _cards = cardDocs.docs
           ..sort(
-              (a, b) => cardIds.indexOf(a.id).compareTo(cardIds.indexOf(b.id)));
+            (a, b) => cardIds.indexOf(a.id).compareTo(cardIds.indexOf(b.id)),
+          );
       }
 
       if (mounted) {
@@ -78,7 +79,8 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
-            'Ez a tartalom csak előfizetőknek érhető el. Vásárolj előfizetést a teljes hozzáféréshez!'),
+          'Ez a tartalom csak előfizetőknek érhető el. Vásárolj előfizetést a teljes hozzáféréshez!',
+        ),
         duration: const Duration(seconds: 4),
         action: SnackBarAction(
           label: 'Előfizetés',
@@ -115,14 +117,21 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
     }
     if (_deck == null) {
       return Scaffold(
-          appBar: AppBar(),
-          body: const Center(child: Text('A köteg nem található.')));
+        appBar: AppBar(),
+        body: const Center(child: Text('A köteg nem található.')),
+      );
     }
 
     final deckData = _deck!.data() as Map<String, dynamic>;
     final title = deckData['title'] ?? 'Névtelen köteg';
     final category = deckData['category'] as String? ?? '';
     final tags = (deckData['tags'] as List<dynamic>? ?? []).cast<String>();
+
+    // DEBUG: Ellenőrizzük, hogy van-e category és tags
+    debugPrint('[DeckView] Deck ID: ${widget.deckId}');
+    debugPrint('[DeckView] Category: "$category"');
+    debugPrint('[DeckView] Tags: $tags');
+    debugPrint('[DeckView] Tags length: ${tags.length}');
 
     // Ellenőrizzük, van-e 'from' query paraméter
     final uri = GoRouterState.of(context).uri;
@@ -200,9 +209,7 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
 
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Row(
-          children: items,
-        ),
+        child: Row(children: items),
       );
     }
 
@@ -253,7 +260,8 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
                 Expanded(
                   child: _cards.isEmpty
                       ? const Center(
-                          child: Text('Nincsenek kártyák ebben a kötegben.'))
+                          child: Text('Nincsenek kártyák ebben a kötegben.'),
+                        )
                       : PageView.builder(
                           controller: _pageController,
                           itemCount: _cards.length,
@@ -267,7 +275,8 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
                             return Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: SingleChildScrollView(
-                                  child: Html(data: htmlContent)),
+                                child: Html(data: htmlContent),
+                              ),
                             );
                           },
                         ),
