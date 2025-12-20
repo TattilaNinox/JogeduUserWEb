@@ -110,22 +110,51 @@ class NoteListTile extends StatelessWidget {
 
     final fromQuery = fromParam.isNotEmpty ? '?from=$fromParam' : '';
 
+    // Navigációs metódus kiválasztása
+    // Ha van customFromUrl (pl. TagDrillDownScreen), akkor push-t használunk, hogy megőrizzük a history-t
+    // Különben go-t használunk, ami a standard működés
+    final usePush = customFromUrl != null && customFromUrl!.isNotEmpty;
+
     if (type == 'interactive') {
-      context.go('/interactive-note/$id$fromQuery');
+      if (usePush) {
+        context.push('/interactive-note/$id$fromQuery');
+      } else {
+        context.go('/interactive-note/$id$fromQuery');
+      }
     } else if (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual') {
       if (isMobile) {
-        context.go('/quiz/$id$fromQuery');
+        if (usePush) {
+          context.push('/quiz/$id$fromQuery');
+        } else {
+          context.go('/quiz/$id$fromQuery');
+        }
       } else {
         _openQuiz(context, dualMode: type == 'dynamic_quiz_dual');
       }
     } else if (type == 'deck') {
-      context.go('/deck/$id/view$fromQuery');
+      if (usePush) {
+        context.push('/deck/$id/view$fromQuery');
+      } else {
+        context.go('/deck/$id/view$fromQuery');
+      }
     } else if (type == 'memoriapalota_allomasok') {
-      context.go('/memoriapalota-allomas/$id$fromQuery');
+      if (usePush) {
+        context.push('/memoriapalota-allomas/$id$fromQuery');
+      } else {
+        context.go('/memoriapalota-allomas/$id$fromQuery');
+      }
     } else if (type == 'memoriapalota_fajlok') {
-      context.go('/memoriapalota-fajl/$id$fromQuery');
+      if (usePush) {
+        context.push('/memoriapalota-fajl/$id$fromQuery');
+      } else {
+        context.go('/memoriapalota-fajl/$id$fromQuery');
+      }
     } else {
-      context.go('/note/$id$fromQuery');
+      if (usePush) {
+        context.push('/note/$id$fromQuery');
+      } else {
+        context.go('/note/$id$fromQuery');
+      }
     }
   }
 

@@ -399,7 +399,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     // MEGJEGYZÉS: Ideális esetben itt egy deep link-et kellene létrehozni a TagDrillDownScreen-hez,
     // de mivel az Navigator.push()-sal van megnyitva, nincs URL-je
     // Egyszerűsített megoldás: visszalépés a /notes főoldalra
-    final customFromUrl = '/notes';
+    const customFromUrl = '/notes';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

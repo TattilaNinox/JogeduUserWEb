@@ -133,10 +133,6 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
     debugPrint('[DeckView] Tags: $tags');
     debugPrint('[DeckView] Tags length: ${tags.length}');
 
-    // Ellenőrizzük, van-e 'from' query paraméter
-    final uri = GoRouterState.of(context).uri;
-    final fromParam = uri.queryParameters['from'];
-
     // Breadcrumb építése
     Widget buildBreadcrumb() {
       final items = <Widget>[];
