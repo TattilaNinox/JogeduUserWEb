@@ -5,8 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../core/firebase_config.dart';
-import 'note_list_tile.dart';
-import '../screens/tag_drill_down_screen.dart';
+import '../screens/category_tags_screen.dart';
 
 class NoteCardGrid extends StatefulWidget {
   final String searchText;
@@ -502,88 +501,6 @@ class _CategorySection extends StatefulWidget {
 }
 
 class _CategorySectionState extends State<_CategorySection> {
-  late bool _isExpanded;
-
-  @override
-  void initState() {
-    super.initState();
-    // Alapértelmezetten zárva - csak akkor legyen kibontva, ha explicit módon kiválasztották a szűrőben
-    _isExpanded = widget.category == widget.selectedCategory &&
-        widget.selectedCategory != null;
-  }
-
-  /// Címke szint építése - CSAK az első szintet (tags[0]) jelenítjük meg fa struktúraként
-  /// A mélyebb szintek (tags[1]+) drill-down navigációval érhetők el
-  Widget _buildTagLevel(
-    Map<String, dynamic> tagLevel,
-    String category,
-    String? selectedTag,
-    bool hasPremiumAccess, {
-    int depth = 0,
-    bool isFirstLevel = false,
-  }) {
-    final List<Widget> children = [];
-    final entries = tagLevel.entries.toList();
-
-    for (int i = 0; i < entries.length; i++) {
-      final entry = entries[i];
-      final key = entry.key;
-      final value = entry.value;
-      final isFirst = i == 0 && isFirstLevel;
-      final isLast = i == entries.length - 1;
-
-      if (value is List<QueryDocumentSnapshot<Map<String, dynamic>>>) {
-        // Ha lista, akkor ezek a jegyzetek - közvetlenül megjelenítjük
-        children.add(_TagSection(
-          key: ValueKey('tag_${category}_${key}_$depth'),
-          tag: key.isEmpty ? 'Nincs címke' : key,
-          docs: value,
-          selectedTag: selectedTag,
-          hasPremiumAccess: hasPremiumAccess,
-          isFirst: isFirst,
-          isLast: isLast,
-          category: category,
-          tagPath: depth == 0 ? [] : [key],
-          depth: depth,
-        ));
-      } else if (value is Map<String, dynamic>) {
-        // Ha Map, akkor ez egy köztes szint
-        // Összegyűjtjük a jegyzeteket ezen a szinten (ha vannak)
-        final docsAtThisLevel = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-        if (value.containsKey('') && value[''] is List) {
-          docsAtThisLevel.addAll((value[''] as List)
-              .cast<QueryDocumentSnapshot<Map<String, dynamic>>>());
-        }
-
-        // FONTOS: Csak az első szintet (depth == 0) jelenítjük meg fa struktúraként
-        // A mélyebb szintekhez (depth > 0) navigációt használunk
-        final childMap = Map<String, dynamic>.from(value)..remove('');
-        final hasChildren = childMap.isNotEmpty;
-
-        children.add(_TagSection(
-          key: ValueKey('tag_${category}_${key}_$depth'),
-          tag: key,
-          docs: docsAtThisLevel,
-          selectedTag: selectedTag,
-          hasPremiumAccess: hasPremiumAccess,
-          isFirst: isFirst,
-          isLast: isLast,
-          category: category,
-          tagPath: depth == 0 ? [] : [key],
-          depth: depth,
-          // Ha depth == 0 és vannak alcímkék, akkor navigációt használunk (children = null)
-          // Ha depth > 0, akkor is navigációt használunk (nem jelenítjük meg a fa struktúrát)
-          children: null,
-          hasChildTags: hasChildren,
-        ));
-      }
-    }
-
-    return Column(
-      children: children,
-    );
-  }
-
   /// Összegyűjti az összes jegyzetet a hierarchiából
   int _countTotalDocs(Map<String, dynamic> hierarchy) {
     int count = 0;
@@ -597,354 +514,9 @@ class _CategorySectionState extends State<_CategorySection> {
     return count;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final totalDocs = _countTotalDocs(widget.tagHierarchy);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          left: BorderSide(
-            color: _isExpanded ? const Color(0xFF3366CC) : Colors.transparent,
-            width: 3,
-          ),
-          // Konténer alján soha ne legyen szegély
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-              },
-              hoverColor: const Color(0xFFF8F9FA),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  color: _isExpanded ? const Color(0xFFF8F9FA) : Colors.white,
-                  border: _isExpanded
-                      ? const Border(
-                          bottom: BorderSide(
-                            color: Colors.white,
-                            width: 1,
-                          ),
-                        )
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isExpanded ? Icons.folder_open : Icons.folder_outlined,
-                      color: const Color(0xFF54595D),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.category,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF202122),
-                          fontSize: 15,
-                          letterSpacing: 0,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '$totalDocs',
-                      style: const TextStyle(
-                        color: Color(0xFF54595D),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    AnimatedRotation(
-                      turns: _isExpanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Color(0xFF54595D),
-                        size: 20,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: _isExpanded
-                ? _buildTagLevel(
-                    widget.tagHierarchy,
-                    widget.category,
-                    widget.selectedTag,
-                    widget.hasPremiumAccess,
-                    depth: 0,
-                    isFirstLevel: true,
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Címke szintű szekció widget
-class _TagSection extends StatefulWidget {
-  final String tag;
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
-  final String? selectedTag;
-  final bool hasPremiumAccess;
-  final Widget?
-      children; // Alcímkék hierarchikus struktúrája (NEM HASZNÁLT - navigációt használunk)
-  final bool isFirst; // Az első elem-e a szülő szekcióban
-  final bool isLast; // Az utolsó elem-e a szülő szekcióban
-  final String category; // Kategória név (navigációhoz)
-  final List<String> tagPath; // Címkék útvonala (navigációhoz)
-  final int depth; // Jelenlegi mélység (0 = tags[0])
-  final bool hasChildTags; // Van-e mélyebb szintű címke
-
-  const _TagSection({
-    super.key,
-    required this.tag,
-    required this.docs,
-    this.selectedTag,
-    required this.hasPremiumAccess,
-    this.children,
-    this.isFirst = false,
-    this.isLast = false,
-    required this.category,
-    required this.tagPath,
-    this.depth = 0,
-    this.hasChildTags = false,
-  });
-
-  @override
-  State<_TagSection> createState() => _TagSectionState();
-}
-
-class _TagSectionState extends State<_TagSection> {
-  late bool _isExpanded;
-
-  @override
-  void initState() {
-    super.initState();
-    // Csak akkor legyen kibontva, ha konkrétan kiválasztva van a szűrőben
-    _isExpanded = widget.tag == widget.selectedTag;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Ha depth == 0 és vannak alcímkék, akkor navigációt használunk
-    final useNavigation = widget.depth == 0 && widget.hasChildTags;
-
-    return Container(
-      margin: EdgeInsets.only(
-        left: 0,
-        right: 0,
-        top: widget.isFirst ? 0 : 1,
-        bottom: 0,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: (widget.isFirst && _isExpanded) || widget.isLast
-            ? Border.all(color: Colors.transparent, width: 0)
-            : const Border(
-                bottom: BorderSide(
-                  color: Color(0xFFB0D4F1),
-                  width: 1,
-                ),
-              ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                if (useNavigation) {
-                  // Navigáció a TagDrillDownScreen-re
-                  _navigateToTagDrillDown(context);
-                } else {
-                  // Expandable viselkedés (ha nincs navigáció)
-                  setState(() {
-                    _isExpanded = !_isExpanded;
-                  });
-                }
-              },
-              hoverColor: const Color(0xFFF8F9FA),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: _isExpanded ? const Color(0xFFE8F0F5) : Colors.white,
-                  border: _isExpanded
-                      ? const Border(
-                          bottom: BorderSide(
-                            color: Colors.white,
-                            width: 1,
-                          ),
-                        )
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isExpanded ? Icons.label : Icons.label_outline,
-                      color: const Color(0xFF54595D),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.tag,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF202122),
-                          fontSize: 14,
-                          letterSpacing: 0,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${widget.docs.length + (widget.hasChildTags ? 1 : 0)}',
-                      style: const TextStyle(
-                        color: Color(0xFF54595D),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Ha navigációt használunk, chevron ikon, különben expandable nyíl
-                    if (useNavigation)
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFF54595D),
-                        size: 18,
-                      )
-                    else if (widget.children != null || widget.docs.isNotEmpty)
-                      AnimatedRotation(
-                        turns: _isExpanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Color(0xFF54595D),
-                          size: 18,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Csak akkor jelenítjük meg a tartalmat, ha NEM navigációt használunk
-          if (!useNavigation)
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child: _isExpanded
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Alcímkék hierarchikus struktúrája (ha van)
-                        if (widget.children != null)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 0),
-                            child: widget.children!,
-                          ),
-                        // Jegyzetek listája
-                        if (widget.docs.isNotEmpty)
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: widget.docs.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 0),
-                            itemBuilder: (context, index) {
-                              final doc = widget.docs[index];
-                              final data = doc.data();
-                              final isAllomas = doc.reference.path
-                                      .contains('memoriapalota_allomasok') &&
-                                  !doc.reference.path.contains('/allomasok/');
-                              final isFajl = doc.reference.path
-                                  .contains('memoriapalota_fajlok');
-                              final type = isAllomas
-                                  ? 'memoriapalota_allomasok'
-                                  : (isFajl
-                                      ? 'memoriapalota_fajlok'
-                                      : (data['type'] as String? ??
-                                          'standard'));
-                              final title = isAllomas || isFajl
-                                  ? (data['cim'] as String? ?? '')
-                                  : (data['title'] as String? ?? '');
-                              if (isFajl) {
-                                debugPrint(
-                                    '[NoteCardGrid] Fajl title: $title, docId: ${doc.id}');
-                              }
-                              final isFree = data['isFree'] as bool? ?? false;
-
-                              final isLocked =
-                                  !isFree && !widget.hasPremiumAccess;
-                              final isLast = index == widget.docs.length - 1;
-
-                              return NoteListTile(
-                                id: doc.id,
-                                title: title,
-                                type: type,
-                                hasDoc: (data['docxUrl'] ?? '')
-                                    .toString()
-                                    .isNotEmpty,
-                                hasAudio: (data['audioUrl'] ?? '')
-                                    .toString()
-                                    .isNotEmpty,
-                                audioUrl: (data['audioUrl'] ?? '').toString(),
-                                hasVideo: (data['videoUrl'] ?? '')
-                                    .toString()
-                                    .isNotEmpty,
-                                deckCount: type == 'deck'
-                                    ? (data['flashcards'] as List<dynamic>? ??
-                                            [])
-                                        .length
-                                    : null,
-                                isLocked: isLocked,
-                                isLast: isLast,
-                              );
-                            },
-                          ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// Platform-natív navigáció a TagDrillDownScreen-re
-  void _navigateToTagDrillDown(BuildContext context) {
-    final newTagPath = [...widget.tagPath, widget.tag];
-
-    final screen = TagDrillDownScreen(
-      category: widget.category,
-      tagPath: newTagPath,
-    );
+  /// Platform-natív navigáció a CategoryTagsScreen-re
+  void _navigateToCategoryTags(BuildContext context) {
+    final screen = CategoryTagsScreen(category: widget.category);
 
     // Platform-natív navigáció
     if (!kIsWeb && Platform.isIOS) {
@@ -958,5 +530,62 @@ class _TagSectionState extends State<_TagSection> {
         MaterialPageRoute(builder: (context) => screen),
       );
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalDocs = _countTotalDocs(widget.tagHierarchy);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(0),
+        side: BorderSide(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _navigateToCategoryTags(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Icon(
+                Icons.folder_outlined,
+                color: const Color(0xFF1976D2),
+                size: 24,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  widget.category,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF202122),
+                  ),
+                ),
+              ),
+              Text(
+                '$totalDocs',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey.shade400,
+                size: 24,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

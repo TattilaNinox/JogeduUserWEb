@@ -29,11 +29,32 @@ class TagDrillDownScreen extends StatefulWidget {
 
 class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   bool _hasPremiumAccess = false;
+  final ScrollController _breadcrumbScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _checkPremiumAccess();
+    // Scroll to the end after the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollBreadcrumbToEnd();
+    });
+  }
+
+  @override
+  void dispose() {
+    _breadcrumbScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollBreadcrumbToEnd() {
+    if (_breadcrumbScrollController.hasClients) {
+      _breadcrumbScrollController.animateTo(
+        _breadcrumbScrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<void> _checkPremiumAccess() async {
@@ -110,10 +131,35 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   Widget _buildBreadcrumb() {
     final items = <Widget>[];
 
-    // Kategória
+    // Főoldal
     items.add(
       TextButton(
         onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+        child: const Text(
+          'Főoldal',
+          style: TextStyle(fontSize: 14),
+        ),
+      ),
+    );
+
+    // Kategória - visszanavigál a CategoryTagsScreen-re
+    items.add(const Icon(Icons.chevron_right, size: 16, color: Colors.grey));
+    items.add(
+      TextButton(
+        onPressed: () {
+          // Visszanavigálás a CategoryTagsScreen-re
+          // Ha csak 1 elem van a tagPath-ban, akkor egy szinttel visszalépünk
+          if (widget.tagPath.length == 1) {
+            Navigator.pop(context);
+          } else {
+            // Ha több elem van, akkor a kategória szintre navigálunk vissza
+            Navigator.popUntil(
+              context,
+              (route) =>
+                  route.settings.name == '/category_tags' || route.isFirst,
+            );
+          }
+        },
         child: Text(
           widget.category,
           style: const TextStyle(fontSize: 14),
@@ -156,6 +202,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      controller: _breadcrumbScrollController,
       child: Row(
         children: items,
       ),
