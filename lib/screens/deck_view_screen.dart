@@ -208,14 +208,14 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title),
-            const SizedBox(height: 4),
-            buildBreadcrumb(),
-          ],
+        title: Text(title),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: buildBreadcrumb(),
+          ),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
