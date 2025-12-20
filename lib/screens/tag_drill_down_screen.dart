@@ -55,6 +55,19 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       }
 
       final userData = userDoc.data()!;
+
+      // Admin ellenőrzés - adminok minden jegyzetet láthatnak
+      final userType = (userData['userType'] as String? ?? '').toLowerCase();
+      final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
+      final isAdminBool = userData['isAdmin'] == true;
+      final isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+
+      if (isAdmin) {
+        setState(() => _hasPremiumAccess = true);
+        return;
+      }
+
+      // Nem admin esetén ellenőrizzük az előfizetést
       final subscriptionStatus =
           userData['subscriptionStatus'] as String? ?? 'inactive';
       final trialActive = userData['trialActive'] as bool? ?? false;
