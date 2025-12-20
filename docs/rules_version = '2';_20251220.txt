@@ -1,0 +1,227 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ────────── Admin-ellenőrzés segédfüggvény ──────────
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.email in [
+               'tattila.ninox@gmail.com',
+             ];
+    }
+
+    // ────────── Felhasználók (+ alsó-gyűjtemények) ──────────
+    match /users/{userId} {
+      // Admin bármit, a felhasználó csak a saját dokumentumát olvashatja/módosíthatja
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+
+      // Al-gyűjtemények
+      match /learning_states/{noteId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      match /user_learning_data/{docId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      } // legacy
+      match /served_questions/{questionId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+
+      // ÚJ alsó-gyűjtemények
+      match /categories/{catId}/learning/{docId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      match /category_stats/{catId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+
+      match /{document=**} {
+        allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+    }
+
+    // ────────── Jegyzetek (minden típus, beleértve: text, interactive, deck, dynamic_quiz, source stb.) ──────────
+    match /notes/{noteId} {
+      // Olvasás: admin bármit, más csak Published / Public (a források mindig Public státuszúak)
+      allow read: if request.auth != null && (isAdmin() || resource.data.status in ['Published', 'Public']);
+
+      // Létrehozás, törlés: csak admin
+      allow create, delete: if isAdmin();
+
+      // Frissítés: admin bármit, nem admin csak az is_selected_for_learning mezőt
+      allow update: if isAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_selected_for_learning']));
+    }
+
+    // ────────── Kategóriák ──────────
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ────────── Tudományok ──────────
+    match /sciences/{scienceId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ────────── Törvénykönyvek ──────────
+    match /torvenykonyvek/{torvenykonyvId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ────────── Kérdésbankok ──────────
+    match /question_banks/{bankId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+ 
+    // ────────── Kétfaktoros hitelesítés (user_2fa) ──────────
+    // A felhasználó a saját 2FA dokumentumát olvashatja/írhatja, admin bármit.
+    match /user_2fa/{userId} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+
+    // ────────── Források / Irodalom ──────────
+    // A források már a notes-gyűjteményben tárolódnak (type == 'source'),
+    // ezért külön gyűjteményre nincs szükség. A korábbi /sources útvonalat
+    // meghagyjuk csak olvashatónak a visszafelé kompatibilitás érdekében.
+    match /sources/{sourceId} {
+      // Olvasás bármely bejelentkezett felhasználónak (read-only)
+      allow read: if request.auth != null;
+      // Írás letiltva – a frissítés már a /notes alatt történik.
+      allow write: if false;
+    }
+        // ────────── Subscription & Payment Collections ──────────
+    // Ezek a kollekciók csak Cloud Functions-ök számára elérhetők
+    // Admin olvashat, de a Cloud Functions-ök service account-tal működnek
+    
+    match /play_purchase_tokens/{tokenId} {
+      // Csak admin olvashat, írás csak Cloud Functions
+      allow read: if isAdmin();
+      allow write: if false; // Cloud Functions service account-tal ír
+    }
+    
+    match /verification_queue/{tokenId} {
+      // Csak admin olvashat, írás csak Cloud Functions
+      allow read: if isAdmin();
+      allow write: if false; // Cloud Functions service account-tal ír
+    }
+    
+    match /processedTokens/{tokenId} {
+      // Csak admin olvashat, írás csak Cloud Functions
+      allow read: if isAdmin();
+      allow write: if false; // Cloud Functions service account-tal ír
+    }
+
+    // ────────── Device Change Codes ──────────
+    match /device_change_codes/{codeId} {
+      // Csak admin és a kód tulajdonosa olvashatja
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+      allow write: if false; // Cloud Functions service account-tal ír
+    }
+
+    // ────────── Jogesetek ──────────
+    match /jogesetek/{paragrafus} {
+      // Olvasás: minden bejelentkezett felhasználó (beleértve a collection query-t is)
+      // MEGJEGYZÉS: A státusz jogesetenként van tárolva (nem dokumentum szinten),
+      // ezért a Firestore szabályokban nem lehet státusz alapú szűrést végezni.
+      // Az alkalmazás szintjén kell szűrni a Published státuszú jogeseteket.
+      allow read: if request.auth != null;
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Jogesetek collection query ──────────
+    // Ez szükséges a getStatistics() metódushoz
+    match /jogesetek/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ────────── Ptk. Sztorik jogesetek ──────────
+    match /ptk_sztorik/{paragrafus} {
+      // Olvasás: minden bejelentkezett felhasználó (beleértve a collection query-t is)
+      // MEGJEGYZÉS: A státusz jogesetenként van tárolva (nem dokumentum szinten),
+      // ezért a Firestore szabályokban nem lehet státusz alapú szűrést végezni.
+      // Az alkalmazás szintjén kell szűrni a Published státuszú jogeseteket.
+      allow read: if request.auth != null;
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Ptk. Sztorik jogesetek collection query ──────────
+    // Ez szükséges a getPtkSztorikStatistics() metódushoz
+    match /ptk_sztorik/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ────────── Memóriapalota fájlok ──────────
+    match /memoriapalota_fajlok/{fileId} {
+      // Olvasás: minden bejelentkezett felhasználó
+      allow read: if request.auth != null;
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Memóriapalota fájlok collection query ──────────
+    // Ez szükséges a getMemoriapalotaFiles() metódushoz
+    match /memoriapalota_fajlok/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ────────── Memóriapalota állomások (útvonalak) ──────────
+    match /memoriapalota_allomasok/{utvonalId} {
+      // Olvasás: minden bejelentkezett felhasználó
+      allow read: if request.auth != null;
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+
+      // Állomások subcollection
+      match /allomasok/{allomasId} {
+        // Olvasás: minden bejelentkezett felhasználó
+        allow read: if request.auth != null;
+        // Létrehozás: csak admin
+        allow create: if isAdmin();
+        // Frissítés: csak admin
+        allow update: if isAdmin();
+        // Törlés: csak admin
+        allow delete: if isAdmin();
+      }
+    }
+    
+    // ────────── Memóriapalota állomások collection query ──────────
+    // Ez szükséges a getMemoriaUtvonalok() metódushoz
+    match /memoriapalota_allomasok/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

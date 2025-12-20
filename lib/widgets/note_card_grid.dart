@@ -1,8 +1,12 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../core/firebase_config.dart';
 import 'note_list_tile.dart';
+import '../screens/tag_drill_down_screen.dart';
 
 class NoteCardGrid extends StatefulWidget {
   final String searchText;
@@ -508,8 +512,8 @@ class _CategorySectionState extends State<_CategorySection> {
         widget.selectedCategory != null;
   }
 
-  /// Rekurzív címke szint építése
-  /// A címkék hierarchikusan működnek: tags[0] = főcím, tags[1] = alcím, tags[2] = alcím az alcím alatt, stb.
+  /// Címke szint építése - CSAK az első szintet (tags[0]) jelenítjük meg fa struktúraként
+  /// A mélyebb szintek (tags[1]+) drill-down navigációval érhetők el
   Widget _buildTagLevel(
     Map<String, dynamic> tagLevel,
     String category,
@@ -538,30 +542,23 @@ class _CategorySectionState extends State<_CategorySection> {
           hasPremiumAccess: hasPremiumAccess,
           isFirst: isFirst,
           isLast: isLast,
+          category: category,
+          tagPath: depth == 0 ? [] : [key],
+          depth: depth,
         ));
       } else if (value is Map<String, dynamic>) {
-        // Ha Map, akkor ez egy köztes szint - rekurzívan építjük
-        // Először összegyűjtjük a jegyzeteket ezen a szinten (ha vannak)
+        // Ha Map, akkor ez egy köztes szint
+        // Összegyűjtjük a jegyzeteket ezen a szinten (ha vannak)
         final docsAtThisLevel = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-        // Csak az üres kulcs alatt lévő jegyzeteket gyűjtjük össze (ezek közvetlenül ezen a szinten vannak)
         if (value.containsKey('') && value[''] is List) {
           docsAtThisLevel.addAll((value[''] as List)
               .cast<QueryDocumentSnapshot<Map<String, dynamic>>>());
         }
 
-        // Rekurzívan építjük az alcímkéket (az üres kulcs nélkül)
+        // FONTOS: Csak az első szintet (depth == 0) jelenítjük meg fa struktúraként
+        // A mélyebb szintekhez (depth > 0) navigációt használunk
         final childMap = Map<String, dynamic>.from(value)..remove('');
-        final childWidget = childMap.isEmpty
-            ? null
-            : _buildTagLevel(
-                childMap,
-                category,
-                selectedTag,
-                hasPremiumAccess,
-                depth: depth + 1,
-                isFirstLevel:
-                    true, // Az első gyermek elem tetején ne legyen margin
-              );
+        final hasChildren = childMap.isNotEmpty;
 
         children.add(_TagSection(
           key: ValueKey('tag_${category}_${key}_$depth'),
@@ -571,7 +568,13 @@ class _CategorySectionState extends State<_CategorySection> {
           hasPremiumAccess: hasPremiumAccess,
           isFirst: isFirst,
           isLast: isLast,
-          children: childWidget,
+          category: category,
+          tagPath: depth == 0 ? [] : [key],
+          depth: depth,
+          // Ha depth == 0 és vannak alcímkék, akkor navigációt használunk (children = null)
+          // Ha depth > 0, akkor is navigációt használunk (nem jelenítjük meg a fa struktúrát)
+          children: null,
+          hasChildTags: hasChildren,
         ));
       }
     }
@@ -706,9 +709,14 @@ class _TagSection extends StatefulWidget {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
   final String? selectedTag;
   final bool hasPremiumAccess;
-  final Widget? children; // Alcímkék hierarchikus struktúrája
+  final Widget?
+      children; // Alcímkék hierarchikus struktúrája (NEM HASZNÁLT - navigációt használunk)
   final bool isFirst; // Az első elem-e a szülő szekcióban
   final bool isLast; // Az utolsó elem-e a szülő szekcióban
+  final String category; // Kategória név (navigációhoz)
+  final List<String> tagPath; // Címkék útvonala (navigációhoz)
+  final int depth; // Jelenlegi mélység (0 = tags[0])
+  final bool hasChildTags; // Van-e mélyebb szintű címke
 
   const _TagSection({
     super.key,
@@ -719,6 +727,10 @@ class _TagSection extends StatefulWidget {
     this.children,
     this.isFirst = false,
     this.isLast = false,
+    required this.category,
+    required this.tagPath,
+    this.depth = 0,
+    this.hasChildTags = false,
   });
 
   @override
@@ -737,26 +749,23 @@ class _TagSectionState extends State<_TagSection> {
 
   @override
   Widget build(BuildContext context) {
-    // Ha kibontva van, akkor is legyen alsó szegély, hogy elválassza a következő címke szekciót
-    // (a jegyzetek kezelik a saját szegélyeiket)
-    // Az első elem tetején ne legyen margin, hogy ne legyen duplikált vonal
-    // Az első elem alsó szegélye se legyen, ha a szülő kibontva van
+    // Ha depth == 0 és vannak alcímkék, akkor navigációt használunk
+    final useNavigation = widget.depth == 0 && widget.hasChildTags;
+
     return Container(
       margin: EdgeInsets.only(
         left: 0,
         right: 0,
         top: widget.isFirst ? 0 : 1,
-        bottom: 0, // Konténer alján soha ne legyen margin
+        bottom: 0,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        // Konténer alján soha ne legyen szegély, csak a sorok között
-        // Az utolsó elem alatt se legyen szegély
         border: (widget.isFirst && _isExpanded) || widget.isLast
             ? Border.all(color: Colors.transparent, width: 0)
             : const Border(
                 bottom: BorderSide(
-                  color: Color(0xFFB0D4F1), // Halvány édenkék
+                  color: Color(0xFFB0D4F1),
                   width: 1,
                 ),
               ),
@@ -768,16 +777,21 @@ class _TagSectionState extends State<_TagSection> {
             color: Colors.transparent,
             child: InkWell(
               onTap: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
+                if (useNavigation) {
+                  // Navigáció a TagDrillDownScreen-re
+                  _navigateToTagDrillDown(context);
+                } else {
+                  // Expandable viselkedés (ha nincs navigáció)
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                }
               },
               hoverColor: const Color(0xFFF8F9FA),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
-                  // Alköteg fejléce: szürkés kék, ha kibontva van
                   color: _isExpanded ? const Color(0xFFE8F0F5) : Colors.white,
                   border: _isExpanded
                       ? const Border(
@@ -810,7 +824,7 @@ class _TagSectionState extends State<_TagSection> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      '${widget.docs.length + (widget.children != null ? 1 : 0)}',
+                      '${widget.docs.length + (widget.hasChildTags ? 1 : 0)}',
                       style: const TextStyle(
                         color: Color(0xFF54595D),
                         fontSize: 13,
@@ -818,7 +832,14 @@ class _TagSectionState extends State<_TagSection> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (widget.children != null || widget.docs.isNotEmpty)
+                    // Ha navigációt használunk, chevron ikon, különben expandable nyíl
+                    if (useNavigation)
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFF54595D),
+                        size: 18,
+                      )
+                    else if (widget.children != null || widget.docs.isNotEmpty)
                       AnimatedRotation(
                         turns: _isExpanded ? 0.5 : 0,
                         duration: const Duration(milliseconds: 200),
@@ -833,88 +854,109 @@ class _TagSectionState extends State<_TagSection> {
               ),
             ),
           ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: _isExpanded
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Alcímkék hierarchikus struktúrája (ha van)
-                      if (widget.children != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 0),
-                          child: widget.children!,
-                        ),
-                      // Jegyzetek listája
-                      if (widget.docs.isNotEmpty)
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: widget.docs.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 0),
-                          itemBuilder: (context, index) {
-                            final doc = widget.docs[index];
-                            final data = doc.data();
-                            // Fő útvonal dokumentumok esetén külön kezelés (nem subcollection)
-                            final isAllomas = doc.reference.path
-                                    .contains('memoriapalota_allomasok') &&
-                                !doc.reference.path.contains('/allomasok/');
-                            final isFajl = doc.reference.path
-                                .contains('memoriapalota_fajlok');
-                            final type = isAllomas
-                                ? 'memoriapalota_allomasok'
-                                : (isFajl
-                                    ? 'memoriapalota_fajlok'
-                                    : (data['type'] as String? ?? 'standard'));
-                            // Fő útvonal dokumentumoknál és fájloknál 'cim' mező, egyébként 'title'
-                            final title = isAllomas || isFajl
-                                ? (data['cim'] as String? ?? '')
-                                : (data['title'] as String? ?? '');
-                            // Debug: cím ellenőrzés
-                            if (isFajl) {
-                              debugPrint(
-                                  '[NoteCardGrid] Fajl title: $title, docId: ${doc.id}');
-                            }
-                            // Ha az isFree mező hiányzik, akkor ZÁRT (false)
-                            final isFree = data['isFree'] as bool? ?? false;
+          // Csak akkor jelenítjük meg a tartalmat, ha NEM navigációt használunk
+          if (!useNavigation)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: _isExpanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Alcímkék hierarchikus struktúrája (ha van)
+                        if (widget.children != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 0),
+                            child: widget.children!,
+                          ),
+                        // Jegyzetek listája
+                        if (widget.docs.isNotEmpty)
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: widget.docs.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 0),
+                            itemBuilder: (context, index) {
+                              final doc = widget.docs[index];
+                              final data = doc.data();
+                              final isAllomas = doc.reference.path
+                                      .contains('memoriapalota_allomasok') &&
+                                  !doc.reference.path.contains('/allomasok/');
+                              final isFajl = doc.reference.path
+                                  .contains('memoriapalota_fajlok');
+                              final type = isAllomas
+                                  ? 'memoriapalota_allomasok'
+                                  : (isFajl
+                                      ? 'memoriapalota_fajlok'
+                                      : (data['type'] as String? ??
+                                          'standard'));
+                              final title = isAllomas || isFajl
+                                  ? (data['cim'] as String? ?? '')
+                                  : (data['title'] as String? ?? '');
+                              if (isFajl) {
+                                debugPrint(
+                                    '[NoteCardGrid] Fajl title: $title, docId: ${doc.id}');
+                              }
+                              final isFree = data['isFree'] as bool? ?? false;
 
-                            final isLocked =
-                                !isFree && !widget.hasPremiumAccess;
-                            // Az utolsó jegyzet alatt ne legyen vonal, mert a címke Container-nek van alsó szegélye
-                            final isLast = index == widget.docs.length - 1;
+                              final isLocked =
+                                  !isFree && !widget.hasPremiumAccess;
+                              final isLast = index == widget.docs.length - 1;
 
-                            return NoteListTile(
-                              id: doc.id,
-                              title: title,
-                              type: type,
-                              hasDoc:
-                                  (data['docxUrl'] ?? '').toString().isNotEmpty,
-                              hasAudio: (data['audioUrl'] ?? '')
-                                  .toString()
-                                  .isNotEmpty,
-                              audioUrl: (data['audioUrl'] ?? '').toString(),
-                              // Fájlok esetén mindig van audioUrl (ha létezik)
-                              // de a hasAudio már be van állítva fent
-                              hasVideo: (data['videoUrl'] ?? '')
-                                  .toString()
-                                  .isNotEmpty,
-                              deckCount: type == 'deck'
-                                  ? (data['flashcards'] as List<dynamic>? ?? [])
-                                      .length
-                                  : null,
-                              isLocked: isLocked,
-                              isLast: isLast,
-                            );
-                          },
-                        ),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
+                              return NoteListTile(
+                                id: doc.id,
+                                title: title,
+                                type: type,
+                                hasDoc: (data['docxUrl'] ?? '')
+                                    .toString()
+                                    .isNotEmpty,
+                                hasAudio: (data['audioUrl'] ?? '')
+                                    .toString()
+                                    .isNotEmpty,
+                                audioUrl: (data['audioUrl'] ?? '').toString(),
+                                hasVideo: (data['videoUrl'] ?? '')
+                                    .toString()
+                                    .isNotEmpty,
+                                deckCount: type == 'deck'
+                                    ? (data['flashcards'] as List<dynamic>? ??
+                                            [])
+                                        .length
+                                    : null,
+                                isLocked: isLocked,
+                                isLast: isLast,
+                              );
+                            },
+                          ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
         ],
       ),
     );
+  }
+
+  /// Platform-natív navigáció a TagDrillDownScreen-re
+  void _navigateToTagDrillDown(BuildContext context) {
+    final newTagPath = [...widget.tagPath, widget.tag];
+
+    final screen = TagDrillDownScreen(
+      category: widget.category,
+      tagPath: newTagPath,
+    );
+
+    // Platform-natív navigáció
+    if (!kIsWeb && Platform.isIOS) {
+      Navigator.push(
+        context,
+        CupertinoPageRoute(builder: (context) => screen),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => screen),
+      );
+    }
   }
 }
