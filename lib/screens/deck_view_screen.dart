@@ -227,26 +227,13 @@ class _DeckViewScreenState extends State<DeckViewScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            if (fromParam != null && fromParam.isNotEmpty) {
-              // Ha van from paraméter, oda navigálunk vissza
-              try {
-                final decodedFrom = Uri.decodeComponent(fromParam);
-                context.go(decodedFrom);
-              } catch (e) {
-                // Ha nem sikerül dekódolni, akkor Navigator.pop vagy /notes
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                } else {
-                  context.go('/notes');
-                }
-              }
+            // Egyszerűen visszalépünk az előző képernyőre
+            // Ha Navigator.push()-sal jöttünk (pl. TagDrillDownScreen), akkor oda megy vissza
+            // Ha context.go()-val jöttünk, akkor a /notes-ra megy
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
             } else {
-              // Ha nincs from paraméter, próbáljuk a Navigator.pop-ot
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              } else {
-                context.go('/notes');
-              }
+              context.go('/notes');
             }
           },
         ),
