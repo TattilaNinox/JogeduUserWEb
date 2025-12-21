@@ -226,38 +226,63 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _buildQuery().snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Hiba: ${snapshot.error}'),
-            );
-          }
+        builder: (context, notesSnapshot) {
+          // Jogesetek stream builder hozzáadása
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _buildJogesetQuery().snapshots(),
+            builder: (context, jogesetSnapshot) {
+              if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
+                return Center(
+                  child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
+                );
+              }
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+              if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          final docs = snapshot.data!.docs
-              .where((d) => d.data()['deletedAt'] == null)
-              .toList();
+              // Összefésüljük a két kollekciót
+              final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+              
+              if (notesSnapshot.hasData) {
+                allDocs.addAll(notesSnapshot.data!.docs
+                    .where((d) => d.data()['deletedAt'] == null)
+                    .toList());
+              }
+              
+              // Jogeset dokumentumok feldolgozása
+              final processedJogesetDocs = <Map<String, dynamic>>[];
+              if (jogesetSnapshot.hasData) {
+                final jogesetDocs = jogesetSnapshot.data!.docs
+                    .where((d) => d.data()['deletedAt'] == null)
+                    .toList();
+                
+                // Admin ellenőrzés
+                final user = FirebaseAuth.instance.currentUser;
+                final isAdmin = user?.email == 'tattila.ninox@gmail.com';
+                
+                processedJogesetDocs.addAll(_processJogesetDocuments(jogesetDocs, isAdmin: isAdmin));
+              }
 
-          if (docs.isEmpty) {
-            return const Center(child: Text('Nincs találat.'));
-          }
+              if (allDocs.isEmpty && processedJogesetDocs.isEmpty) {
+                return const Center(child: Text('Nincs találat.'));
+              }
 
-          // Hierarchikus csoportosítás
-          final hierarchy = _buildHierarchy(docs);
+              // Hierarchikus csoportosítás
+              final hierarchy = _buildHierarchy(allDocs, processedJogesetDocs);
 
-          return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            children: _buildHierarchyWidgets(hierarchy),
+              return ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: _buildHierarchyWidgets(hierarchy),
+              );
+            },
           );
         },
       ),
     );
   }
 
-  /// Firestore lekérdezés építése
+  /// Firestore lekérdezés építése notes kollekcióhoz
   /// FONTOS: Firestore nem támogatja több array-contains szűrőt,
   /// ezért csak a kategóriára szűrünk, és kliens oldalon szűrjük a címkéket
   Query<Map<String, dynamic>> _buildQuery() {
@@ -269,13 +294,74 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     return query;
   }
 
+  /// Firestore lekérdezés építése jogesetek kollekcióhoz
+  /// FONTOS: A jogesetek dokumentumai csak egy 'jogesetek' tömböt tartalmaznak,
+  /// a category, tags, status mezők a tömb elemeiben vannak, nem a dokumentum szinten.
+  /// Ezért csak science alapján szűrünk, a többi szűrést kliens oldalon végezzük.
+  Query<Map<String, dynamic>> _buildJogesetQuery() {
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('jogesetek');
+    // Megjegyzés: Ha van index a science mezőre a dokumentum szinten, akkor használhatjuk,
+    // de valószínűleg nincs, ezért minden dokumentumot lekérdezünk és kliens oldalon szűrünk
+
+    return query;
+  }
+
+  /// Jogeset dokumentumok feldolgozása és kliens oldali szűrése
+  /// Kinyeri a jogesetek tömböt minden dokumentumból és szűr kategória alapján
+  List<Map<String, dynamic>> _processJogesetDocuments(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+      {bool isAdmin = false}) {
+    final processedDocs = <Map<String, dynamic>>[];
+
+    for (var doc in docs) {
+      final data = doc.data();
+      final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
+
+      // Minden jogeset objektumot külön dokumentumként kezelünk
+      for (var jogesetData in jogesetekList) {
+        final jogeset = jogesetData as Map<String, dynamic>;
+        
+        // Kategória szűrés
+        final category = jogeset['category'] as String? ?? '';
+        if (category != widget.category) {
+          continue;
+        }
+
+        // Státusz szűrés
+        final status = jogeset['status'] as String? ?? 'Draft';
+        if (!isAdmin && status != 'Published') {
+          continue;
+        }
+
+        // Létrehozunk egy virtuális dokumentumot a jogesetből
+        final virtualDoc = {
+          ...jogeset,
+          '_documentId': doc.id, // Az eredeti dokumentum ID-ja
+          '_jogesetId': jogeset['id'], // A jogeset ID-ja a dokumentumon belül
+          'type': 'jogeset',
+          // A 'name' mezőt használjuk címként (a dokumentum szerint 'cim' a mező neve)
+          'name': jogeset['cim'] as String? ?? '',
+          // A 'title' mezőt is hozzáadjuk a kompatibilitásért
+          'title': jogeset['title'] as String? ?? '',
+        };
+
+        processedDocs.add(virtualDoc);
+      }
+    }
+
+    return processedDocs;
+  }
+
   /// Hierarchia építése a dokumentumokból
   /// Kliens oldali szűrés a teljes tag path alapján
   Map<String, dynamic> _buildHierarchy(
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> notesDocs,
+      List<Map<String, dynamic>> jogesetDocs) {
     final hierarchy = <String, dynamic>{};
 
-    for (var doc in docs) {
+    // Notes dokumentumok feldolgozása
+    for (var doc in notesDocs) {
       final data = doc.data();
       final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
 
@@ -322,6 +408,55 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         (hierarchy['_direct'] as List).add(doc);
       }
     }
+    
+    // Jogeset dokumentumok feldolgozása
+    for (var jogesetData in jogesetDocs) {
+      final tags = (jogesetData['tags'] as List<dynamic>? ?? []).cast<String>();
+
+      // Ellenőrizzük, hogy a dokumentum címkéi megfelelnek-e a jelenlegi útvonalnak
+      bool matchesPath = true;
+
+      if (tags.length < widget.tagPath.length) {
+        matchesPath = false;
+      } else {
+        for (int i = 0; i < widget.tagPath.length; i++) {
+          if (tags[i] != widget.tagPath[i]) {
+            matchesPath = false;
+            break;
+          }
+        }
+      }
+
+      if (!matchesPath) continue;
+
+      // Ha van következő szintű címke
+      if (tags.length > _currentDepth) {
+        final nextTag = tags[_currentDepth];
+
+        if (!hierarchy.containsKey(nextTag)) {
+          hierarchy[nextTag] = <String, dynamic>{
+            'docs': <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+            'jogesetek': <Map<String, dynamic>>[],
+            'hasChildren': false,
+          };
+        }
+
+        if (tags.length > _currentDepth + 1) {
+          hierarchy[nextTag]['hasChildren'] = true;
+        }
+
+        // Jogeseteket külön listába tesszük
+        if (hierarchy[nextTag]['jogesetek'] == null) {
+          hierarchy[nextTag]['jogesetek'] = <Map<String, dynamic>>[];
+        }
+        (hierarchy[nextTag]['jogesetek'] as List).add(jogesetData);
+      } else {
+        // Ha nincs következő szintű címke, akkor közvetlenül ide tartozik
+        hierarchy.putIfAbsent(
+            '_directJogesetek', () => <Map<String, dynamic>>[]);
+        (hierarchy['_directJogesetek'] as List).add(jogesetData);
+      }
+    }
 
     return hierarchy;
   }
@@ -343,10 +478,24 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         widgets.add(const SizedBox(height: 24));
       }
     }
+    
+    // Közvetlen jogesetek (amelyeknek nincs további alcímkéjük)
+    if (hierarchy.containsKey('_directJogesetek')) {
+      final directJogesetek = hierarchy['_directJogesetek']
+          as List<Map<String, dynamic>>;
+
+      if (directJogesetek.isNotEmpty) {
+        for (var jogesetData in directJogesetek) {
+          widgets.add(_buildJogesetWidget(jogesetData));
+        }
+
+        widgets.add(const SizedBox(height: 24));
+      }
+    }
 
     // Aztán a következő szintű címkék
     final tagEntries = hierarchy.entries
-        .where((e) => e.key != '_direct')
+        .where((e) => e.key != '_direct' && e.key != '_directJogesetek')
         .toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
@@ -363,7 +512,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   Widget _buildTagWidget(String tag, Map<String, dynamic> data) {
     final docs =
         data['docs'] as List<QueryDocumentSnapshot<Map<String, dynamic>>>;
+    final jogesetek = data['jogesetek'] as List<Map<String, dynamic>>? ?? [];
     final hasChildren = data['hasChildren'] as bool;
+    final totalCount = docs.length + jogesetek.length;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -397,7 +548,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                 ),
               ),
               Text(
-                '${docs.length}',
+                '$totalCount',
                 style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 14,
@@ -418,8 +569,20 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   /// Jegyzet widget építése
   Widget _buildNoteWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
-    final title = data['title'] as String? ?? '';
-    final type = data['type'] as String? ?? 'standard';
+    
+    // Ellenőrizzük, hogy jogeset dokumentumról van-e szó
+    final isJogeset = doc.reference.path.contains('jogesetek');
+    
+    // Jogeseteknél 'name' mezőt használunk, egyébként 'title'-t
+    final title = isJogeset 
+        ? (data['name'] as String? ?? '')
+        : (data['title'] as String? ?? '');
+    
+    // Típus meghatározása
+    final type = isJogeset 
+        ? 'jogeset'
+        : (data['type'] as String? ?? 'standard');
+    
     final isFree = data['isFree'] as bool? ?? false;
     final isLocked = !isFree && !_hasPremiumAccess;
 
@@ -445,6 +608,30 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       isLocked: isLocked,
       isLast: false,
       customFromUrl: customFromUrl, // Egyedi from URL átadása
+    );
+  }
+
+  /// Jogeset widget építése
+  Widget _buildJogesetWidget(Map<String, dynamic> jogesetData) {
+    // A dokumentum ID-t a _documentId mezőből vesszük
+    final documentId = jogesetData['_documentId'] as String? ?? '';
+    final title = jogesetData['name'] as String? ?? jogesetData['cim'] as String? ?? '';
+    final type = 'jogeset';
+    final isFree = jogesetData['isFree'] as bool? ?? false;
+    final isLocked = !isFree && !_hasPremiumAccess;
+
+    const customFromUrl = '/notes';
+
+    return NoteListTile(
+      id: documentId,
+      title: title,
+      type: type,
+      hasDoc: false, // Jogeseteknek nincs docxUrl-ük
+      hasAudio: false, // Jogeseteknek nincs audioUrl-ük
+      hasVideo: false, // Jogeseteknek nincs videoUrl-ük
+      isLocked: isLocked,
+      isLast: false,
+      customFromUrl: customFromUrl,
     );
   }
 }

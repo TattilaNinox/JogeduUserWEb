@@ -24,6 +24,7 @@ import 'screens/interactive_note_view_screen.dart';
 import 'screens/dynamic_quiz_view_screen.dart';
 import 'screens/memoriapalota_allomas_view_screen.dart';
 import 'screens/memoriapalota_fajl_view_screen.dart';
+import 'screens/jogeset_view_screen.dart';
 import 'core/session_guard.dart';
 import 'screens/guard_splash_screen.dart';
 import 'screens/account_screen.dart';
@@ -294,6 +295,15 @@ final _router = GoRouter(
         final noteId = state.pathParameters['noteId']!;
         final from = state.uri.queryParameters['from'];
         return MemoriapalotaFajlViewScreen(noteId: noteId, from: from);
+      },
+    ),
+    // Jogeset megtekintése
+    GoRoute(
+      path: '/jogeset/:documentId',
+      builder: (context, state) {
+        final documentId = state.pathParameters['documentId']!;
+        final from = state.uri.queryParameters['from'];
+        return JogesetViewScreen(documentId: documentId, from: from);
       },
     ),
     GoRoute(

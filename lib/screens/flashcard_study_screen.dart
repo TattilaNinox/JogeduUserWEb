@@ -588,7 +588,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
                                   "p": Style(
                                     fontSize: FontSize(12),
                                     color: Colors.black87,
-                                    lineHeight: LineHeight(1.4),
+                                    lineHeight: const LineHeight(1.4),
                                     textAlign: TextAlign.justify,
                                     margin: Margins.only(bottom: 8),
                                   ),

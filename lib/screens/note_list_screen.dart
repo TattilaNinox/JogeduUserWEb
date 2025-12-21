@@ -299,9 +299,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
           if (isAdmin) {
             if (status != 'Published' &&
                 status != 'Draft' &&
-                status != 'Public') continue;
+                status != 'Public') {
+              continue;
+            }
           } else {
-            if (status != 'Published' && status != 'Public') continue;
+            if (status != 'Published' && status != 'Public') {
+              continue;
+            }
           }
 
           if (data.containsKey('tags') && data['tags'] is List) {
@@ -333,7 +337,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
           if (isAdmin) {
             if (status != 'Published' &&
                 status != 'Draft' &&
-                status != 'Public') continue;
+                status != 'Public') {
+              continue;
+            }
           } else {
             if (status != 'Published' && status != 'Public') continue;
           }

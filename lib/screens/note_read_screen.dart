@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
 import 'dart:ui_web' as ui_web;
-import 'dart:html' as html;
-import 'dart:convert' as convert;
+
 import '../widgets/audio_preview_player.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
@@ -37,7 +36,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
 
   Future<void> _loadNote() async {
     debugPrint('🔵 [_loadNote] START - noteId: ${widget.noteId}');
-    
+
     final snapshot = await FirebaseFirestore.instance
         .collection('notes')
         .doc(widget.noteId)
@@ -56,17 +55,18 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
       if (pages.isNotEmpty) {
         htmlContent = pages[_currentPageIndex] as String? ?? '';
         debugPrint('🔵 [_loadNote] HTML content length: ${htmlContent.length}');
-        debugPrint('🔵 [_loadNote] HTML preview (first 1000 chars): ${htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent}');
+        debugPrint(
+            '🔵 [_loadNote] HTML preview (first 1000 chars): ${htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent}');
       }
     }
-    
+
     if (htmlContent != null && htmlContent.isNotEmpty) {
       debugPrint('🟢 [_loadNote] Calling _setupIframe');
       _setupIframe(htmlContent);
     } else {
       debugPrint('🔴 [_loadNote] No HTML content - NOT calling _setupIframe');
     }
-    
+
     setState(() {
       _noteSnapshot = snapshot;
       _hasContent = htmlContent != null && htmlContent.isNotEmpty;
@@ -75,95 +75,25 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
 
   void _setupIframe(String htmlContent) {
     debugPrint('🟢 [_setupIframe] START - HTML length: ${htmlContent.length}');
-    // #region agent log
-    try {
-      html.HttpRequest.request(
-        'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
-        method: 'POST',
-        requestHeaders: {'Content-Type': 'application/json'},
-        sendData: convert.jsonEncode({
-          'location': 'note_read_screen.dart:61',
-          'message': '_setupIframe called',
-          'data': {
-            'htmlLength': htmlContent.length,
-            'hasStyleTag': htmlContent.toLowerCase().contains('<style'),
-            'htmlPreview': htmlContent.length > 500 ? htmlContent.substring(0, 500) : htmlContent,
-          },
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'sessionId': 'debug-session',
-          'runId': 'run1',
-          'hypothesisId': 'A',
-        }),
-      ).then((_) {}, onError: (_) {});
-    } catch (_) {}
-    // #endregion
-    
+
     // Minden alkalommal új view ID-t generálunk, amikor a tartalom változik
-    _viewId = 'note-read-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
-    
-    // #region agent log
-    try {
-      html.HttpRequest.request(
-        'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
-        method: 'POST',
-        requestHeaders: {'Content-Type': 'application/json'},
-        sendData: convert.jsonEncode({
-          'location': 'note_read_screen.dart:65',
-          'message': 'HTML content analysis',
-          'data': {
-            'containsKulcsszo': htmlContent.toLowerCase().contains('kulcsszo'),
-            'containsJogszabaly': htmlContent.toLowerCase().contains('jogszabaly'),
-            'containsSzekcio': htmlContent.toLowerCase().contains('szekcio'),
-            'containsSectionNumber': RegExp(r'<span[^>]*style[^>]*background[^>]*>', caseSensitive: false).hasMatch(htmlContent),
-            'hasKulcsszoClass': htmlContent.contains('class') && htmlContent.contains('kulcsszo'),
-            'hasJogszabalyClass': htmlContent.contains('class') && htmlContent.contains('jogszabaly-doboz'),
-            'hasSzekcioClass': htmlContent.contains('class') && (htmlContent.contains('szekcio-piros') || htmlContent.contains('szekcio-kek')),
-          },
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'sessionId': 'debug-session',
-          'runId': 'run1',
-          'hypothesisId': 'B',
-        }),
-      ).then((_) {}, onError: (_) {});
-    } catch (_) {}
-    // #endregion
-    
+    _viewId =
+        'note-read-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
+
     // Iframe elem létrehozása
     final iframeElement = web.HTMLIFrameElement()
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.border = 'none';
-    
+
     iframeElement.sandbox.add('allow-scripts');
     iframeElement.sandbox.add('allow-same-origin');
     iframeElement.sandbox.add('allow-forms');
     iframeElement.sandbox.add('allow-popups');
-    
+
     // HTML tartalom CSS-szel ellátva - sötét szöveg, jól olvasható mobil eszközön is
     String styledHtmlContent = htmlContent;
     if (htmlContent.isNotEmpty) {
-      // #region agent log
-      try {
-        html.HttpRequest.request(
-          'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
-          method: 'POST',
-          requestHeaders: {'Content-Type': 'application/json'},
-          sendData: convert.jsonEncode({
-            'location': 'note_read_screen.dart:78',
-            'message': 'Before CSS processing',
-            'data': {
-              'hasStyleTag': htmlContent.toLowerCase().contains('<style'),
-              'htmlSample': htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent,
-            },
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-            'sessionId': 'debug-session',
-            'runId': 'run1',
-            'hypothesisId': 'C',
-          }),
-        ).then((_) {}, onError: (_) {});
-      } catch (_) {}
-      // #endregion
-      
       // Ellenőrizzük, hogy van-e már <style> tag
       if (!htmlContent.toLowerCase().contains('<style')) {
         // CSS hozzáadása a szöveg sötét színéhez és olvashatóságához
@@ -448,54 +378,13 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           htmlWithLang = '<html lang="hu">$htmlWithLang</html>';
         } else {
           // Ha nincs html vagy body tag, hozzáadjuk mindkettőt lang attribútummal
-          htmlWithLang = '<html lang="hu"><body lang="hu">$htmlContent</body></html>';
+          htmlWithLang =
+              '<html lang="hu"><body lang="hu">$htmlContent</body></html>';
         }
         styledHtmlContent = cssStyle + htmlWithLang;
-        
-        // #region agent log
-        try {
-          html.HttpRequest.request(
-            'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
-            method: 'POST',
-            requestHeaders: {'Content-Type': 'application/json'},
-            sendData: convert.jsonEncode({
-              'location': 'note_read_screen.dart:324',
-              'message': 'After CSS added (no existing style tag)',
-              'data': {
-                'finalHtmlLength': styledHtmlContent.length,
-                'cssAdded': true,
-              },
-              'timestamp': DateTime.now().millisecondsSinceEpoch,
-              'sessionId': 'debug-session',
-              'runId': 'run1',
-              'hypothesisId': 'D',
-            }),
-          ).then((_) {}, onError: (_) {});
-        } catch (_) {}
-        // #endregion
       } else {
         // Ha már van style tag, hozzáadjuk a body stílust és az html lang attribútumot
-        
-        // #region agent log
-        try {
-          html.HttpRequest.request(
-            'http://127.0.0.1:7243/ingest/c3485852-9827-41f8-bed9-9d0720136b2c',
-            method: 'POST',
-            requestHeaders: {'Content-Type': 'application/json'},
-            sendData: convert.jsonEncode({
-              'location': 'note_read_screen.dart:326',
-              'message': 'Existing style tag found',
-              'data': {
-                'htmlSample': htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent,
-              },
-              'timestamp': DateTime.now().millisecondsSinceEpoch,
-              'sessionId': 'debug-session',
-              'runId': 'run1',
-              'hypothesisId': 'E',
-            }),
-          ).then((_) {}, onError: (_) {});
-        } catch (_) {}
-        // #endregion
+
         String htmlWithLang = htmlContent;
         // Hozzáadjuk a lang attribútumot az html taghez
         if (htmlContent.toLowerCase().contains('<html')) {
@@ -518,7 +407,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           RegExp(r'<body[^>]*>', caseSensitive: false),
           '<body lang="hu" style="color: #202122 !important; background-color: #ffffff !important; font-family: Verdana, sans-serif !important; font-size: 13px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important; text-align: justify !important; overflow-wrap: break-word !important; word-break: break-word !important; letter-spacing: 0.3px !important;">',
         );
-        
+
         // Hozzáadjuk a hiányzó CSS stílusokat a meglévő style tag után
         const additionalCss = '''
           /* Szekció számok színes dobozokban - piros */
@@ -665,7 +554,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
   })();
 </script>
 ''';
-        
+
         // Hozzáadjuk a CSS-t a meglévő </style> tag elé
         if (htmlWithLang.toLowerCase().contains('</style>')) {
           styledHtmlContent = htmlWithLang.replaceAll(
@@ -704,27 +593,36 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           styledHtmlContent = '<head>$additionalJs</head>$styledHtmlContent';
         }
       }
-      
-      iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(styledHtmlContent)}';
-      
+
+      iframeElement.src =
+          'data:text/html;charset=utf-8,${Uri.encodeComponent(styledHtmlContent)}';
+
       // #region agent log - HTML tartalom konzolba írása
       debugPrint('=== HTML CONTENT DEBUG ===');
       debugPrint('HTML Length: ${htmlContent.length}');
       debugPrint('HTML Preview (first 3000 chars):');
-      final preview = htmlContent.length > 3000 ? htmlContent.substring(0, 3000) : htmlContent;
+      final preview = htmlContent.length > 3000
+          ? htmlContent.substring(0, 3000)
+          : htmlContent;
       debugPrint(preview);
       debugPrint('=== Checking for key elements ===');
-      debugPrint('Contains "kulcsszo": ${htmlContent.toLowerCase().contains('kulcsszo')}');
-      debugPrint('Contains "jogszabaly": ${htmlContent.toLowerCase().contains('jogszabaly')}');
-      debugPrint('Contains style with #1976d2: ${htmlContent.contains('#1976d2')}');
-      debugPrint('Contains style with #dc3545: ${htmlContent.contains('#dc3545')}');
-      debugPrint('Contains style with rgb(25, 118, 210): ${htmlContent.contains('rgb(25, 118, 210)')}');
-      debugPrint('Contains style with rgb(220, 53, 69): ${htmlContent.contains('rgb(220, 53, 69)')}');
+      debugPrint(
+          'Contains "kulcsszo": ${htmlContent.toLowerCase().contains('kulcsszo')}');
+      debugPrint(
+          'Contains "jogszabaly": ${htmlContent.toLowerCase().contains('jogszabaly')}');
+      debugPrint(
+          'Contains style with #1976d2: ${htmlContent.contains('#1976d2')}');
+      debugPrint(
+          'Contains style with #dc3545: ${htmlContent.contains('#dc3545')}');
+      debugPrint(
+          'Contains style with rgb(25, 118, 210): ${htmlContent.contains('rgb(25, 118, 210)')}');
+      debugPrint(
+          'Contains style with rgb(220, 53, 69): ${htmlContent.contains('rgb(220, 53, 69)')}');
       debugPrint('Final styled HTML length: ${styledHtmlContent.length}');
       debugPrint('========================');
       // #endregion
     }
-    
+
     // Platform view regisztrálása
     // ignore: undefined_prefixed_name
     ui_web.platformViewRegistry.registerViewFactory(
@@ -746,10 +644,10 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
     final category = data['category'] as String?;
     final tags = data['tags'] as List<dynamic>?;
     final tag = tags != null && tags.isNotEmpty ? tags.first.toString() : null;
-    
+
     // Debug: ellenőrizzük, hogy milyen adatokat kaptunk
     debugPrint('🔵 NoteReadScreen: title=$title, category=$category, tag=$tag');
-    
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -776,7 +674,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             // CSAK FilterStorage-ban tárolt előző oldal szűrőit használjuk, SOHA ne a jegyzet aktuális értékeit!
             final effectiveTag = FilterStorage.tag;
             final effectiveCategory = FilterStorage.category;
-            
+
             if (effectiveTag != null && effectiveTag.isNotEmpty) {
               // Először próbáljuk a címkére, ha van
               final uri = Uri(
@@ -795,7 +693,8 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
                 },
               );
               context.go(uri.toString());
-            } else if (effectiveCategory != null && effectiveCategory.isNotEmpty) {
+            } else if (effectiveCategory != null &&
+                effectiveCategory.isNotEmpty) {
               // Ha nincs címke, de van kategória, akkor a kategóriára lépünk vissza
               final uri = Uri(
                 path: '/notes',
@@ -874,7 +773,8 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
                           : const Center(
                               child: Text(
                                 'Ez a jegyzet nem tartalmaz tartalmat.',
-                                style: TextStyle(color: Colors.grey, fontSize: 16),
+                                style:
+                                    TextStyle(color: Colors.grey, fontSize: 16),
                               ),
                             ),
                     ),

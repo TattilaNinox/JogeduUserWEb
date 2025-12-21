@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
 import 'tag_drill_down_screen.dart';
 
@@ -87,55 +88,115 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _buildQuery().snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Hiba: ${snapshot.error}'),
-            );
-          }
+        builder: (context, notesSnapshot) {
+          // Jogesetek stream builder hozzáadása
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _buildJogesetQuery().snapshots(),
+            builder: (context, jogesetSnapshot) {
+              if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
+                return Center(
+                  child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
+                );
+              }
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+              if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          final docs = snapshot.data!.docs
-              .where((d) => d.data()['deletedAt'] == null)
-              .toList();
+              // Összefésüljük a két kollekciót
+              final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+              
+              if (notesSnapshot.hasData) {
+                allDocs.addAll(notesSnapshot.data!.docs
+                    .where((d) => d.data()['deletedAt'] == null)
+                    .toList());
+              }
+              
+              // Összegyűjtjük a tags[0] címkéket
+              final tagMap =
+                  <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+              
+              // Jogesetek címkéinek külön kezelése
+              final jogesetTagMap = <String, List<Map<String, dynamic>>>{};
 
-          if (docs.isEmpty) {
-            return const Center(child: Text('Nincs találat.'));
-          }
+              // Notes dokumentumok feldolgozása
+              for (var doc in allDocs) {
+                final data = doc.data();
+                final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
 
-          // Összegyűjtjük a tags[0] címkéket
-          final tagMap =
-              <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+                if (tags.isNotEmpty) {
+                  final firstTag = tags[0];
+                  tagMap.putIfAbsent(firstTag, () => []);
+                  tagMap[firstTag]!.add(doc);
+                }
+              }
+              
+              // Jogeset dokumentumok feldolgozása
+              // Admin ellenőrzés szükséges a státusz szűréshez
+              final user = FirebaseAuth.instance.currentUser;
+              final isAdmin = user?.email == 'tattila.ninox@gmail.com'; // Egyszerűsített admin ellenőrzés
+              
+              // Jogesetek feldolgozása (ha vannak)
+              if (jogesetSnapshot.hasData) {
+                final jogesetDocs = jogesetSnapshot.data!.docs
+                    .where((d) => d.data()['deletedAt'] == null)
+                    .toList();
+                final processedJogesetek = _processJogesetDocuments(jogesetDocs, isAdmin: isAdmin);
+                
+                for (var jogesetData in processedJogesetek) {
+                  final tags = (jogesetData['tags'] as List<dynamic>? ?? []).cast<String>();
+                  
+                  if (tags.isNotEmpty) {
+                    final firstTag = tags[0];
+                    jogesetTagMap.putIfAbsent(firstTag, () => []);
+                    jogesetTagMap[firstTag]!.add(jogesetData);
+                  }
+                }
+              }
+              
+              // Összevonjuk a két tag map-et
+              final allTags = <String>{};
+              allTags.addAll(tagMap.keys);
+              allTags.addAll(jogesetTagMap.keys);
+              
+              if (allTags.isEmpty && allDocs.isEmpty) {
+                return const Center(child: Text('Nincs találat.'));
+              }
 
-          for (var doc in docs) {
-            final data = doc.data();
-            final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
+              // Rendezés
+              final sortedTags = allTags.toList()..sort();
 
-            if (tags.isNotEmpty) {
-              final firstTag = tags[0];
-              tagMap.putIfAbsent(firstTag, () => []);
-              tagMap[firstTag]!.add(doc);
-            }
-          }
-
-          // Rendezés
-          final sortedTags = tagMap.keys.toList()..sort();
-
-          return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            children: [
-              ...sortedTags.map((tag) => _buildTagCard(tag, tagMap[tag]!)),
-            ],
+              return ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  ...sortedTags.map((tag) {
+                    // Összevonjuk a notes és jogeset dokumentumokat
+                    final notesDocs = tagMap[tag] ?? [];
+                    final jogesetDocs = jogesetTagMap[tag] ?? [];
+                    final totalCount = notesDocs.length + jogesetDocs.length;
+                    
+                    // Ellenőrizzük, van-e mélyebb szintű címke
+                    final hasDeepTags = notesDocs.any((doc) {
+                          final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
+                          return tags.length > 1;
+                        }) ||
+                        jogesetDocs.any((jogeset) {
+                          final tags = (jogeset['tags'] as List<dynamic>? ?? []).cast<String>();
+                          return tags.length > 1;
+                        });
+                    
+                    return _buildTagCard(tag, notesDocs, jogesetDocs, totalCount, hasDeepTags);
+                  }),
+                ],
+              );
+            },
           );
         },
       ),
     );
   }
 
-  /// Firestore lekérdezés építése
+  /// Firestore lekérdezés építése notes kollekcióhoz
   Query<Map<String, dynamic>> _buildQuery() {
     Query<Map<String, dynamic>> query = FirebaseConfig.firestore
         .collection('notes')
@@ -145,17 +206,71 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
     return query;
   }
 
+  /// Firestore lekérdezés építése jogesetek kollekcióhoz
+  /// FONTOS: A jogesetek dokumentumai csak egy 'jogesetek' tömböt tartalmaznak,
+  /// a category, tags, status mezők a tömb elemeiben vannak, nem a dokumentum szinten.
+  /// Ezért csak science alapján szűrünk, a többi szűrést kliens oldalon végezzük.
+  Query<Map<String, dynamic>> _buildJogesetQuery() {
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('jogesetek');
+    // Megjegyzés: Ha van index a science mezőre a dokumentum szinten, akkor használhatjuk,
+    // de valószínűleg nincs, ezért minden dokumentumot lekérdezünk és kliens oldalon szűrünk
+
+    return query;
+  }
+
+  /// Jogeset dokumentumok feldolgozása és kliens oldali szűrése
+  /// Kinyeri a jogesetek tömböt minden dokumentumból és szűr kategória alapján
+  List<Map<String, dynamic>> _processJogesetDocuments(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+      {bool isAdmin = false}) {
+    final processedDocs = <Map<String, dynamic>>[];
+
+    for (var doc in docs) {
+      final data = doc.data();
+      final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
+
+      // Minden jogeset objektumot külön dokumentumként kezelünk
+      for (var jogesetData in jogesetekList) {
+        final jogeset = jogesetData as Map<String, dynamic>;
+        
+        // Kategória szűrés
+        final category = jogeset['category'] as String? ?? '';
+        if (category != widget.category) {
+          continue;
+        }
+
+        // Státusz szűrés
+        final status = jogeset['status'] as String? ?? 'Draft';
+        if (!isAdmin && status != 'Published') {
+          continue;
+        }
+
+        // Létrehozunk egy virtuális dokumentumot a jogesetből
+        // A dokumentum ID-t és a jogeset adatait kombináljuk
+        final virtualDoc = {
+          ...jogeset,
+          '_documentId': doc.id, // Az eredeti dokumentum ID-ja
+          '_jogesetId': jogeset['id'], // A jogeset ID-ja a dokumentumon belül
+          'type': 'jogeset',
+          // A 'name' mezőt használjuk címként (a dokumentum szerint 'cim' a mező neve)
+          'name': jogeset['cim'] as String? ?? '',
+        };
+
+        processedDocs.add(virtualDoc);
+      }
+    }
+
+    return processedDocs;
+  }
+
   /// Címke kártya widget építése
   Widget _buildTagCard(
-      String tag, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    // Számoljuk meg, hány jegyzet van összesen ebben a címkében (beleértve az alcímkéket is)
-    final noteCount = docs.length;
-
-    // Ellenőrizzük, van-e mélyebb szintű címke
-    final hasDeepTags = docs.any((doc) {
-      final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
-      return tags.length > 1;
-    });
+      String tag,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> notesDocs,
+      List<Map<String, dynamic>> jogesetDocs,
+      int totalCount,
+      bool hasDeepTags) {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -189,7 +304,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 ),
               ),
               Text(
-                '$noteCount',
+                '$totalCount',
                 style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 14,

@@ -1,0 +1,604 @@
+================================================================================
+JOGESETEK KOLLEKCIÓ STRUKTÚRA ÉS MEZŐK RÉSZLETES LEÍRÁSA
+================================================================================
+
+Ez a dokumentum pontosan és részletesen leírja a jogesetek Firestore kollekció
+struktúráját, a mezők neveit és azok pontos szerepét.
+
+================================================================================
+1. FIRESTORE KOLLEKCIÓ STRUKTÚRA
+================================================================================
+
+Kollektó neve: "jogesetek"
+
+A kollekció dokumentumokat tartalmaz, ahol minden dokumentum egy paragrafushoz
+tartozó összes jogesetet tartalmazza.
+
+Dokumentum ID formátum:
+- Normalizált formátum: "6_519", "4_15", "6_528"
+- A paragrafus számot normalizáljuk: kettőspont (:) -> aláhúzás (_)
+- Példa: "6:519" -> "6_519"
+- Példa: "6:528 1. bek" -> "6_528" (csak az első rész, szóköz előtti rész)
+
+================================================================================
+2. DOKUMENTUM STRUKTÚRA (JogesetDocument)
+================================================================================
+
+Egy dokumentum a következő struktúrával rendelkezik:
+
+{
+  "jogesetek": [                    // Array: A jogesetek tömbje (kötelező)
+    // Jogeset objektumok (lásd lent)
+  ]
+}
+
+FONTOS MEGJEGYZÉS:
+- A metaadatok (category, tags, status, isFree, title) mindig jogesetenként
+  vannak tárolva, nem dokumentum szinten.
+- Minden jogeset objektum tartalmazza a saját metaadatait.
+
+================================================================================
+3. JOGESET OBJEKTUM STRUKTÚRA (Jogeset)
+================================================================================
+
+Egy jogeset objektum a következő mezőket tartalmazza:
+
+{
+  // ========== KÖTELEZŐ MEZŐK ==========
+  
+  "id": 1,                          // Integer: Egyedi azonosító a dokumentumon belül
+                                     // Szerepe: A jogeset azonosítása egy paragrafuson belül
+                                     // Formátum: 1, 2, 3, ... (sorozatszám)
+                                     // Megjegyzés: Automatikusan újraszámozódik, ha szükséges
+  
+  "title": "6:519. §",              // String: A jogeset címe/paragrafus száma
+                                     // Szerepe: A jogeset azonosítása és megjelenítése
+                                     // Példa: "6:519. §", "4:15. §"
+                                     // Megjegyzés: Kötelező mező, minden jogesetnek rendelkeznie kell vele
+  
+  "cim": "Károkozás autóbalesetben", // String: A jogeset rövid címe
+                                     // Szerepe: A jogeset témájának összefoglalása
+                                     // Tartalom: Rövid, leíró cím a tényállásról
+                                     // Példa: "Károkozás autóbalesetben", "Vízszivárgás okozta kár"
+  
+  "tenyek": "Egy autóbaleset...",    // String: A jogeset tényállásának részletes leírása
+                                     // Szerepe: A tények objektív, részletes bemutatása
+                                     // Tartalom: Szöveges leírás, több bekezdés lehet
+                                     // Formátum: Szabad szöveg, lehet több bekezdés
+                                     // Példa: "Egy autóbaleset történt 2024 január 15-én..."
+  
+  "kerdes": "Ki a felelős...?",      // String: A jogi kérdés, amit a jogeset felvet
+                                     // Szerepe: A jogi probléma megfogalmazása
+                                     // Tartalom: Kérdő mondat formájában
+                                     // Példa: "Ki a felelős a kárért?", "Milyen jogszabályt kell alkalmazni?"
+  
+  "alkalmazando_jogszabaly": "6:519. §", // String: Az alkalmazandó jogszabály hivatkozás
+                                     // Szerepe: Megmutatja, melyik jogszabályt kell alkalmazni
+                                     // Formátum: "6:519. §", "4:15. §"
+                                     // Megjegyzés: Ez a jogszabály, ami alapján a jogeset készült
+  
+  "megoldas": "A felelősség...",     // String: A jogeset megoldása
+                                     // Szerepe: A jogi kérdés válasza és a jogszabály alkalmazása
+                                     // Tartalom: Részletes magyarázat, hogyan kell alkalmazni a jogszabályt
+                                     // Formátum: Szabad szöveg, részletes magyarázat
+                                     // Példa: "A felelősség a károkozóra hárul..."
+  
+  "komplexitas": "komplex",          // String: A jogeset komplexitási szintje
+                                     // Szerepe: A jogeset nehézségének jelzése
+                                     // Lehetséges értékek: "egyszerű" | "közepes" | "komplex"
+                                     // Használat: Szűréshez, színezéshez, kategorizáláshoz
+                                     // Megjegyzés: A megjelenítésnél színkódolásra használjuk
+  
+  "category": "Polgári jog",         // String: Fő kategória
+                                     // Szerepe: A jogeset kategorizálása
+                                     // Tartalom: A kategória neve (pl. "Polgári jog", "Kereskedelmi jog")
+                                     // Megjegyzés: A categories kollekcióból származik
+  
+  "generalt_datum": Timestamp,       // Timestamp: Generálás dátuma és ideje
+                                     // Szerepe: Nyomon követés, hogy mikor készült a jogeset
+                                     // Formátum: Firestore Timestamp objektum
+                                     // Példa: 2024-01-15T10:30:00Z
+                                     // Használat: Rendezéshez, szűréshez
+  
+  // ========== OPCIÓNÁLIS MEZŐK ==========
+  
+  "science": "Jogász",               // String (opcionális, alapértelmezett: "Jogász")
+                                     // Szerepe: A tudományág azonosítása
+                                     // Tartalom: A tudományág neve
+                                     // Alapértelmezett érték: "Jogász"
+                                     // Megjegyzés: Jelenleg mindig "Jogász"
+  
+  "tags": ["kártérítés", "baleset"], // Array<String> (opcionális, alapértelmezett: [])
+                                     // Szerepe: További kategorizálás és kereshetőség
+                                     // Tartalom: Címkék tömbje
+                                     // Példa: ["kártérítés", "baleset", "autó"]
+                                     // Használat: Szűréshez, kereséshez
+                                     // Megjegyzés: Üres tömb, ha nincs megadva
+  
+  "status": "Draft",                 // String (opcionális, alapértelmezett: "Draft")
+                                     // Szerepe: A jogeset publikációs státusza
+                                     // Lehetséges értékek: "Draft" | "Published" | "Archived"
+                                     // - "Draft": Piszkozat, még nem publikálva
+                                     // - "Published": Közzétéve, elérhető
+                                     // - "Archived": Archiválva, nem aktív
+                                     // Használat: Szűréshez, publikációs logikához
+  
+  "isFree": false,                   // Boolean (opcionális, alapértelmezett: false)
+                                     // Szerepe: Ingyenesen elérhető-e a jogeset
+                                     // Tartalom: true = ingyenes, false = fizetős
+                                     // Használat: Hozzáférési logikához
+  
+  "model": "gemini-3-pro",           // String (opcionális, null lehet)
+                                     // Szerepe: Melyik AI modell generálta a jogesetet
+                                     // Tartalom: A modell neve
+                                     // Példa: "gemini-3-pro", "gemini-2.0", "gemini-2.5-pro"
+                                     // Használat: Nyomon követéshez, minőségértékeléshez
+                                     // Megjegyzés: Csak akkor van megadva, ha AI generálta
+  
+  "eredeti_jogszabaly_szoveg": "..." // String (opcionális, null lehet)
+                                     // Szerepe: Az eredeti jogszabály teljes szövege
+                                     // Tartalom: A jogszabály teljes szövege, ami alapján generálták
+                                     // Formátum: Szabad szöveg, több bekezdés lehet
+                                     // Használat: Referenciaként, kontextusként
+                                     // Megjegyzés: Csak akkor van megadva, ha az eredeti szöveg elérhető
+}
+
+================================================================================
+4. MEZŐK RÉSZLETES SZEREPE ÉS HASZNÁLATA
+================================================================================
+
+4.1. Azonosítási mezők
+
+- id (Integer)
+  Szerepe: Egyedi azonosító egy dokumentumon belül
+  Használat: 
+    * Jogesetek rendezése és azonosítása
+    * Lista megjelenítésnél sorszámként
+    * Egyedi jogeset kiválasztása
+  Megjegyzés: Automatikusan újraszámozódik 1-től kezdve
+
+- title (String)
+  Szerepe: A jogeset/paragrafus azonosítása
+  Használat:
+    * Lista megjelenítésnél
+    * Navigációban
+    * Dokumentum címe
+  Megjegyzés: Kötelező mező, minden jogesetnek rendelkeznie kell vele
+
+4.2. Tartalmi mezők
+
+- cim (String)
+  Szerepe: A jogeset témájának rövid összefoglalása
+  Használat:
+    * Lista megjelenítésnél címként
+    * Kereséshez
+    * Gyors áttekintéshez
+  Tartalom: Rövid, leíró szöveg (általában 5-15 szó)
+
+- tenyek (String)
+  Szerepe: A tényállás objektív, részletes bemutatása
+  Használat:
+    * Fő megjelenítésnél a tények szekcióban
+    * Jogeset megértéséhez
+    * Kontextus biztosításához
+  Tartalom: Részletes szöveges leírás, lehet több bekezdés
+  Formátum: Szabad szöveg, HTML formázás lehet benne
+
+- kerdes (String)
+  Szerepe: A jogi probléma megfogalmazása
+  Használat:
+    * Fő megjelenítésnél a kérdés szekcióban
+    * Interaktív tanuláshoz
+    * Probléma azonosításához
+  Tartalom: Kérdő mondat formájában
+  Megjegyzés: Kiemelt megjelenítés (kék háttér)
+
+- alkalmazando_jogszabaly (String)
+  Szerepe: Az alkalmazandó jogszabály hivatkozás
+  Használat:
+    * Megjelenítésnél metaadatként
+    * Jogszabály kereséshez
+    * Kapcsolódó jogesetek kereséséhez
+  Formátum: "6:519. §", "4:15. §"
+
+- megoldas (String)
+  Szerepe: A jogi kérdés válasza és megoldása
+  Használat:
+    * Fő megjelenítésnél a megoldás szekcióban
+    * Interaktív tanuláshoz (először rejtve)
+    * Jogszabály alkalmazásának megértéséhez
+  Tartalom: Részletes magyarázat
+  Megjegyzés: Kiemelt megjelenítés (zöld háttér, kerettel)
+
+- eredeti_jogszabaly_szoveg (String, opcionális)
+  Szerepe: Az eredeti jogszabály szövegének tárolása
+  Használat:
+    * Referenciaként megjelenítésnél
+    * Kontextus biztosításához
+    * Eredeti szöveg visszakereséséhez
+  Tartalom: A jogszabály teljes szövege
+  Megjegyzés: Expandable panelben jelenik meg
+
+4.3. Kategorizálási mezők
+
+- komplexitas (String)
+  Szerepe: A jogeset nehézségének jelzése
+  Lehetséges értékek:
+    * "egyszerű": Könnyű, alapvető jogesetek
+    * "közepes": Közepes nehézségű jogesetek
+    * "komplex": Nehéz, összetett jogesetek
+  Használat:
+    * Szűréshez
+    * Színezéshez (zöld/narancs/piros)
+    * Nehézség szerinti rendezéshez
+
+- category (String)
+  Szerepe: Fő kategória azonosítása
+  Tartalom: A kategória neve a categories kollekcióból
+  Példa: "Polgári jog", "Kereskedelmi jog", "Közigazgatási jog"
+  Használat:
+    * Szűréshez
+    * Kategorizáláshoz
+    * Navigációhoz
+  Megjegyzés: A categories kollekcióból származik, ahol a science = "Jogász"
+
+- tags (Array<String>)
+  Szerepe: További kategorizálás és kereshetőség
+  Tartalom: Címkék tömbje
+  Példa: ["kártérítés", "baleset", "autó", "felelősség"]
+  Használat:
+    * Részletes szűréshez
+    * Kereséshez
+    * Kapcsolódó jogesetek kereséséhez
+  Megjegyzés: Üres tömb, ha nincs megadva
+
+- science (String, opcionális)
+  Szerepe: A tudományág azonosítása
+  Tartalom: Jelenleg mindig "Jogász"
+  Használat:
+    * Jövőbeli bővíthetőséghez
+    * Kategorizáláshoz
+  Megjegyzés: Alapértelmezett érték: "Jogász"
+
+4.4. Publikációs mezők
+
+- status (String, opcionális)
+  Szerepe: A jogeset publikációs státusza
+  Lehetséges értékek:
+    * "Draft": Piszkozat, még nem publikálva
+    * "Published": Közzétéve, elérhető a felhasználóknak
+    * "Archived": Archiválva, nem aktív, de nem törölve
+  Használat:
+    * Publikációs logikához
+    * Szűréshez (csak Published jogeseteket mutatni)
+    * Admin felületen státusz kezeléshez
+  Alapértelmezett: "Draft"
+
+- isFree (Boolean, opcionális)
+  Szerepe: Ingyenesen elérhető-e a jogeset
+  Tartalom:
+    * true: Ingyenesen elérhető minden felhasználónak
+    * false: Fizetős, csak előfizetőknek elérhető
+  Használat:
+    * Hozzáférési logikához
+    * Szűréshez
+    * Fizetési logikához
+  Alapértelmezett: false
+
+4.5. Metaadat mezők
+
+- generalt_datum (Timestamp)
+  Szerepe: Generálás dátuma és ideje
+  Formátum: Firestore Timestamp objektum
+  Használat:
+    * Rendezéshez (legújabbak előre)
+    * Szűréshez (dátum szerint)
+    * Statisztikákhoz
+    * Nyomon követéshez
+  Megjegyzés: Automatikusan beállítódik generáláskor
+
+- model (String, opcionális)
+  Szerepe: Melyik AI modell generálta a jogesetet
+  Tartalom: A modell neve
+  Példa: "gemini-3-pro", "gemini-2.0", "gemini-2.5-pro"
+  Használat:
+    * Minőségértékeléshez
+    * Modell összehasonlításhoz
+    * Statisztikákhoz
+  Megjegyzés: Csak akkor van megadva, ha AI generálta
+
+================================================================================
+5. FIRESTORE ADATSTRUKTÚRA PÉLDA
+================================================================================
+
+5.1. Teljes dokumentum példa
+
+Collection: "jogesetek"
+Document ID: "6_519"
+
+{
+  "jogesetek": [
+    {
+      "id": 1,
+      "title": "6:519. §",
+      "cim": "Károkozás autóbalesetben",
+      "tenyek": "Egy autóbaleset történt 2024 január 15-én Budapesten. Kovács János vezetett egy személygépkocsival, amikor hátulról nekiment Nagy Péter járművének. Nagy Péter járműve jelentős károsodást szenvedett, összesen 500.000 forint kárt okozva.",
+      "kerdes": "Ki a felelős a kárért és milyen jogszabály alapján kell eljárni?",
+      "alkalmazando_jogszabaly": "6:519. §",
+      "megoldas": "A felelősség a károkozóra, Kovács Jánosra hárul. A 6:519. § szerint mindenki felelős az általa okozott kárért. Kovács János köteles megtéríteni a kárt, amelyet okozott.",
+      "komplexitas": "komplex",
+      "science": "Jogász",
+      "category": "Polgári jog",
+      "tags": ["kártérítés", "baleset", "autó"],
+      "status": "Published",
+      "isFree": false,
+      "generalt_datum": Timestamp(2024, 1, 15, 10, 30, 0),
+      "model": "gemini-3-pro",
+      "eredeti_jogszabaly_szoveg": "Aki másnak hátrányt okoz, köteles azt megtéríteni."
+    },
+    {
+      "id": 2,
+      "title": "6:519. §",
+      "cim": "Vízszivárgás okozta kár",
+      "tenyek": "Egy lakásban vízszivárgás történt, amely a szomszédos lakásba is átfolyt. A vízszivárgás oka egy elromlott csap volt, amelyet a lakás tulajdonosa nem javított ki időben.",
+      "kerdes": "Ki felelős a szomszédos lakásban keletkezett kárért?",
+      "alkalmazando_jogszabaly": "6:519. §",
+      "megoldas": "A lakás tulajdonosa felelős a kárért, mivel nem javította ki időben a hibás csapot, amely a vízszivárgást okozta.",
+      "komplexitas": "közepes",
+      "science": "Jogász",
+      "category": "Polgári jog",
+      "tags": ["kártérítés", "lakás", "vízszivárgás"],
+      "status": "Published",
+      "isFree": true,
+      "generalt_datum": Timestamp(2024, 1, 16, 14, 20, 0),
+      "model": "gemini-3-pro"
+    }
+  ]
+}
+
+================================================================================
+6. NORMALIZÁLÁSI SZABÁLYOK
+================================================================================
+
+6.1. Paragrafus szám normalizálása dokumentum ID-hoz
+
+A paragrafus számot normalizáljuk a következőképpen:
+
+1. Szóközök eltávolítása elejéről és végéről
+2. Ha van szóköz, csak az első részt vesszük (pl. "6:528 1. bek" -> "6:528")
+3. Kettőspont (:) -> aláhúzás (_)
+4. Pontok (.) eltávolítása
+5. § jel eltávolítása
+
+Példák:
+- "6:519" -> "6_519"
+- "6:519. §" -> "6_519"
+- "6:528 1. bek. §" -> "6_528"
+- "4:15" -> "4_15"
+
+6.2. Dokumentum ID visszaalakítása paragrafus számra
+
+A dokumentum ID-t visszaalakíthatjuk paragrafus számra:
+- Aláhúzás (_) -> kettőspont (:)
+- Hozzáadjuk a ". §" végződést (ha szükséges)
+
+Példák:
+- "6_519" -> "6:519" vagy "6:519. §"
+- "4_15" -> "4:15" vagy "4:15. §"
+
+================================================================================
+7. FIRESTORE SZABÁLYOK ÉS HOZZÁFÉRÉS
+================================================================================
+
+7.1. Olvasási jogosultságok
+
+- Csak bejelentkezett felhasználók olvashatják a jogeseteket (authenticated read)
+- A jogesetek lekérdezhetők csak bejelentkezés után
+- A request.auth != null feltételnek teljesülnie kell az olvasáshoz
+- Nincs public read hozzáférés, minden felhasználónak be kell jelentkeznie
+
+FONTOS MEGJEGYZÉS - Státusz alapú szűrés:
+- JELENLEG a Firestore szabályokban NINCS státusz alapú szűrés a jogeseteknél
+- Minden bejelentkezett felhasználó minden jogesetet olvashat, függetlenül a státusztól
+  (Draft, Published, Archived - mind elérhető)
+- Ez ELTÉR a jegyzetek működésétől, ahol:
+  * Admin: minden jegyzetet olvashat (bármilyen státusszal)
+  * Nem admin: csak Published/Public státuszú jegyzeteket olvashat
+- A jogeseteknél a státusz mező létezik és tárolódik, de jelenleg nem használatos
+  a Firestore szabályokban a hozzáférés szabályozásához
+- Ha a jövőben státusz alapú szűrést szeretnél implementálni, akkor a Firestore
+  szabályokat frissíteni kellene hasonlóan a jegyzetekhez:
+  allow read: if request.auth != null && (isAdmin() || resource.data.status == 'Published');
+
+7.2. Írási jogosultságok
+
+- Csak admin felhasználók írhatnak (admin write)
+- A jogesetek generálása és szerkesztése admin funkció
+- A felhasználók nem módosíthatják a jogeseteket
+
+7.3. Törlési jogosultságok
+
+- Csak admin felhasználók törölhetnek (admin delete)
+- A teljes dokumentum törlődik (összes jogeset egy paragrafushoz)
+
+================================================================================
+8. KAPCSOLÓDÓ KOLLEKCIÓK
+================================================================================
+
+8.1. categories kollekció
+
+A jogesetek "category" mezője a "categories" kollekcióból származik.
+
+Struktúra:
+- Collection: "categories"
+- Mezők:
+  * "name": String (pl. "Polgári jog")
+  * "science": String (pl. "Jogász")
+  
+Lekérdezés:
+- A categories kollekcióból lekérdezzük azokat a kategóriákat, ahol science = "Jogász"
+
+8.2. Kapcsolat
+
+- A jogesetek "category" mezője egyezik a categories kollekció "name" mezőjével
+- A jogesetek "science" mezője egyezik a categories kollekció "science" mezőjével
+
+================================================================================
+9. HASZNÁLATI ESETEK ÉS MŰVELETEK
+================================================================================
+
+9.1. Jogeset lekérése
+
+- Véletlenszerű jogeset lekérése egy paragrafushoz
+- Összes jogeset lekérése egy paragrafushoz
+- Összes paragrafus lekérése
+
+9.2. Jogeset mentése
+
+- Új jogesetek hozzáadása egy dokumentumhoz
+- Teljes dokumentum felülírása (deprecated)
+- Jogesetek hozzáadása meglévő dokumentumhoz
+
+9.3. Metaadatok frissítése
+
+- Egy jogeset metaadatainak frissítése
+- Összes jogeset metaadatainak frissítése egy paragrafushoz
+
+9.4. Törlés
+
+- Teljes dokumentum törlése (összes jogeset egy paragrafushoz)
+
+9.5. Statisztikák
+
+- Jogesetek száma paragrafusonként
+- Összes dokumentum lekérése statisztikákhoz
+
+================================================================================
+10. ADATTÍPUSOK ÉS FORMÁTUMOK
+================================================================================
+
+11.1. String mezők
+
+- cim, tenyek, kerdes, megoldas: Szabad szöveg, Unicode karakterek támogatottak
+- title, alkalmazando_jogszabaly: Formázott szöveg (pl. "6:519. §")
+- category, science: Kategória nevek
+- status: Fix értékek ("Draft", "Published", "Archived")
+- komplexitas: Fix értékek ("egyszerű", "közepes", "komplex")
+- model: Modell nevek (pl. "gemini-3-pro")
+
+10.2. Numerikus mezők
+
+- id: Integer (1, 2, 3, ...)
+
+10.3. Boolean mezők
+
+- isFree: true vagy false
+
+10.4. Tömb mezők
+
+- tags: Array<String>, üres tömb lehet
+
+10.5. Dátum mezők
+
+- generalt_datum: Firestore Timestamp objektum
+  Formátum: Timestamp(év, hónap, nap, óra, perc, másodperc)
+  Példa: Timestamp(2024, 1, 15, 10, 30, 0)
+
+10.6. Opcionális mezők
+
+- model: String | null
+- eredeti_jogszabaly_szoveg: String | null
+- science: String (alapértelmezett: "Jogász")
+- tags: Array<String> (alapértelmezett: [])
+- status: String (alapértelmezett: "Draft")
+- isFree: Boolean (alapértelmezett: false)
+
+================================================================================
+11. VALIDÁCIÓS SZABÁLYOK
+================================================================================
+
+11.1. Kötelező mezők ellenőrzése
+
+- id: Kötelező, pozitív egész szám
+- title: Kötelező, nem üres string
+- cim: Kötelező, nem üres string
+- tenyek: Kötelező, nem üres string
+- kerdes: Kötelező, nem üres string
+- alkalmazando_jogszabaly: Kötelező, nem üres string
+- megoldas: Kötelező, nem üres string
+- komplexitas: Kötelező, értéke: "egyszerű" | "közepes" | "komplex"
+- category: Kötelező, nem üres string
+- generalt_datum: Kötelező, érvényes Timestamp
+
+11.2. Érték validáció
+
+- status: Csak "Draft", "Published", vagy "Archived" lehet
+- komplexitas: Csak "egyszerű", "közepes", vagy "komplex" lehet
+- tags: String tömb, minden elem nem üres string
+- id: Pozitív egész szám, egyedi a dokumentumon belül
+
+11.3. Normalizálás
+
+- Paragrafus szám normalizálása dokumentum ID-hoz
+- ID-k automatikus újraszámozása, ha szükséges
+
+================================================================================
+12. PÉLDA MŰVELETEK
+================================================================================
+
+12.1. Jogeset lekérése
+
+```dart
+// Véletlenszerű jogeset lekérése
+final jogeset = await JogesetService.getRandomJogeset("6:519");
+
+// Összes jogeset lekérése
+final document = await JogesetService.getJogesetekByParagrafus("6:519");
+final jogesetek = document?.jogesetek ?? [];
+```
+
+12.2. Jogeset hozzáadása
+
+```dart
+final ujJogeset = Jogeset(
+  id: 1,
+  title: "6:519. §",
+  cim: "Új jogeset",
+  tenyek: "...",
+  kerdes: "...",
+  alkalmazandoJogszabaly: "6:519. §",
+  megoldas: "...",
+  komplexitas: "közepes",
+  category: "Polgári jog",
+  generaltDatum: DateTime.now(),
+);
+
+await JogesetService.addJogesetek("6:519", [ujJogeset]);
+```
+
+12.3. Metaadatok frissítése
+
+```dart
+// Egy jogeset metaadatainak frissítése
+await JogesetService.updateJogesetMetadata(
+  paragrafus: "6:519",
+  jogesetId: 1,
+  category: "Polgári jog",
+  tags: ["kártérítés"],
+  status: "Published",
+  isFree: true,
+);
+
+// Összes jogeset metaadatainak frissítése
+await JogesetService.updateAllJogesetekMetadata(
+  paragrafus: "6:519",
+  category: "Polgári jog",
+  tags: ["kártérítés"],
+  status: "Published",
+  isFree: true,
+);
+```
+
+================================================================================
+VÉGE
+================================================================================

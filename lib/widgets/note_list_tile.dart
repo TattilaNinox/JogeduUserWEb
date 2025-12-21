@@ -53,6 +53,8 @@ class NoteListTile extends StatelessWidget {
         return Icons.train;
       case 'memoriapalota_fajlok':
         return Icons.audiotrack;
+      case 'jogeset':
+        return Icons.gavel; // Kalapács ikon jogesetekhez
       default:
         return Icons.menu_book;
     }
@@ -148,6 +150,12 @@ class NoteListTile extends StatelessWidget {
         context.push('/memoriapalota-fajl/$id$fromQuery');
       } else {
         context.go('/memoriapalota-fajl/$id$fromQuery');
+      }
+    } else if (type == 'jogeset') {
+      if (usePush) {
+        context.push('/jogeset/$id$fromQuery');
+      } else {
+        context.go('/jogeset/$id$fromQuery');
       }
     } else {
       if (usePush) {

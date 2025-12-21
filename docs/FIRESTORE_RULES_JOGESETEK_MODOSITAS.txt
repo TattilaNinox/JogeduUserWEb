@@ -1,0 +1,327 @@
+================================================================================
+FIRESTORE SZABÁLYOK MÓDOSÍTÁSA - JOGESETEK STÁTUSZ ALAPÚ SZŰRÉSHEZ
+================================================================================
+
+FIGYELEM: A jogeseteknél a státusz a dokumentumon belüli "jogesetek" tömb
+elemeiben van tárolva, nem a dokumentum szintjén. Ezért a Firestore szabályokban
+NEM lehet közvetlenül ellenőrizni a státuszt.
+
+Két lehetőség van:
+
+================================================================================
+1. LEHETSÉGES MEGOLDÁS: Dokumentum szintű státusz hozzáadása
+================================================================================
+
+Ha dokumentum szintű státuszt is tárolunk, akkor a szabályokban is ellenőrizhető.
+
+MÓDOSÍTOTT SZABÁLYOK:
+
+    // ────────── Jogesetek ──────────
+    match /jogesetek/{paragrafus} {
+      // Olvasás: admin bármit, más csak Published státuszú dokumentumokat
+      // MEGJEGYZÉS: Ez csak akkor működik, ha a dokumentum szintjén is van "status" mező
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Jogesetek collection query ──────────
+    // Ez szükséges a getStatistics() metódushoz
+    match /jogesetek/{document=**} {
+      // Olvasás: admin bármit, más csak Published státuszú dokumentumokat
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ────────── Ptk. Sztorik jogesetek ──────────
+    match /ptk_sztorik/{paragrafus} {
+      // Olvasás: admin bármit, más csak Published státuszú dokumentumokat
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Ptk. Sztorik jogesetek collection query ──────────
+    match /ptk_sztorik/{document=**} {
+      // Olvasás: admin bármit, más csak Published státuszú dokumentumokat
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+================================================================================
+2. AJÁNLOTT MEGOLDÁS: Alkalmazás szintű szűrés (jelenlegi struktúra megtartása)
+================================================================================
+
+Mivel a státusz jogesetenként van tárolva (nem dokumentum szinten), az alkalmazás
+szintjén kell szűrni. A Firestore szabályok változatlanok maradnak, de az
+alkalmazásban csak a Published státuszú jogeseteket kell megjeleníteni.
+
+JELENLEGI SZABÁLYOK (változatlanok):
+
+    // ────────── Jogesetek ──────────
+    match /jogesetek/{paragrafus} {
+      // Olvasás: minden bejelentkezett felhasználó
+      allow read: if request.auth != null;
+      // Létrehozás: csak admin
+      allow create: if isAdmin();
+      // Frissítés: csak admin
+      allow update: if isAdmin();
+      // Törlés: csak admin
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Jogesetek collection query ──────────
+    match /jogesetek/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+MÓDOSÍTÁS AZ ALKALMAZÁSBAN:
+
+Az alkalmazásban (pl. JogesetService) szűrni kell a Published státuszú jogeseteket:
+
+```dart
+// Példa: getRandomJogeset módosítása
+static Future<Jogeset?> getRandomJogeset(String paragrafus, {bool adminMode = false}) async {
+  // ... meglévő kód ...
+  
+  final document = JogesetDocument.fromMap(data, docId);
+  if (document.jogesetek.isEmpty) {
+    return null;
+  }
+
+  // Szűrés: admin mindent lát, nem admin csak Published-et
+  final filteredJogesetek = adminMode 
+    ? document.jogesetek
+    : document.jogesetek.where((j) => j.status == 'Published').toList();
+  
+  if (filteredJogesetek.isEmpty) {
+    return null;
+  }
+
+  final random = Random();
+  final randomIndex = random.nextInt(filteredJogesetek.length);
+  return filteredJogesetek[randomIndex];
+}
+```
+
+================================================================================
+3. TELJES FIRESTORE.RULES FÁJL (1. megoldással - dokumentum szintű státusz)
+================================================================================
+
+Ha dokumentum szintű státuszt is tárolsz, akkor használd ezt a teljes fájlt:
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ────────── Admin-ellenőrzés segédfüggvény ──────────
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.email in [
+               'tattila.ninox@gmail.com',
+             ];
+    }
+
+    // ────────── Felhasználók (+ alsó-gyűjtemények) ──────────
+    match /users/{userId} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+
+      match /learning_states/{noteId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      match /user_learning_data/{docId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      match /served_questions/{questionId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+
+      match /categories/{catId}/learning/{docId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+      match /category_stats/{catId} {
+        allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+
+      match /{document=**} {
+        allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      }
+    }
+
+    // ────────── Jegyzetek ──────────
+    match /notes/{noteId} {
+      allow read: if request.auth != null && (isAdmin() || resource.data.status in ['Published', 'Public']);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_selected_for_learning']));
+    }
+
+    // ────────── Kategóriák ──────────
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ────────── Tudományok ──────────
+    match /sciences/{scienceId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ────────── Törvénykönyvek ──────────
+    match /torvenykonyvek/{torvenykonyvId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ────────── Kérdésbankok ──────────
+    match /question_banks/{bankId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+ 
+    // ────────── Kétfaktoros hitelesítés ──────────
+    match /user_2fa/{userId} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+
+    // ────────── Források ──────────
+    match /sources/{sourceId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ────────── Subscription & Payment Collections ──────────
+    match /play_purchase_tokens/{tokenId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    
+    match /verification_queue/{tokenId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    
+    match /processedTokens/{tokenId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ────────── Device Change Codes ──────────
+    match /device_change_codes/{codeId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+      allow write: if false;
+    }
+
+    // ────────── Jogesetek ──────────
+    match /jogesetek/{paragrafus} {
+      // Olvasás: admin bármit, más csak Published státuszú dokumentumokat
+      // FONTOS: Ez csak akkor működik, ha a dokumentum szintjén is van "status" mező
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Jogesetek collection query ──────────
+    match /jogesetek/{document=**} {
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ────────── Ptk. Sztorik jogesetek ──────────
+    match /ptk_sztorik/{paragrafus} {
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ────────── Ptk. Sztorik jogesetek collection query ──────────
+    match /ptk_sztorik/{document=**} {
+      allow read: if request.auth != null && 
+                     (isAdmin() || 
+                      resource.data.status == 'Published' || 
+                      resource.data.get('status', 'Published') == 'Published');
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ────────── Memóriapalota fájlok ──────────
+    match /memoriapalota_fajlok/{fileId} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    match /memoriapalota_fajlok/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
+
+================================================================================
+FONTOS MEGJEGYZÉSEK
+================================================================================
+
+1. A dokumentum szintű státusz csak akkor működik, ha minden dokumentumban van
+   "status" mező a legfelső szinten (nem csak a jogesetek tömb elemeiben).
+
+2. Ha dokumentum szintű státuszt szeretnél, akkor:
+   - Minden dokumentumot frissíteni kell, hogy tartalmazza a "status" mezőt
+   - A status értéke lehet: "Published" (ha van benne Published jogeset), 
+     "Draft" (ha csak Draft van), stb.
+   - Vagy mindig a legfelsőbb státuszt tárolod (pl. ha van Published, akkor Published)
+
+3. Az alkalmazás szintű szűrés egyszerűbb és nem igényel adatmigrációt.
+
+4. Ha az alkalmazás szintű szűrést választod, akkor a Firestore szabályok
+   változatlanok maradnak, csak az alkalmazásban kell szűrni.
+
+================================================================================
+VÉGE
+================================================================================
