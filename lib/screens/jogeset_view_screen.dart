@@ -37,7 +37,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   
   // PageController a mobilnézetben való lapozáshoz
   PageController? _pageController;
-  int _currentPageIndex = 0;
 
   // Jegyzet adatok breadcrumb-hoz
   String? _noteTitle;
@@ -136,7 +135,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         _currentIndex = initialIndex;
         _isLoading = false;
         _isMegoldasVisible = false;
-        _currentPageIndex = 0;
       });
       
       // PageController inicializálása mobilnézetben
@@ -175,7 +173,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex++;
       _isMegoldasVisible = false;
-      _currentPageIndex = 0;
     });
     
     // PageController újrainicializálása új jogesethez
@@ -196,7 +193,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex--;
       _isMegoldasVisible = false;
-      _currentPageIndex = 0;
     });
     
     // PageController újrainicializálása új jogesethez
@@ -482,11 +478,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     
     return PageView.builder(
       controller: _pageController,
-      onPageChanged: (index) {
-        setState(() {
-          _currentPageIndex = index;
-        });
-      },
       itemCount: pages.length,
       itemBuilder: (context, index) {
         return SingleChildScrollView(
@@ -519,10 +510,10 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                               children: [
                                 Text(
                                   currentJogeset.cim,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 16, // További csökkentés: 18-2
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF202122),
+                                    color: Color(0xFF202122),
                                   ),
                                 ),
                                 // Lapozási ikon és szöveg mobilnézetben
@@ -717,10 +708,10 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14, // 16-2
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF202122),
+            color: Color(0xFF202122),
           ),
         ),
         const SizedBox(height: 8),
@@ -761,10 +752,10 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         children: [
           Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14, // 16-2
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF202122),
+              color: Color(0xFF202122),
             ),
           ),
           const SizedBox(height: 8),

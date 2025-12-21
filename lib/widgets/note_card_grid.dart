@@ -144,11 +144,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             widget.selectedType!.isEmpty ||
             widget.selectedType == 'memoriapalota_fajlok';
 
-        // Ha nincs típus szűrő, vagy ha a típus szűrő "jogeset", betöltjük a jogeset dokumentumokat
-        final shouldLoadJogesetek = widget.selectedType == null ||
-            widget.selectedType!.isEmpty ||
-            widget.selectedType == 'jogeset';
-
         // Fő útvonal dokumentumok lekérdezése a memoriapalota_allomasok kollekcióból
         // Ezek a fő dokumentumok, amelyek az utvonalId-val rendelkeznek
         Query<Map<String, dynamic>>? allomasQuery = shouldLoadAllomasok
@@ -200,31 +195,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           }
         }
 
-        // Jogeset dokumentumok lekérdezése a jogesetek kollekcióból
-        Query<Map<String, dynamic>>? jogesetQuery = shouldLoadJogesetek
-            ? FirebaseConfig.firestore
-                .collection('jogesetek')
-                .where('science', isEqualTo: userScience)
-            : null;
-
-        if (jogesetQuery != null) {
-          // status
-          if (widget.selectedStatus != null &&
-              widget.selectedStatus!.isNotEmpty) {
-            jogesetQuery =
-                jogesetQuery.where('status', isEqualTo: widget.selectedStatus);
-          } else {
-            jogesetQuery = isAdmin
-                ? jogesetQuery.where('status', whereIn: ['Published', 'Draft'])
-                : jogesetQuery.where('status', isEqualTo: 'Published');
-          }
-          // tag
-          if (widget.selectedTag != null && widget.selectedTag!.isNotEmpty) {
-            jogesetQuery =
-                jogesetQuery.where('tags', arrayContains: widget.selectedTag);
-          }
-        }
-
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: query.snapshots(),
           builder: (context, snapshot) {
@@ -236,11 +206,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: fajlokQuery?.snapshots(),
                   builder: (context, fajlokSnapshot) {
-                    // Jogesetek stream builder
-                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: jogesetQuery?.snapshots(),
-                      builder: (context, jogesetSnapshot) {
-                        // Debug: találatok száma
+                    // Debug: találatok száma
                         if (snapshot.hasData) {
                           final docs = snapshot.data!.docs;
                           debugPrint(
@@ -259,10 +225,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                         if (fajlokSnapshot.hasData) {
                           debugPrint(
                               '[NoteCardGrid] Found ${fajlokSnapshot.data!.docs.length} fajlok');
-                        }
-                        if (jogesetSnapshot.hasData) {
-                          debugPrint(
-                              '[NoteCardGrid] Found ${jogesetSnapshot.data!.docs.length} jogesetek');
                         }
 
                         if (snapshot.hasError) {
@@ -320,22 +282,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                           allDocs.addAll(fajlokDocs);
                         }
 
-                        // Jogeset dokumentumok hozzáadása - csak akkor, ha nincs típus szűrő vagy a jogeset típusa van kiválasztva
-                        if (shouldLoadJogesetek) {
-                          final jogesetDocs = (jogesetSnapshot.data?.docs ??
-                                  const <QueryDocumentSnapshot<
-                                      Map<String, dynamic>>>[])
-                              .where((d) {
-                            final data = d.data();
-                            // Szűrés név alapján (name mező)
-                            final name = (data['name'] ?? '').toString();
-                            return name
-                                .toLowerCase()
-                                .contains(widget.searchText.toLowerCase());
-                          }).toList();
-                          allDocs.addAll(jogesetDocs);
-                        }
-
                         // Típus szűrés
                         final filteredDocs = widget.selectedType != null &&
                                 widget.selectedType!.isNotEmpty
@@ -354,10 +300,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                   return widget.selectedType ==
                                       'memoriapalota_fajlok';
                                 }
-                                // A jogeset dokumentumok a jogesetek kollekcióból jönnek
-                                if (d.reference.path.contains('jogesetek')) {
-                                  return widget.selectedType == 'jogeset';
-                                }
                                 return data['type'] == widget.selectedType;
                               }).toList()
                             : allDocs;
@@ -369,9 +311,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                 ConnectionState.active &&
                             (!shouldLoadAllomasok ||
                                 !allomasSnapshot.hasData) &&
-                            (!shouldLoadFajlok || !fajlokSnapshot.hasData) &&
-                            (!shouldLoadJogesetek ||
-                                !jogesetSnapshot.hasData)) {
+                            (!shouldLoadFajlok || !fajlokSnapshot.hasData)) {
                           return const Center(
                               child: CircularProgressIndicator());
                         }
@@ -479,26 +419,16 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                     .contains('memoriapalota_fajlok');
                                 final isFajlB = b.reference.path
                                     .contains('memoriapalota_fajlok');
-                                final isJogesetA =
-                                    a.reference.path.contains('jogesetek');
-                                final isJogesetB =
-                                    b.reference.path.contains('jogesetek');
                                 final typeA = isAllomasA
                                     ? 'memoriapalota_allomasok'
                                     : (isFajlA
                                         ? 'memoriapalota_fajlok'
-                                        : (isJogesetA
-                                            ? 'jogeset'
-                                            : (a.data()['type'] as String? ??
-                                                '')));
+                                        : (a.data()['type'] as String? ?? ''));
                                 final typeB = isAllomasB
                                     ? 'memoriapalota_allomasok'
                                     : (isFajlB
                                         ? 'memoriapalota_fajlok'
-                                        : (isJogesetB
-                                            ? 'jogeset'
-                                            : (b.data()['type'] as String? ??
-                                                '')));
+                                        : (b.data()['type'] as String? ?? ''));
 
                                 // 'source' típus mindig a lista végére kerüljön
                                 final bool isSourceA = typeA == 'source';
@@ -513,17 +443,13 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                 if (typeCompare != 0) {
                                   return typeCompare;
                                 }
-                                // Cím meghatározása: fő útvonal dokumentumoknál, fájloknál és jogeseteknél 'cim' vagy 'name', egyébként 'title'
+                                // Cím meghatározása: fő útvonal dokumentumoknál, fájloknál 'cim', egyébként 'title'
                                 final titleA = isAllomasA || isFajlA
                                     ? (a.data()['cim'] as String? ?? '')
-                                    : (isJogesetA
-                                        ? (a.data()['name'] as String? ?? '')
-                                        : (a.data()['title'] as String? ?? ''));
+                                    : (a.data()['title'] as String? ?? '');
                                 final titleB = isAllomasB || isFajlB
                                     ? (b.data()['cim'] as String? ?? '')
-                                    : (isJogesetB
-                                        ? (b.data()['name'] as String? ?? '')
-                                        : (b.data()['title'] as String? ?? ''));
+                                    : (b.data()['title'] as String? ?? '');
                                 return titleA.compareTo(titleB);
                               });
                             } else if (value is Map<String, dynamic>) {
@@ -549,20 +475,18 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                               selectedTag: widget.selectedTag,
                               hasPremiumAccess: hasPremiumAccess,
                             );
-                          }).toList(),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-}
+                           }).toList(),
+                         );
+                   },
+                 );
+               },
+             );
+           },
+         );
+       },
+     );
+   }
+ }
 
 // Kategória szintű szekció widget
 class _CategorySection extends StatefulWidget {

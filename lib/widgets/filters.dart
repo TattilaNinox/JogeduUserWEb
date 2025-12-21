@@ -228,7 +228,7 @@ class _FiltersState extends State<Filters> {
         ),
       ),
       child: DropdownButtonFormField<T>(
-        value: effectiveValue,
+        initialValue: effectiveValue,
         decoration: InputDecoration(
           labelText: hint,
           filled: true,

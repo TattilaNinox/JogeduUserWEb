@@ -602,16 +602,14 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     // Ellenőrizzük, hogy jogeset dokumentumról van-e szó
     final isJogeset = doc.reference.path.contains('jogesetek');
     
-    // Jogeseteknél 'name' mezőt használunk, egyébként 'title'-t
-    final title = isJogeset 
-        ? (data['name'] as String? ?? '')
-        : (data['title'] as String? ?? '');
+    // Ha jogeset dokumentum, használjuk a _buildJogesetWidget metódust
+    if (isJogeset) {
+      return _buildJogesetWidget(doc);
+    }
     
-    // Típus meghatározása
-    final type = isJogeset 
-        ? 'jogeset'
-        : (data['type'] as String? ?? 'standard');
-    
+    // Egyébként normál jegyzetként kezeljük
+    final title = data['title'] as String? ?? '';
+    final type = data['type'] as String? ?? 'standard';
     final isFree = data['isFree'] as bool? ?? false;
     final isLocked = !isFree && !_hasPremiumAccess;
 
