@@ -144,6 +144,11 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             widget.selectedType!.isEmpty ||
             widget.selectedType == 'memoriapalota_fajlok';
 
+        // Ha nincs típus szűrő, vagy ha a típus szűrő "dialogus_fajlok", betöltjük a dialogus fájl dokumentumokat
+        final shouldLoadDialogus = widget.selectedType == null ||
+            widget.selectedType!.isEmpty ||
+            widget.selectedType == 'dialogus_fajlok';
+
         // Fő útvonal dokumentumok lekérdezése a memoriapalota_allomasok kollekcióból
         // Ezek a fő dokumentumok, amelyek az utvonalId-val rendelkeznek
         Query<Map<String, dynamic>>? allomasQuery = shouldLoadAllomasok
@@ -156,6 +161,13 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         Query<Map<String, dynamic>>? fajlokQuery = shouldLoadFajlok
             ? FirebaseConfig.firestore
                 .collection('memoriapalota_fajlok')
+                .where('science', isEqualTo: userScience)
+            : null;
+
+        // Dialogus fájl dokumentumok lekérdezése a dialogus_fajlok kollekcióból
+        Query<Map<String, dynamic>>? dialogusQuery = shouldLoadDialogus
+            ? FirebaseConfig.firestore
+                .collection('dialogus_fajlok')
                 .where('science', isEqualTo: userScience)
             : null;
 
@@ -195,6 +207,26 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           }
         }
 
+        if (dialogusQuery != null) {
+          // status
+          if (widget.selectedStatus != null &&
+              widget.selectedStatus!.isNotEmpty) {
+            dialogusQuery =
+                dialogusQuery.where('status', isEqualTo: widget.selectedStatus);
+          } else {
+            dialogusQuery = isAdmin
+                ? dialogusQuery.where('status', whereIn: ['Published', 'Draft'])
+                : dialogusQuery.where('status', isEqualTo: 'Published');
+          }
+          // tag
+          // FONTOS: Firestore nem támogatja több array-contains szűrőt,
+          // és a dialogus_fajlok dokumentumoknak category és tags mezője is van
+          if (widget.selectedTag != null && widget.selectedTag!.isNotEmpty) {
+            dialogusQuery =
+                dialogusQuery.where('tags', arrayContains: widget.selectedTag);
+          }
+        }
+
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: query.snapshots(),
           builder: (context, snapshot) {
@@ -206,7 +238,11 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: fajlokQuery?.snapshots(),
                   builder: (context, fajlokSnapshot) {
-                    // Debug: találatok száma
+                    // Dialogus fájlok stream builder
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: dialogusQuery?.snapshots(),
+                      builder: (context, dialogusSnapshot) {
+                        // Debug: találatok száma
                         if (snapshot.hasData) {
                           final docs = snapshot.data!.docs;
                           debugPrint(
@@ -225,6 +261,10 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                         if (fajlokSnapshot.hasData) {
                           debugPrint(
                               '[NoteCardGrid] Found ${fajlokSnapshot.data!.docs.length} fajlok');
+                        }
+                        if (dialogusSnapshot.hasData) {
+                          debugPrint(
+                              '[NoteCardGrid] Found ${dialogusSnapshot.data!.docs.length} dialogus_fajlok');
                         }
 
                         if (snapshot.hasError) {
@@ -282,6 +322,29 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                           allDocs.addAll(fajlokDocs);
                         }
 
+                        // Dialogus fájl dokumentumok hozzáadása
+                        if (shouldLoadDialogus) {
+                          final dialogusDocs = (dialogusSnapshot.data?.docs ??
+                                  const <QueryDocumentSnapshot<
+                                      Map<String, dynamic>>>[])
+                              .where((d) {
+                            final data = d.data();
+                            
+                            // Audio URL ellenőrzése
+                            final audioUrl = data['audioUrl'] as String?;
+                            if (audioUrl == null || audioUrl.isEmpty || audioUrl.trim().isEmpty) {
+                              return false;
+                            }
+                            
+                            // Szűrés cím alapján (title vagy cim mező)
+                            final title = (data['title'] ?? data['cim'] ?? '').toString();
+                            return title
+                                .toLowerCase()
+                                .contains(widget.searchText.toLowerCase());
+                          }).toList();
+                          allDocs.addAll(dialogusDocs);
+                        }
+
                         // Típus szűrés
                         final filteredDocs = widget.selectedType != null &&
                                 widget.selectedType!.isNotEmpty
@@ -300,6 +363,12 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                   return widget.selectedType ==
                                       'memoriapalota_fajlok';
                                 }
+                                // A dialogus fájl dokumentumok a dialogus_fajlok kollekcióból jönnek
+                                if (d.reference.path
+                                    .contains('dialogus_fajlok')) {
+                                  return widget.selectedType ==
+                                      'dialogus_fajlok';
+                                }
                                 return data['type'] == widget.selectedType;
                               }).toList()
                             : allDocs;
@@ -311,7 +380,8 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                 ConnectionState.active &&
                             (!shouldLoadAllomasok ||
                                 !allomasSnapshot.hasData) &&
-                            (!shouldLoadFajlok || !fajlokSnapshot.hasData)) {
+                            (!shouldLoadFajlok || !fajlokSnapshot.hasData) &&
+                            (!shouldLoadDialogus || !dialogusSnapshot.hasData)) {
                           return const Center(
                               child: CircularProgressIndicator());
                         }
@@ -327,8 +397,14 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                             {};
 
                         for (var d in docs) {
-                          final category =
-                              (d.data()['category'] ?? 'Egyéb') as String;
+                          // Ha dialogus_fajlok dokumentum, akkor a kategória mindig "Dialogus tags"
+                          // Ez biztosítja, hogy külön mappába kerüljenek
+                          final isDialogusFajl = d.reference.path.contains('dialogus_fajlok');
+                          
+                          final category = isDialogusFajl 
+                              ? 'Dialogus tags' 
+                              : (d.data()['category'] ?? 'Egyéb') as String;
+                              
                           final tags =
                               (d.data()['tags'] as List<dynamic>? ?? [])
                                   .cast<String>();
@@ -419,16 +495,25 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                     .contains('memoriapalota_fajlok');
                                 final isFajlB = b.reference.path
                                     .contains('memoriapalota_fajlok');
+                                final isDialogusA = a.reference.path
+                                    .contains('dialogus_fajlok');
+                                final isDialogusB = b.reference.path
+                                    .contains('dialogus_fajlok');
+                                    
                                 final typeA = isAllomasA
                                     ? 'memoriapalota_allomasok'
                                     : (isFajlA
                                         ? 'memoriapalota_fajlok'
-                                        : (a.data()['type'] as String? ?? ''));
+                                        : (isDialogusA 
+                                            ? 'dialogus_fajlok' 
+                                            : (a.data()['type'] as String? ?? '')));
                                 final typeB = isAllomasB
                                     ? 'memoriapalota_allomasok'
                                     : (isFajlB
                                         ? 'memoriapalota_fajlok'
-                                        : (b.data()['type'] as String? ?? ''));
+                                        : (isDialogusB 
+                                            ? 'dialogus_fajlok' 
+                                            : (b.data()['type'] as String? ?? '')));
 
                                 // 'source' típus mindig a lista végére kerüljön
                                 final bool isSourceA = typeA == 'source';
@@ -444,11 +529,11 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                   return typeCompare;
                                 }
                                 // Cím meghatározása: fő útvonal dokumentumoknál, fájloknál 'cim', egyébként 'title'
-                                final titleA = isAllomasA || isFajlA
-                                    ? (a.data()['cim'] as String? ?? '')
+                                final titleA = isAllomasA || isFajlA || isDialogusA
+                                    ? (a.data()['title'] ?? a.data()['cim'] ?? '').toString()
                                     : (a.data()['title'] as String? ?? '');
-                                final titleB = isAllomasB || isFajlB
-                                    ? (b.data()['cim'] as String? ?? '')
+                                final titleB = isAllomasB || isFajlB || isDialogusB
+                                    ? (b.data()['title'] ?? b.data()['cim'] ?? '').toString()
                                     : (b.data()['title'] as String? ?? '');
                                 return titleA.compareTo(titleB);
                               });
@@ -475,18 +560,20 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                               selectedTag: widget.selectedTag,
                               hasPremiumAccess: hasPremiumAccess,
                             );
-                           }).toList(),
-                         );
-                   },
-                 );
-               },
-             );
-           },
-         );
-       },
-     );
-   }
- }
+                          }).toList(),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
 
 // Kategória szintű szekció widget
 class _CategorySection extends StatefulWidget {

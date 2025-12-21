@@ -1,0 +1,460 @@
+================================================================================
+DIALOGUS_FAJLOK KOLLEKCIÓ STRUKTÚRA ÉS MEZŐK
+================================================================================
+
+A dialogus_fajlok kollekció a memóriapalota és dialógus fájlokat tartalmazza.
+Ez a Firestore kollekció tárolja a generált tartalmakat, amelyek lehetnek
+memóriapalota fájlok, teljes dialógusok, vagy mindkettő.
+
+================================================================================
+1. KOLLEKCIÓ ALAPADATOK
+================================================================================
+
+Kollekcó neve: dialogus_fajlok
+Adatbázis: Firebase Firestore
+Szolgáltatás: MemoriapalotaService (lib/services/memoriapalota_service.dart)
+
+================================================================================
+2. DOKUMENTUM STRUKTÚRA ÉS MEZŐK
+================================================================================
+
+Minden dokumentum a következő mezőket tartalmazza:
+
+{
+  // ========== KÖTELEZŐ MEZŐK ==========
+  
+  "id": "auto-generated-document-id",  // String (Firestore automatikusan generálja)
+                                        // Szerepe: Egyedi dokumentum azonosító
+                                        // Típus: String (Firestore document ID)
+                                        // Használat: Dokumentum azonosítás, hivatkozás
+  
+  "title": "Fájl címe",                 // String (kötelező)
+                                        // Szerepe: A fájl címe/neve
+                                        // Tartalom: Rövid, leíró cím
+                                        // Megjegyzés: Backward compatibility: 'cim' mező is lehet
+                                        // Használat: Lista megjelenítés, keresés
+  
+  "helyszin": "Memóriapalota",          // String (kötelező)
+                                        // Szerepe: A fájl helyszíne/kategóriája
+                                        // Tartalom: Pl. "Memóriapalota", "Joghallgatói podcast", stb.
+                                        // Használat: Szűrés, csoportosítás
+  
+  "fajltipus": "teljes_dialogus",       // String (kötelező)
+                                        // Szerepe: A fájl típusának meghatározása
+                                        // Lehetséges értékek:
+                                        //   - "memoriapalota" (kék szín, Icons.castle)
+                                        //   - "teljes_dialogus" (zöld szín, Icons.mic)
+                                        //   - "mindkettő" (lila szín, Icons.library_books)
+                                        // Használat: Szűrés, ikon megjelenítés, szín meghatározás
+  
+  "tartalom": "<p>HTML tartalom...</p>", // String (kötelező)
+                                         // Szerepe: A fájl fő tartalma
+                                         // Tartalom: HTML formátumú szöveg
+                                         // Formátum: HTML (h1, h2, h3, p, ul, ol, span stb.)
+                                         // Stílusok: .szin-piros, .szin-zold, .szin-kek,
+                                         //            .hatter-sarga, .jogszabaly-doboz stb.
+                                         // Használat: Fő megjelenítés, HTML-ként renderelve
+  
+  "bemenetiTartalom": "Eredeti szöveg", // String (kötelező)
+                                         // Szerepe: Az eredeti bemeneti tartalom
+                                         // Tartalom: A generálás előtti eredeti szöveg
+                                         // Használat: Referenciaként, visszakereséshez
+  
+  "generaltDatum": Timestamp,            // Timestamp (kötelező, automatikus)
+                                         // Szerepe: A fájl létrehozásának dátuma
+                                         // Típus: Firestore Timestamp
+                                         // Generálás: FieldValue.serverTimestamp()
+                                         // Használat: Rendezés, dátum megjelenítés
+  
+  "generaltFelhasznalo": "user@email.com", // String (kötelező, automatikus)
+                                            // Szerepe: A fájlt létrehozó felhasználó
+                                            // Tartalom: Email cím vagy user ID
+                                            // Generálás: FirebaseAuth.currentUser.email vagy uid
+                                            // Használat: Audit trail, felhasználó azonosítás
+  
+  "status": "Draft",                     // String (kötelező, alapértelmezett: "Draft")
+                                        // Szerepe: A fájl státusza
+                                        // Lehetséges értékek:
+                                        //   - "Draft" (narancs szín, 'D' betű)
+                                        //   - "Published" (zöld szín, 'P' betű)
+                                        //   - "Archived" (szürke szín, 'A' betű)
+                                        //   - "Public" (automatikusan "Published"-ként kezelve)
+                                        // Használat: Szűrés, státusz megjelenítés, workflow
+  
+  // ========== OPCIONÁLIS MEZŐK ==========
+  
+  "cim": "Fájl címe",                    // String (opcionális)
+                                         // Szerepe: Backward compatibility - ugyanaz mint 'title'
+                                         // Megjegyzés: Ha 'title' hiányzik, 'cim'-ből töltődik be
+                                         //              Ha 'cim' hiányzik, 'title'-ből töltődik be
+  
+  "audioUrl": "https://storage.../file.mp3", // String (opcionális)
+                                             // Szerepe: A fájlhoz tartozó hanganyag URL-je
+                                             // Tartalom: Firebase Storage download URL
+                                             // Formátum: HTTPS URL
+                                             // Használat: Audio lejátszás (MiniAudioPlayer)
+                                             // Megjegyzés: MP3 fájlok, max 7 MB (transzkódolás után)
+  
+  "model": "gemini-pro",                 // String (opcionális)
+                                        // Szerepe: Melyik AI modell generálta a tartalmat
+                                        // Tartalom: Modell neve (pl. "gemini-pro", "gpt-4")
+                                        // Használat: Audit trail, modell követés
+  
+  "science": "Jog",                      // String (opcionális)
+                                        // Szerepe: A fájl tudományága/tárgya
+                                        // Tartalom: Pl. "Jog", "Orvostudomány", stb.
+                                        // Használat: Szűrés, kategorizálás
+  
+  "category": "Polgári jog",            // String (opcionális)
+                                        // Szerepe: A fájl kategóriája
+                                        // Tartalom: Részletesebb kategória név
+                                        // Használat: Szűrés, rendezés (index: category + generaltDatum)
+                                        // Megjegyzés: Firestore index szükséges a rendezéshez
+  
+  "tags": ["tag1", "tag2", "tag3"],     // List<String> (opcionális)
+                                        // Szerepe: Címkék a fájlhoz
+                                        // Tartalom: String lista, címke nevek
+                                        // Használat: Szűrés, keresés, kategorizálás
+                                        // Megjegyzés: Automatikusan mentődik a 'tags' kollekcióba is
+  
+  "isFree": false,                       // Boolean (opcionális, alapértelmezett: false)
+                                        // Szerepe: Ingyenes-e a fájl
+                                        // Tartalom: true vagy false
+                                        // Használat: Szűrés, ingyenes tartalom jelzése
+                                        // Megjelenítés: Zöld "Ingyenes" címke ha true
+  
+  "modified": Timestamp,                 // Timestamp (opcionális, automatikus)
+                                        // Szerepe: Utolsó módosítás dátuma
+                                        // Típus: Firestore Timestamp
+                                        // Generálás: FieldValue.serverTimestamp() frissítéskor
+                                        // Használat: Módosítás követés
+}
+
+================================================================================
+3. MEZŐK RÉSZLETES LEÍRÁSA
+================================================================================
+
+3.1. AZONOSÍTÁSI MEZŐK
+
+- id (String)
+  Szerepe: Egyedi dokumentum azonosító
+  Típus: Firestore automatikusan generált document ID
+  Használat: 
+    * Dokumentum azonosítás
+    * Hivatkozások más dokumentumokban
+    * Firebase Storage path generálás (pl. 'memoriapalota_fajlok/$fileId/$fileName')
+  Megjegyzés: Nem módosítható, csak olvasható
+
+- title / cim (String)
+  Szerepe: A fájl címe/neve
+  Típus: String
+  Tartalom: Rövid, leíró cím (általában 5-50 karakter)
+  Használat:
+    * Lista megjelenítésnél címként
+    * Kereséshez
+    * Dialog fejlécében
+  Megjegyzés: 
+    * Backward/forward compatibility: mindkét mező támogatott
+    * Ha 'title' hiányzik, 'cim'-ből töltődik be
+    * Ha 'cim' hiányzik, 'title'-ből töltődik be
+
+3.2. KATEGORIZÁLÁSI MEZŐK
+
+- helyszin (String)
+  Szerepe: A fájl helyszíne/kategóriája
+  Típus: String
+  Tartalom: Pl. "Memóriapalota", "Joghallgatói podcast", "Memória útvonal"
+  Használat: Szűrés, csoportosítás, megjelenítés
+  Megjegyzés: Kötelező mező, minden fájlnak rendelkeznie kell vele
+
+- fajltipus (String)
+  Szerepe: A fájl típusának meghatározása
+  Típus: String (enum-like)
+  Lehetséges értékek:
+    * "memoriapalota" - Kék szín, Icons.castle ikon
+    * "teljes_dialogus" - Zöld szín, Icons.mic ikon
+    * "mindkettő" - Lila szín, Icons.library_books ikon
+  Használat: 
+    * Szűrés fájltípus szerint
+    * Ikon és szín megjelenítés
+    * UI logika (pl. szerkesztés mód)
+  Megjegyzés: Kötelező mező, alapértelmezett nincs
+
+- science (String, opcionális)
+  Szerepe: A fájl tudományága/tárgya
+  Típus: String
+  Tartalom: Pl. "Jog", "Orvostudomány", "Közgazdaságtan"
+  Használat: Szűrés, kategorizálás
+  Megjegyzés: Opcionális, de ajánlott a jobb szervezéshez
+
+- category (String, opcionális)
+  Szerepe: A fájl kategóriája
+  Típus: String
+  Tartalom: Részletesebb kategória név (pl. "Polgári jog", "Közigazgatási jog")
+  Használat: 
+    * Szűrés kategória szerint
+    * Rendezés (Firestore index: category + generaltDatum)
+  Megjegyzés: 
+    * Opcionális
+    * Firestore index szükséges a rendezéshez (firestore.indexes.json)
+
+- tags (List<String>, opcionális)
+  Szerepe: Címkék a fájlhoz
+  Típus: List<String>
+  Tartalom: String lista, címke nevek (pl. ["PTK", "szerződés", "érvényesség"])
+  Használat: 
+    * Szűrés címke szerint
+    * Keresés
+    * Kategorizálás
+  Megjegyzés: 
+    * Opcionális
+    * Automatikusan mentődik a 'tags' kollekcióba is (batch write)
+    * Maximum 3 címke jelenik meg a listában, több esetén "+N" jelzés
+
+- isFree (Boolean, opcionális)
+  Szerepe: Ingyenes-e a fájl
+  Típus: Boolean
+  Tartalom: true vagy false (alapértelmezett: false)
+  Használat: 
+    * Szűrés ingyenes tartalom szerint
+    * Ingyenes tartalom jelzése (zöld "Ingyenes" címke)
+  Megjelenítés: Zöld "Ingyenes" címke ha true
+
+3.3. TARTALMI MEZŐK
+
+- tartalom (String)
+  Szerepe: A fájl fő tartalma
+  Típus: String (HTML formátum)
+  Tartalom: HTML formátumú szöveg
+  Formátum: HTML (h1, h2, h3, p, ul, ol, span, div stb.)
+  Támogatott HTML stílusok:
+    * .szin-piros - Piros színű, félkövér szöveg
+    * .szin-zold - Zöld színű, félkövér szöveg
+    * .szin-kek - Kék színű, félkövér szöveg
+    * .hatter-sarga - Sárga háttér
+    * .jogszabaly-doboz - Jogszabály doboz stílus
+    * .jogszabaly-cimke - Jogszabály címke stílus
+  Használat: 
+    * Fő megjelenítés (HTML-ként renderelve iframe-ben)
+    * Letöltés TXT formátumban (voice tag-ekkel ha teljes_dialogus)
+  Megjegyzés: 
+    * Kötelező mező
+    * Web platformon HtmlElementView-ben jelenik meg
+    * Nem web platformon egyszerű szövegként
+
+- bemenetiTartalom (String)
+  Szerepe: Az eredeti bemeneti tartalom
+  Típus: String
+  Tartalom: A generálás előtti eredeti szöveg
+  Használat: 
+    * Referenciaként
+    * Visszakereséshez
+    * Audit trail
+  Megjegyzés: Kötelező mező, de lehet üres string is
+
+3.4. AUDIO MEZŐK
+
+- audioUrl (String, opcionális)
+  Szerepe: A fájlhoz tartozó hanganyag URL-je
+  Típus: String (HTTPS URL)
+  Tartalom: Firebase Storage download URL
+  Formátum: https://firebasestorage.googleapis.com/...
+  Használat: 
+    * Audio lejátszás (MiniAudioPlayer widget)
+    * Hanganyag törlés (Firebase Storage + Firestore)
+  Megjegyzés: 
+    * Opcionális
+    * MP3 fájlok támogatottak
+    * Max 7 MB (transzkódolás után 32 kbps)
+    * Firebase Storage path: 'memoriapalota_fajlok/$fileId/$fileName'
+    * Transzkódolás: FFmpeg.wasm (csak web platformon, SharedArrayBuffer szükséges)
+
+3.5. METADATUM MEZŐK
+
+- generaltDatum (Timestamp)
+  Szerepe: A fájl létrehozásának dátuma
+  Típus: Firestore Timestamp
+  Generálás: FieldValue.serverTimestamp() (szerver oldali időpont)
+  Használat: 
+    * Rendezés (alapértelmezett: descending)
+    * Dátum megjelenítés (formátum: YYYY.MM.DD HH:mm)
+    * Szűrés dátum szerint
+  Megjegyzés: 
+    * Kötelező mező, automatikusan generálódik
+    * Firestore index szükséges a rendezéshez (category + generaltDatum)
+
+- generaltFelhasznalo (String)
+  Szerepe: A fájlt létrehozó felhasználó
+  Típus: String
+  Tartalom: Email cím vagy user ID
+  Generálás: FirebaseAuth.currentUser.email ?? uid ?? 'unknown'
+  Használat: 
+    * Audit trail
+    * Felhasználó azonosítás
+    * Módosítás követés
+  Megjegyzés: Kötelező mező, automatikusan generálódik
+
+- modified (Timestamp, opcionális)
+  Szerepe: Utolsó módosítás dátuma
+  Típus: Firestore Timestamp
+  Generálás: FieldValue.serverTimestamp() frissítéskor
+  Használat: Módosítás követés
+  Megjegyzés: 
+    * Opcionális
+    * Csak frissítéskor kerül beállításra
+    * Nem jelenik meg a lista nézetben
+
+- model (String, opcionális)
+  Szerepe: Melyik AI modell generálta a tartalmat
+  Típus: String
+  Tartalom: Modell neve (pl. "gemini-pro", "gpt-4", "claude-3")
+  Használat: 
+    * Audit trail
+    * Modell követés
+    * Statisztikák
+  Megjegyzés: 
+    * Opcionális
+    * Csak akkor kerül beállításra, ha meg van adva a generáláskor
+    * Megjelenik a lista nézetben "Modell: ..." formátumban
+
+3.6. STÁTUSZ MEZŐK
+
+- status (String)
+  Szerepe: A fájl státusza
+  Típus: String (enum-like)
+  Lehetséges értékek:
+    * "Draft" - Piszkozat (narancs szín, 'D' betű)
+    * "Published" - Közzétett (zöld szín, 'P' betű)
+    * "Archived" - Archivált (szürke szín, 'A' betű)
+    * "Public" - Nyilvános (automatikusan "Published"-ként kezelve)
+  Alapértelmezett: "Draft"
+  Használat: 
+    * Szűrés státusz szerint
+    * Státusz megjelenítés (színkódolt badge)
+    * Workflow kezelés
+  Megjegyzés: 
+    * Kötelező mező
+    * StatusMenuWidget-ben módosítható
+    * Backward compatibility: üres string = "Draft"
+
+================================================================================
+4. FIRESTORE INDEXEK
+================================================================================
+
+A kollekcióhoz tartozó Firestore indexek (firestore.indexes.json):
+
+1. category + generaltDatum index
+   - Collection: dialogus_fajlok
+   - Mezők: category (ASCENDING), generaltDatum (DESCENDING)
+   - Szerepe: Kategória szerinti szűrés + dátum szerinti rendezés
+   - Használat: getMemoriapalotaFilesFiltered() metódus
+
+================================================================================
+5. FIRESTORE RULES
+================================================================================
+
+A kollekcióhoz tartozó Firestore biztonsági szabályok (firestore.rules):
+
+- Olvasás: Minden bejelentkezett felhasználó (request.auth != null)
+- Létrehozás: Csak admin (isAdmin())
+- Frissítés: Csak admin (isAdmin())
+- Törlés: Csak admin (isAdmin())
+
+================================================================================
+6. HASZNÁLATI PÉLDÁK
+================================================================================
+
+6.1. ÚJ FÁJL LÉTREHOZÁSA
+
+MemoriapalotaService.saveMemoriapalotaFile(
+  cim: "Polgári jog alapjai",
+  helyszin: "Memóriapalota",
+  fajltipus: "memoriapalota",
+  tartalom: "<p>HTML tartalom...</p>",
+  bemenetiTartalom: "Eredeti szöveg",
+  model: "gemini-pro", // opcionális
+);
+
+6.2. FÁJL FRISSÍTÉSE
+
+MemoriapalotaService.updateMemoriapalotaFile(
+  fileId: "document-id",
+  cim: "Új cím", // opcionális
+  helyszin: "Új helyszín", // opcionális
+  tartalom: "<p>Új tartalom...</p>", // opcionális
+  science: "Jog", // opcionális
+  category: "Polgári jog", // opcionális
+  tags: ["PTK", "szerződés"], // opcionális
+  isFree: true, // opcionális
+);
+
+6.3. AUDIO URL FRISSÍTÉSE
+
+MemoriapalotaService.updateAudioUrl(
+  fileId: "document-id",
+  audioUrl: "https://storage.../file.mp3",
+);
+
+6.4. STÁTUSZ FRISSÍTÉSE
+
+MemoriapalotaService.updateMemoriapalotaFileStatus(
+  fileId: "document-id",
+  status: "Published",
+);
+
+6.5. FÁJLOK LEKÉRÉSE
+
+// Összes fájl dátum szerint rendezve
+List<Map<String, dynamic>> files = 
+    await MemoriapalotaService.getMemoriapalotaFiles();
+
+// Szűrt fájlok
+List<Map<String, dynamic>> filteredFiles = 
+    await MemoriapalotaService.getMemoriapalotaFilesFiltered(
+      cim: "Polgári jog alapjai", // opcionális
+      category: "Polgári jog", // opcionális
+    );
+
+================================================================================
+7. BACKWARD/FORWARD COMPATIBILITY
+================================================================================
+
+A kollekció támogatja a 'title' és 'cim' mezők közötti kompatibilitást:
+
+- Ha 'title' hiányzik, 'cim'-ből töltődik be
+- Ha 'cim' hiányzik, 'title'-ből töltődik be
+- Mindkét mező támogatott a kódban
+
+Ez biztosítja a kompatibilitást a régi és új dokumentumok között.
+
+================================================================================
+8. MEGJEGYZÉSEK
+================================================================================
+
+- A kollekció a memóriapalota_fajlok Firebase Storage path-ot használja
+- Az audio fájlok transzkódolása csak web platformon működik (FFmpeg.wasm)
+- A HTML tartalom megjelenítése csak web platformon működik (HtmlElementView)
+- A tags automatikusan mentődik a 'tags' kollekcióba is
+- A status "Public" értéke automatikusan "Published"-ként kezelődik
+- A generaltDatum szerver oldali időpontot használ (FieldValue.serverTimestamp())
+
+================================================================================
+9. KAPCSOLÓDÓ KOLLEKCIÓK
+================================================================================
+
+- tags: Címkék kollekciója (automatikusan frissül)
+- memoriapalota_allomasok: Memória útvonalak kollekciója (külön struktúra)
+- Firebase Storage: memoriapalota_fajlok/$fileId/$fileName (audio fájlok)
+
+================================================================================
+10. WIDGETEK ÉS KOMPONENSEK
+================================================================================
+
+- DialogFileListItemWidget: Lista elem megjelenítés
+- FileViewDialog: Fájl megtekintés (HTML renderelés)
+- MiniAudioPlayer: Audio lejátszás
+- StatusMenuWidget: Státusz módosítás
+
+================================================================================
+VÉGE
+================================================================================

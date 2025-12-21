@@ -228,7 +228,8 @@ class _FiltersState extends State<Filters> {
         ),
       ),
       child: DropdownButtonFormField<T>(
-        initialValue: effectiveValue,
+        key: ValueKey('${hint}_${items.length}_${items.join(",")}'),
+        value: effectiveValue,
         decoration: InputDecoration(
           labelText: hint,
           filled: true,

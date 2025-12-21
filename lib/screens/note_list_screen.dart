@@ -197,6 +197,51 @@ class _NoteListScreenState extends State<NoteListScreen> {
         }
       }
 
+      // Hozzáadjuk a "Dialogus tags" kategóriát, ha van legalább egy dialogus_fajlok dokumentum
+      // Ellenőrizzük, hogy van-e legalább egy dialogus_fajlok dokumentum audioUrl-lel
+      try {
+        Query<Map<String, dynamic>> dialogusQuery = FirebaseConfig.firestore
+            .collection('dialogus_fajlok')
+            .where('science', isEqualTo: userScience);
+        
+        if (isAdmin) {
+          dialogusQuery = dialogusQuery.where('status', whereIn: ['Published', 'Draft']);
+        } else {
+          dialogusQuery = dialogusQuery.where('status', isEqualTo: 'Published');
+        }
+        
+        final dialogusSnapshot = await dialogusQuery.get();
+        // debugPrint('🔵 dialogus_fajlok: ${dialogusSnapshot.docs.length} dokumentum található');
+        
+        // Ellenőrizzük, van-e legalább egy dokumentum audioUrl-lel
+        bool hasDialogusFiles = false;
+        int validDocsCount = 0;
+        for (var doc in dialogusSnapshot.docs) {
+          final data = doc.data();
+          if (data['deletedAt'] != null) continue;
+          
+          final audioUrl = data['audioUrl'] as String?;
+          if (audioUrl != null && audioUrl.isNotEmpty) {
+            validDocsCount++;
+            hasDialogusFiles = true;
+            // Nem break, hogy lássuk az összes érvényes dokumentumot
+          }
+        }
+        
+        // debugPrint('🔵 dialogus_fajlok: $validDocsCount érvényes dokumentum (audioUrl-lel)');
+        
+        if (hasDialogusFiles) {
+          categoriesSet.add('Dialogus tags');
+          // debugPrint('🔵 "Dialogus tags" kategória hozzáadva');
+        } else {
+          // debugPrint('🔴 "Dialogus tags" kategória NEM lett hozzáadva (nincs érvényes dokumentum)');
+        }
+      } catch (e, stackTrace) {
+        // Ha hiba van a dialogus_fajlok lekérdezésben, csak logoljuk, de nem akadályozzuk meg a kategóriák betöltését
+        debugPrint('🔴 Hiba a dialogus_fajlok kollekció lekérdezésekor: $e');
+        debugPrint('🔴 Stack trace: $stackTrace');
+      }
+
       setState(() {
         _categories = categoriesSet.toList()..sort();
       });

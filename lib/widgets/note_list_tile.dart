@@ -60,6 +60,8 @@ class NoteListTile extends StatelessWidget {
         return Icons.audiotrack;
       case 'jogeset':
         return Icons.gavel; // Kalapács ikon jogesetekhez
+      case 'dialogus_fajlok':
+        return Icons.mic; // Mikrofon ikon dialogus fájlokhoz (zöld szín, mint teljes_dialogus)
       default:
         return Icons.menu_book;
     }
@@ -164,6 +166,10 @@ class NoteListTile extends StatelessWidget {
       } else {
         context.go('/jogeset/$id$fromQuery');
       }
+    } else if (type == 'dialogus_fajlok') {
+      // Dialogus fájlok esetén nincs külön navigáció, csak az audio lejátszó megjelenik
+      // Nincs teendő, mert az audio lejátszó már megjelenik a build() metódusban
+      return;
     } else {
       if (usePush) {
         context.push('/note/$id$fromQuery');
@@ -304,7 +310,7 @@ class NoteListTile extends StatelessWidget {
           ),
         ),
         child: InkWell(
-          onTap: () => _open(context),
+          onTap: type == 'dialogus_fajlok' ? null : () => _open(context), // Dialogus fájlok esetén nincs navigáció
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -313,7 +319,16 @@ class NoteListTile extends StatelessWidget {
                 final bool isNarrow = constraints.maxWidth < 520;
 
                 Widget audioWidget = const SizedBox.shrink();
-                if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
+                // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
+                if (type == 'dialogus_fajlok' && (audioUrl?.isNotEmpty ?? false)) {
+                  audioWidget = Align(
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: isNarrow ? double.infinity : 150,
+                      child: MiniAudioPlayer(audioUrl: audioUrl!, compact: true),
+                    ),
+                  );
+                } else if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
                   audioWidget = Align(
                     alignment: Alignment.center,
                     child: SizedBox(
@@ -409,7 +424,11 @@ class NoteListTile extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (hasAudio) ...[
+                      // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
+                      if (type == 'dialogus_fajlok' && (audioUrl?.isNotEmpty ?? false)) ...[
+                        const SizedBox(height: 12),
+                        audioWidget,
+                      ] else if (hasAudio) ...[
                         const SizedBox(height: 12),
                         audioWidget,
                       ],
@@ -431,7 +450,17 @@ class NoteListTile extends StatelessWidget {
                       child: titleAndMeta,
                     ),
                     // Jobb oldali lejátszó - fix szélesség
-                    if (hasAudio) ...[
+                    // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
+                    if (type == 'dialogus_fajlok' && (audioUrl?.isNotEmpty ?? false)) ...[
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 150,
+                        child: MiniAudioPlayer(
+                          audioUrl: audioUrl!,
+                          compact: true,
+                        ),
+                      ),
+                    ] else if (hasAudio) ...[
                       const SizedBox(width: 12),
                       SizedBox(
                         width: 150,

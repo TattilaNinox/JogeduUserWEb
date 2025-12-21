@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_config.dart';
 
 class AccessControl {
   // Engedélyezett admin email címek
@@ -8,30 +8,53 @@ class AccessControl {
     // További admin email címek...
   ];
 
-  // Ellenőrzi, hogy a bejelentkezett felhasználó admin-e
+  /// Ellenőrzi, hogy a bejelentkezett felhasználó admin-e
+  /// Több módszert használ: email, userType, isAdmin flag
   static Future<bool> isAdminUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
 
-    // Email alapú ellenőrzés
-    if (!allowedAdmins.contains(user.email)) {
-      return false;
-    }
-
-    // Firestore-ban tárolt admin flag ellenőrzése
     try {
-      final userDoc = await FirebaseFirestore.instance
+      final userDoc = await FirebaseConfig.firestore
           .collection('users')
           .doc(user.uid)
           .get();
 
-      return userDoc.data()?['isAdmin'] == true;
+      if (!userDoc.exists) return false;
+
+      final userData = userDoc.data() ?? {};
+      final userType = (userData['userType'] as String? ?? '').toLowerCase();
+      final isAdminEmail = user.email != null && allowedAdmins.contains(user.email);
+      final isAdminBool = userData['isAdmin'] == true;
+
+      return userType == 'admin' || isAdminEmail || isAdminBool;
     } catch (e) {
-      return false;
+      // Ha hiba van, csak email alapján ellenőrizzük
+      return user.email != null && allowedAdmins.contains(user.email);
     }
   }
 
-  // Környezet alapú ellenőrzés
+  /// Szinkron admin ellenőrzés userData alapján (StreamBuilder-ekhez)
+  /// Használja a már betöltött userData-t, hogy ne kelljen újra lekérdezni
+  static bool isAdminUserSync(Map<String, dynamic>? userData, String? userEmail) {
+    if (userData == null) {
+      return userEmail != null && allowedAdmins.contains(userEmail);
+    }
+
+    final userType = (userData['userType'] as String? ?? '').toLowerCase();
+    final isAdminEmail = userEmail != null && allowedAdmins.contains(userEmail);
+    final isAdminBool = userData['isAdmin'] == true;
+
+    return userType == 'admin' || isAdminEmail || isAdminBool;
+  }
+
+  /// Visszaadja a felhasználó tudományágát
+  /// Webalkalmazásban MINDIG "Jogász"
+  static String getUserScience() {
+    return 'Jogász';
+  }
+
+  /// Környezet alapú ellenőrzés
   static bool isProductionEnvironment() {
     // Production környezetben extra védelem
     const bool isProduction = bool.fromEnvironment('dart.vm.product');

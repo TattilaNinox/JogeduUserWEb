@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
+import '../core/access_control.dart';
 import '../widgets/note_list_tile.dart';
 
 /// Drill-down navigációs képernyő a címkék hierarchikus böngészéséhez.
@@ -224,61 +225,156 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _buildQuery().snapshots(),
-        builder: (context, notesSnapshot) {
-          // Jogesetek stream builder hozzáadása
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _buildJogesetQuery().snapshots(),
-            builder: (context, jogesetSnapshot) {
-              if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
-                return Center(
-                  child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
-                );
-              }
+      body: widget.category == 'Dialogus tags'
+          ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _buildDialogusFajlokQuery().snapshots(),
+              builder: (context, dialogusSnapshot) {
+                if (dialogusSnapshot.hasError) {
+                  return Center(
+                    child: Text('Hiba: ${dialogusSnapshot.error}'),
+                  );
+                }
 
-              if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                if (!dialogusSnapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              // Összefésüljük a két kollekciót
-              final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              
-              if (notesSnapshot.hasData) {
-                allDocs.addAll(notesSnapshot.data!.docs
-                    .where((d) => d.data()['deletedAt'] == null)
-                    .toList());
-              }
-              
-              // Jogeset dokumentumok feldolgozása - dokumentumonként
-              final processedJogesetDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              if (jogesetSnapshot.hasData) {
-                final jogesetDocs = jogesetSnapshot.data!.docs
-                    .where((d) => d.data()['deletedAt'] == null)
+                final dialogusDocs = dialogusSnapshot.data!.docs
+                    .where((d) {
+                      final data = d.data();
+                      return data['deletedAt'] == null;
+                    })
                     .toList();
-                
-                // Admin ellenőrzés
+
+                // Admin ellenőrzés - StreamBuilder-ben szinkron módon
                 final user = FirebaseAuth.instance.currentUser;
-                final isAdmin = user?.email == 'tattila.ninox@gmail.com';
-                
-                processedJogesetDocs.addAll(_processJogesetDocuments(jogesetDocs, isAdmin: isAdmin));
-              }
+                bool isAdmin = false;
+                if (user != null && user.email != null) {
+                  isAdmin = AccessControl.allowedAdmins.contains(user.email);
+                }
 
-              if (allDocs.isEmpty && processedJogesetDocs.isEmpty) {
-                return const Center(child: Text('Nincs találat.'));
-              }
+                // Feldolgozzuk a dialogus fájlokat
+                final processedDialogusDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-              // Hierarchikus csoportosítás
-              final hierarchy = _buildHierarchy(allDocs, processedJogesetDocs);
+                for (var doc in dialogusDocs) {
+                  final data = doc.data();
+                  
+                  // Szűrés: csak azok a dokumentumok, amelyeknek van audioUrl-je
+                  final audioUrl = data['audioUrl'] as String?;
+                  if (audioUrl == null || audioUrl.isEmpty || audioUrl.trim().isEmpty) {
+                    continue;
+                  }
 
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: _buildHierarchyWidgets(hierarchy),
-              );
-            },
-          );
-        },
-      ),
+                  // Státusz szűrés
+                  final status = data['status'] as String? ?? 'Draft';
+                  if (!isAdmin && status != 'Published') {
+                    continue;
+                  }
+
+                  // Science már szűrve van a Firestore lekérdezésben
+
+                  // Category szűrés: az első tagPath elem a category
+                  final category = data['category'] as String? ?? '';
+                  if (widget.tagPath.isNotEmpty && category != widget.tagPath[0]) {
+                    continue;
+                  }
+
+                  // Tags szűrés: a tagPath többi eleme a tags tömb elemei
+                  // Csak a cast-nál lehet probléma, ezért itt van try-catch
+                  List<String> tags;
+                  try {
+                    tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
+                  } catch (e) {
+                    debugPrint('🔴 Dokumentum ${doc.id}: hibás tags formátum');
+                    continue;
+                  }
+
+                  if (widget.tagPath.length > 1) {
+                    bool matchesTags = true;
+                    for (int i = 1; i < widget.tagPath.length; i++) {
+                      if (tags.length < i || tags[i - 1] != widget.tagPath[i]) {
+                        matchesTags = false;
+                        break;
+                      }
+                    }
+                    if (!matchesTags) continue;
+                  }
+
+                  processedDialogusDocs.add(doc);
+                }
+
+                if (processedDialogusDocs.isEmpty) {
+                  return const Center(child: Text('Nincs találat.'));
+                }
+
+                // Hierarchikus csoportosítás
+                final hierarchy = _buildDialogusHierarchy(processedDialogusDocs);
+
+                return ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: _buildHierarchyWidgets(hierarchy),
+                );
+              },
+            )
+          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _buildQuery().snapshots(),
+              builder: (context, notesSnapshot) {
+                // Jogesetek stream builder hozzáadása
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _buildJogesetQuery().snapshots(),
+                  builder: (context, jogesetSnapshot) {
+                    if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
+                      return Center(
+                        child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
+                      );
+                    }
+
+                    // Normál kategóriák esetén (notes és jogesetek)
+                    if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    // Összefésüljük a két kollekciót
+                    final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    
+                    if (notesSnapshot.hasData) {
+                      allDocs.addAll(notesSnapshot.data!.docs
+                          .where((d) => d.data()['deletedAt'] == null)
+                          .toList());
+                    }
+                    
+                    // Jogeset dokumentumok feldolgozása - dokumentumonként
+                    final processedJogesetDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    if (jogesetSnapshot.hasData) {
+                      final jogesetDocs = jogesetSnapshot.data!.docs
+                          .where((d) => d.data()['deletedAt'] == null)
+                          .toList();
+                      
+                      // Admin ellenőrzés
+                      final user = FirebaseAuth.instance.currentUser;
+                      bool isAdmin = false;
+                      if (user != null) {
+                        isAdmin = AccessControl.allowedAdmins.contains(user.email);
+                      }
+                      
+                      processedJogesetDocs.addAll(_processJogesetDocuments(jogesetDocs, isAdmin: isAdmin));
+                    }
+
+                    if (allDocs.isEmpty && processedJogesetDocs.isEmpty) {
+                      return const Center(child: Text('Nincs találat.'));
+                    }
+
+                    // Hierarchikus csoportosítás
+                    final hierarchy = _buildHierarchy(allDocs, processedJogesetDocs);
+
+                    return ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: _buildHierarchyWidgets(hierarchy),
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 
@@ -286,11 +382,23 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   /// FONTOS: Firestore nem támogatja több array-contains szűrőt,
   /// ezért csak a kategóriára szűrünk, és kliens oldalon szűrjük a címkéket
   Query<Map<String, dynamic>> _buildQuery() {
+    final userScience = AccessControl.getUserScience();
     Query<Map<String, dynamic>> query = FirebaseConfig.firestore
         .collection('notes')
-        .where('science', isEqualTo: 'Jogász')
+        .where('science', isEqualTo: userScience)
         .where('category', isEqualTo: widget.category);
 
+    return query;
+  }
+
+  /// Firestore lekérdezés építése dialogus_fajlok kollekcióhoz
+  Query<Map<String, dynamic>> _buildDialogusFajlokQuery() {
+    final userScience = AccessControl.getUserScience();
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('dialogus_fajlok')
+        .where('science', isEqualTo: userScience);
+    
+    // Státusz és category szűrés kliens oldalon történik (admin/nem-admin különbség miatt)
     return query;
   }
 
@@ -408,7 +516,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     
     // Jogeset dokumentumok feldolgozása - dokumentumonként
     final user = FirebaseAuth.instance.currentUser;
-    final isAdmin = user?.email == 'tattila.ninox@gmail.com';
+    bool isAdmin = false;
+    if (user != null) {
+      isAdmin = AccessControl.allowedAdmins.contains(user.email);
+    }
     
     for (var doc in jogesetDocs) {
       final data = doc.data();
@@ -599,12 +710,18 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   Widget _buildNoteWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     
-    // Ellenőrizzük, hogy jogeset dokumentumról van-e szó
+    // Ellenőrizzük, hogy jogeset vagy dialogus_fajlok dokumentumról van-e szó
     final isJogeset = doc.reference.path.contains('jogesetek');
+    final isDialogusFajlok = doc.reference.path.contains('dialogus_fajlok');
     
     // Ha jogeset dokumentum, használjuk a _buildJogesetWidget metódust
     if (isJogeset) {
       return _buildJogesetWidget(doc);
+    }
+    
+    // Ha dialogus_fajlok dokumentum, használjuk a _buildDialogusFajlokWidget metódust
+    if (isDialogusFajlok) {
+      return _buildDialogusFajlokWidget(doc);
     }
     
     // Egyébként normál jegyzetként kezeljük
@@ -645,7 +762,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     
     // Admin ellenőrzés
     final user = FirebaseAuth.instance.currentUser;
-    final isAdmin = user?.email == 'tattila.ninox@gmail.com';
+    bool isAdmin = false;
+    if (user != null) {
+      isAdmin = AccessControl.allowedAdmins.contains(user.email);
+    }
     
     // Szűrjük a jogeseteket kategória és státusz alapján
     final matchingJogesetek = <Map<String, dynamic>>[];
@@ -696,5 +816,113 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       jogesetCount: jogesetCount,
       category: widget.category,
     );
+  }
+
+  /// Dialogus fájlok widget építése
+  Widget _buildDialogusFajlokWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    
+    // Cím meghatározása
+    final title = data['title'] as String? ?? data['cim'] as String? ?? '';
+    
+    // Audio URL
+    final audioUrl = data['audioUrl'] as String? ?? '';
+    
+    // Szűrés: csak azok a dokumentumok, amelyeknek van audioUrl-je
+    if (audioUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Státusz szűrés
+    final user = FirebaseAuth.instance.currentUser;
+    bool isAdmin = false;
+    if (user != null) {
+      isAdmin = AccessControl.allowedAdmins.contains(user.email);
+    }
+    final status = data['status'] as String? ?? 'Draft';
+    if (!isAdmin && status != 'Published') {
+      return const SizedBox.shrink();
+    }
+    
+    // Premium ellenőrzés
+    final isFree = data['isFree'] as bool? ?? false;
+    final isLocked = !isFree && !_hasPremiumAccess;
+    
+    const customFromUrl = '/notes';
+
+    return NoteListTile(
+      id: doc.id,
+      title: title,
+      type: 'dialogus_fajlok',
+      hasDoc: false,
+      hasAudio: true,
+      audioUrl: audioUrl,
+      hasVideo: false,
+      isLocked: isLocked,
+      isLast: false,
+      customFromUrl: customFromUrl,
+    );
+  }
+
+  /// Hierarchia építése dialogus_fajlok dokumentumokból
+  Map<String, dynamic> _buildDialogusHierarchy(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    final hierarchy = <String, dynamic>{};
+
+    for (var doc in docs) {
+      final data = doc.data();
+      final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
+
+      // Ellenőrizzük, hogy a dokumentum címkéi megfelelnek-e a jelenlegi útvonalnak
+      // A tagPath első eleme a category, a többi a tags tömb elemei
+      bool matchesPath = true;
+
+      // Ha a tagPath hossza 1-nél nagyobb (van category + tags), akkor ellenőrizzük a tags tömböt
+      if (widget.tagPath.length > 1) {
+        // A tags tömb hosszának legalább annyinak kell lennie, mint a tagPath.length - 1
+        if (tags.length < widget.tagPath.length - 1) {
+          matchesPath = false;
+        } else {
+          // Ellenőrizzük, hogy minden tagPath elem (category után) megegyezik-e a tags tömb megfelelő elemével
+          for (int i = 1; i < widget.tagPath.length; i++) {
+            if (tags[i - 1] != widget.tagPath[i]) {
+              matchesPath = false;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!matchesPath) continue;
+
+      // A következő szintű címke indexe: tagPath.length - 1 (mert az első elem a category)
+      final nextTagIndex = widget.tagPath.length - 1;
+
+      // Ha van következő szintű címke
+      if (tags.length > nextTagIndex) {
+        final nextTag = tags[nextTagIndex];
+
+        if (!hierarchy.containsKey(nextTag)) {
+          hierarchy[nextTag] = <String, dynamic>{
+            'docs': <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+            'hasChildren': false,
+          };
+        }
+
+        // Ellenőrizzük, van-e még mélyebb szint
+        if (tags.length > nextTagIndex + 1) {
+          hierarchy[nextTag]['hasChildren'] = true;
+        }
+
+        hierarchy[nextTag]['docs'].add(doc);
+      } else {
+        // Ha nincs következő szintű címke, akkor közvetlenül ide tartozik
+        hierarchy.putIfAbsent(
+            '_direct', () => <QueryDocumentSnapshot<Map<String, dynamic>>>[]);
+        (hierarchy['_direct'] as List).add(doc);
+      }
+    }
+
+    return hierarchy;
   }
 }

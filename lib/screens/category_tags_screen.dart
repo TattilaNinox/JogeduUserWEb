@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
+import '../core/access_control.dart';
 import 'tag_drill_down_screen.dart';
 
 /// Kategória címkék képernyő - megjeleníti egy kategória 0-s indexű címkéit
@@ -86,25 +87,109 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _buildQuery().snapshots(),
-        builder: (context, notesSnapshot) {
-          // Jogesetek stream builder hozzáadása
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _buildJogesetQuery().snapshots(),
-            builder: (context, jogesetSnapshot) {
-              if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
-                return Center(
-                  child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
+      body: widget.category == 'Dialogus tags'
+          ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _buildDialogusFajlokQuery().snapshots(),
+              builder: (context, dialogusSnapshot) {
+                if (dialogusSnapshot.hasError) {
+                  return Center(
+                    child: Text('Hiba: ${dialogusSnapshot.error}'),
+                  );
+                }
+
+                if (!dialogusSnapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final dialogusDocs = dialogusSnapshot.data!.docs
+                    .where((d) {
+                      final data = d.data();
+                      return data['deletedAt'] == null;
+                    })
+                    .toList();
+
+                // Admin ellenőrzés - StreamBuilder-ben szinkron módon
+                final user = FirebaseAuth.instance.currentUser;
+                bool isAdmin = false;
+                if (user != null && user.email != null) {
+                  isAdmin = AccessControl.allowedAdmins.contains(user.email);
+                }
+
+                // Feldolgozzuk a dialogus fájlokat: category mező alapján csoportosítás
+                final categoryMap = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+
+                debugPrint('🔵 CategoryTagsScreen: ${dialogusDocs.length} dialogus_fajlok dokumentum betöltve');
+                
+                for (var doc in dialogusDocs) {
+                  final data = doc.data();
+                  
+                  // Szűrés: csak azok a dokumentumok, amelyeknek van audioUrl-je
+                  final audioUrl = data['audioUrl'] as String?;
+                  if (audioUrl == null || audioUrl.isEmpty || audioUrl.trim().isEmpty) {
+                    debugPrint('🔴 Dokumentum ${doc.id}: nincs audioUrl');
+                    continue;
+                  }
+
+                  // Státusz szűrés
+                  final status = data['status'] as String? ?? 'Draft';
+                  if (!isAdmin && status != 'Published') {
+                    debugPrint('🔴 Dokumentum ${doc.id}: státusz nem Published ($status)');
+                    continue;
+                  }
+
+                  // Science már szűrve van a Firestore lekérdezésben
+
+                  // Category mező alapján csoportosítás
+                  final category = data['category'] as String? ?? '';
+                  if (category.isNotEmpty && category.trim().isNotEmpty) {
+                    categoryMap.putIfAbsent(category, () => []);
+                    categoryMap[category]!.add(doc);
+                    debugPrint('🔵 Dokumentum ${doc.id}: hozzáadva a $category kategóriához');
+                  } else {
+                    debugPrint('🔴 Dokumentum ${doc.id}: nincs category mező vagy üres');
+                  }
+                }
+                
+                debugPrint('🔵 CategoryTagsScreen: ${categoryMap.length} kategória található');
+
+                if (categoryMap.isEmpty) {
+                  return const Center(child: Text('Nincs találat.'));
+                }
+
+                // Rendezés
+                final sortedCategories = categoryMap.keys.toList()..sort();
+
+                return ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    ...sortedCategories.map((category) {
+                      final docs = categoryMap[category] ?? [];
+                      return _buildCategoryCard(category, docs);
+                    }),
+                  ],
                 );
-              }
+              },
+            )
+          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _buildQuery().snapshots(),
+              builder: (context, notesSnapshot) {
+                // Jogesetek stream builder hozzáadása
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _buildJogesetQuery().snapshots(),
+                  builder: (context, jogesetSnapshot) {
+                    if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
+                      return Center(
+                        child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
+                      );
+                    }
 
-              if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                    // Normál kategóriák esetén (notes és jogesetek)
+                    if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-              // Összefésüljük a két kollekciót
-              final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    // Összefésüljük a két kollekciót
+                    final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
               
               if (notesSnapshot.hasData) {
                 allDocs.addAll(notesSnapshot.data!.docs
@@ -134,7 +219,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
               // Jogeset dokumentumok feldolgozása
               // Admin ellenőrzés szükséges a státusz szűréshez
               final user = FirebaseAuth.instance.currentUser;
-              final isAdmin = user?.email == 'tattila.ninox@gmail.com'; // Egyszerűsített admin ellenőrzés
+              bool isAdmin = false;
+              if (user != null) {
+                isAdmin = AccessControl.allowedAdmins.contains(user.email);
+              }
               
               // Jogesetek feldolgozása (ha vannak)
               if (jogesetSnapshot.hasData) {
@@ -214,20 +302,32 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                   }),
                 ],
               );
-            },
-          );
-        },
-      ),
+                  },
+                );
+              },
+            ),
     );
   }
 
   /// Firestore lekérdezés építése notes kollekcióhoz
   Query<Map<String, dynamic>> _buildQuery() {
+    final userScience = AccessControl.getUserScience();
     Query<Map<String, dynamic>> query = FirebaseConfig.firestore
         .collection('notes')
-        .where('science', isEqualTo: 'Jogász')
+        .where('science', isEqualTo: userScience)
         .where('category', isEqualTo: widget.category);
 
+    return query;
+  }
+
+  /// Firestore lekérdezés építése dialogus_fajlok kollekcióhoz
+  Query<Map<String, dynamic>> _buildDialogusFajlokQuery() {
+    final userScience = AccessControl.getUserScience();
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('dialogus_fajlok')
+        .where('science', isEqualTo: userScience);
+    
+    // Státusz szűrés kliens oldalon történik (admin/nem-admin különbség miatt)
     return query;
   }
 
@@ -327,6 +427,79 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
               ),
               Text(
                 '$totalCount',
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right,
+                color: Colors.grey,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Kategória kártya widget építése (Dialogus tags esetén)
+  Widget _buildCategoryCard(
+      String category,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          // Navigálás a TagDrillDownScreen-re, de a category paraméter "Dialogus tags" marad
+          // és a tagPath tartalmazza a kategóriát
+          final screen = TagDrillDownScreen(
+            category: 'Dialogus tags',
+            tagPath: [category],
+          );
+
+          if (!kIsWeb && Platform.isIOS) {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(builder: (context) => screen),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => screen),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.folder,
+                color: Color(0xFF3366CC),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  category,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                '${docs.length}',
                 style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 14,
