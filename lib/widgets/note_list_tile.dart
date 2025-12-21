@@ -6,6 +6,7 @@ import 'quiz_viewer.dart';
 import 'quiz_viewer_dual.dart';
 import '../models/quiz_models.dart';
 import 'mini_audio_player.dart';
+import 'jogeset_list_dialog.dart';
 
 class NoteListTile extends StatelessWidget {
   final String id;
@@ -20,6 +21,8 @@ class NoteListTile extends StatelessWidget {
   final bool isLocked; // Új paraméter a zárt állapot jelzésére
   final bool isLast; // Jelzi, hogy ez az utolsó elem a listában
   final String? customFromUrl; // Egyedi from URL (pl. TagDrillDownScreen-hez)
+  final int? jogesetCount; // Jogesetek száma egy dokumentumban (csak jogeset típusnál)
+  final String? category; // Kategória (csak jogeset típusnál)
 
   const NoteListTile({
     super.key,
@@ -35,6 +38,8 @@ class NoteListTile extends StatelessWidget {
     this.isLocked = false, // Alapértelmezetten nem zárt
     this.isLast = false, // Alapértelmezetten nem utolsó
     this.customFromUrl, // Opcionális egyedi from URL
+    this.jogesetCount, // Jogesetek száma egy dokumentumban
+    this.category, // Kategória
   });
 
   IconData _typeIcon() {
@@ -152,6 +157,8 @@ class NoteListTile extends StatelessWidget {
         context.go('/memoriapalota-fajl/$id$fromQuery');
       }
     } else if (type == 'jogeset') {
+      // Jogesetek esetén a dokumentum megnyitása (nem a dialog)
+      // A dialog csak a List ikonra kattintva nyílik meg
       if (usePush) {
         context.push('/jogeset/$id$fromQuery');
       } else {
@@ -269,6 +276,19 @@ class NoteListTile extends StatelessWidget {
     }
   }
 
+  void _openJogesetListDialog(BuildContext context) {
+    // A dokumentum ID-t használjuk (a kombinált ID-ból kivesszük a #-t és utána lévő részt)
+    final documentId = id.contains('#') ? id.split('#')[0] : id;
+    
+    showDialog(
+      context: context,
+      builder: (context) => JogesetListDialog(
+        documentId: documentId,
+        category: category,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Opacity(
@@ -318,15 +338,31 @@ class NoteListTile extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            title.isEmpty ? '(Cím nélkül)' : title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 15,
-                              color: Color(0xFF202122),
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title.isEmpty ? '(Cím nélkül)' : title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 15,
+                                  color: Color(0xFF202122),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              // Jogesetek száma és metaadatok
+                              if (type == 'jogeset' && jogesetCount != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$jogesetCount jogeset',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         // Lakatos ikon zárt jegyzetek esetén
@@ -336,6 +372,18 @@ class NoteListTile extends StatelessWidget {
                             Icons.lock_outline,
                             size: 16,
                             color: Color(0xFF54595D),
+                          ),
+                        ],
+                        // List ikon jogesetekhez
+                        if (type == 'jogeset' && jogesetCount != null && jogesetCount! > 0) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.list, size: 20),
+                            color: Theme.of(context).primaryColor,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _openJogesetListDialog(context),
+                            tooltip: 'Jogesetek listája',
                           ),
                         ],
                       ],

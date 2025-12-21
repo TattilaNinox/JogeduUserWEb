@@ -52,6 +52,7 @@ class JogesetService {
       return JogesetDocument(
         documentId: documentId,
         jogesetek: filteredJogesetek,
+        title: document.title, // Megőrizzük a dokumentum title mezőjét
       );
     } catch (e) {
       debugPrint('🔴 JogesetService.getJogesetDocument hiba: $e');

@@ -117,7 +117,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                   <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
               
               // Jogesetek címkéinek külön kezelése
-              final jogesetTagMap = <String, List<Map<String, dynamic>>>{};
+              final jogesetTagMap = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
 
               // Notes dokumentumok feldolgozása
               for (var doc in allDocs) {
@@ -141,15 +141,36 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 final jogesetDocs = jogesetSnapshot.data!.docs
                     .where((d) => d.data()['deletedAt'] == null)
                     .toList();
-                final processedJogesetek = _processJogesetDocuments(jogesetDocs, isAdmin: isAdmin);
+                final processedJogesetDocs = _processJogesetDocuments(jogesetDocs, isAdmin: isAdmin);
                 
-                for (var jogesetData in processedJogesetek) {
-                  final tags = (jogesetData['tags'] as List<dynamic>? ?? []).cast<String>();
+                // Az első jogeset címkéit használjuk a dokumentum címkéjeként
+                for (var doc in processedJogesetDocs) {
+                  final data = doc.data();
+                  final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
                   
-                  if (tags.isNotEmpty) {
-                    final firstTag = tags[0];
-                    jogesetTagMap.putIfAbsent(firstTag, () => []);
-                    jogesetTagMap[firstTag]!.add(jogesetData);
+                  // Megkeressük az első megfelelő jogesetet a címkék meghatározásához
+                  Map<String, dynamic>? firstMatchingJogeset;
+                  for (var jogesetData in jogesetekList) {
+                    final jogeset = jogesetData as Map<String, dynamic>;
+                    
+                    final category = jogeset['category'] as String? ?? '';
+                    if (category != widget.category) continue;
+                    
+                    final status = jogeset['status'] as String? ?? 'Draft';
+                    if (!isAdmin && status != 'Published') continue;
+                    
+                    firstMatchingJogeset = jogeset;
+                    break;
+                  }
+                  
+                  if (firstMatchingJogeset != null) {
+                    final tags = (firstMatchingJogeset['tags'] as List<dynamic>? ?? []).cast<String>();
+                    
+                    if (tags.isNotEmpty) {
+                      final firstTag = tags[0];
+                      jogesetTagMap.putIfAbsent(firstTag, () => []);
+                      jogesetTagMap[firstTag]!.add(doc);
+                    }
                   }
                 }
               }
@@ -180,8 +201,12 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                           final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
                           return tags.length > 1;
                         }) ||
-                        jogesetDocs.any((jogeset) {
-                          final tags = (jogeset['tags'] as List<dynamic>? ?? []).cast<String>();
+                        jogesetDocs.any((doc) {
+                          final data = doc.data();
+                          final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
+                          if (jogesetekList.isEmpty) return false;
+                          final firstJogeset = jogesetekList.first as Map<String, dynamic>;
+                          final tags = (firstJogeset['tags'] as List<dynamic>? ?? []).cast<String>();
                           return tags.length > 1;
                         });
                     
@@ -220,17 +245,20 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   }
 
   /// Jogeset dokumentumok feldolgozása és kliens oldali szűrése
-  /// Kinyeri a jogesetek tömböt minden dokumentumból és szűr kategória alapján
-  List<Map<String, dynamic>> _processJogesetDocuments(
+  /// Dokumentumonként kezeli a jogeseteket, nem külön jogesetenként
+  /// Visszaadja a dokumentumokat az első jogeset metaadataival és a jogesetek számával
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _processJogesetDocuments(
       List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
       {bool isAdmin = false}) {
-    final processedDocs = <Map<String, dynamic>>[];
+    final processedDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
     for (var doc in docs) {
       final data = doc.data();
       final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
 
-      // Minden jogeset objektumot külön dokumentumként kezelünk
+      // Szűrjük a jogeseteket kategória és státusz alapján
+      final matchingJogesetek = <Map<String, dynamic>>[];
+      
       for (var jogesetData in jogesetekList) {
         final jogeset = jogesetData as Map<String, dynamic>;
         
@@ -246,18 +274,12 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           continue;
         }
 
-        // Létrehozunk egy virtuális dokumentumot a jogesetből
-        // A dokumentum ID-t és a jogeset adatait kombináljuk
-        final virtualDoc = {
-          ...jogeset,
-          '_documentId': doc.id, // Az eredeti dokumentum ID-ja
-          '_jogesetId': jogeset['id'], // A jogeset ID-ja a dokumentumon belül
-          'type': 'jogeset',
-          // A 'name' mezőt használjuk címként (a dokumentum szerint 'cim' a mező neve)
-          'name': jogeset['cim'] as String? ?? '',
-        };
+        matchingJogesetek.add(jogeset);
+      }
 
-        processedDocs.add(virtualDoc);
+      // Ha van legalább egy megfelelő jogeset, hozzáadjuk a dokumentumot
+      if (matchingJogesetek.isNotEmpty) {
+        processedDocs.add(doc);
       }
     }
 
@@ -268,7 +290,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   Widget _buildTagCard(
       String tag,
       List<QueryDocumentSnapshot<Map<String, dynamic>>> notesDocs,
-      List<Map<String, dynamic>> jogesetDocs,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> jogesetDocs,
       int totalCount,
       bool hasDeepTags) {
 

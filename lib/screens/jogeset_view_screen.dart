@@ -14,11 +14,13 @@ import '../utils/filter_storage.dart';
 /// Egy dokumentumban (paragrafusban) több jogeset van, ezeket lehet léptetni.
 class JogesetViewScreen extends StatefulWidget {
   final String documentId;
+  final int? jogesetId; // Opcionális: ha meg van adva, ezt a jogesetet nyitja meg
   final String? from;
 
   const JogesetViewScreen({
     super.key,
     required this.documentId,
+    this.jogesetId,
     this.from,
   });
 
@@ -32,6 +34,10 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   bool _isLoading = true;
   bool _isMegoldasVisible = false;
   bool _isAdmin = false;
+  
+  // PageController a mobilnézetben való lapozáshoz
+  PageController? _pageController;
+  int _currentPageIndex = 0;
 
   // Jegyzet adatok breadcrumb-hoz
   String? _noteTitle;
@@ -44,6 +50,12 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     _loadFiltersFromUrl();
     _checkAdminStatus();
     _loadDocument();
+  }
+
+  @override
+  void dispose() {
+    _pageController?.dispose();
+    super.dispose();
   }
 
   /// Betölti a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
@@ -108,12 +120,31 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
       if (!mounted) return;
 
+      // Ha meg van adva jogesetId, megkeressük a megfelelő indexet
+      int initialIndex = 0;
+      if (widget.jogesetId != null && document != null) {
+        final index = document.jogesetek.indexWhere(
+          (jogeset) => jogeset.id == widget.jogesetId,
+        );
+        if (index >= 0) {
+          initialIndex = index;
+        }
+      }
+
       setState(() {
         _document = document;
-        _currentIndex = 0;
+        _currentIndex = initialIndex;
         _isLoading = false;
         _isMegoldasVisible = false;
+        _currentPageIndex = 0;
       });
+      
+      // PageController inicializálása mobilnézetben
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      if (isMobile && document != null && document.jogesetek.isNotEmpty) {
+        _pageController = PageController(initialPage: 0);
+      }
 
       // Betöltjük a jegyzet adatait breadcrumb-hoz
       if (document != null && document.jogesetek.isNotEmpty) {
@@ -144,7 +175,16 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex++;
       _isMegoldasVisible = false;
+      _currentPageIndex = 0;
     });
+    
+    // PageController újrainicializálása új jogesethez
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    if (isMobile && _document != null) {
+      _pageController?.dispose();
+      _pageController = PageController(initialPage: 0);
+    }
   }
 
   /// Előző jogeset megjelenítése
@@ -156,8 +196,18 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex--;
       _isMegoldasVisible = false;
+      _currentPageIndex = 0;
     });
+    
+    // PageController újrainicializálása új jogesethez
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    if (isMobile && _document != null) {
+      _pageController?.dispose();
+      _pageController = PageController(initialPage: 0);
+    }
   }
+  
 
   /// Megoldás láthatóságának váltása
   void _toggleMegoldas() {
@@ -259,7 +309,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 currentJogeset.title,
                 style: TextStyle(
-                  fontSize: isMobile ? 16 : 18,
+                  fontSize: isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -307,136 +357,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Expanded(
             child: Container(
               color: const Color(0xFFF8F9FA),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(isMobile ? 16 : 24),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  margin: const EdgeInsets.symmetric(horizontal: 0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.all(isMobile ? 20 : 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Cím és komplexitás badge
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              currentJogeset.cim,
-                              style: TextStyle(
-                                fontSize: isMobile ? 20 : 24,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF202122),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _buildKomplexitasBadge(currentJogeset.komplexitas),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Tényállás
-                      _buildSection(
-                        title: 'Tényállás',
-                        content: currentJogeset.tenyek,
-                        isMobile: isMobile,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Kérdés (kiemelt)
-                      _buildHighlightedSection(
-                        title: 'Jogi kérdés',
-                        content: currentJogeset.kerdes,
-                        color: Colors.blue.shade50,
-                        borderColor: Colors.blue.shade200,
-                        isMobile: isMobile,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Alkalmazandó jogszabály
-                      _buildInfoRow(
-                        label: 'Alkalmazandó jogszabály:',
-                        value: currentJogeset.alkalmazandoJogszabaly,
-                        isMobile: isMobile,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Megoldás megjelenítése/elrejtése gomb
-                      Center(
-                        child: ElevatedButton.icon(
-                          onPressed: _toggleMegoldas,
-                          icon: Icon(_isMegoldasVisible
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          label: Text(_isMegoldasVisible
-                              ? 'Megoldás elrejtése'
-                              : 'Megoldás megjelenítése'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            backgroundColor: Theme.of(context).primaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      // Megoldás (kiemelt, feltételesen látható)
-                      if (_isMegoldasVisible) ...[
-                        const SizedBox(height: 24),
-                        _buildHighlightedSection(
-                          title: 'Megoldás',
-                          content: currentJogeset.megoldas,
-                          color: Colors.green.shade50,
-                          borderColor: Colors.green.shade300,
-                          isMobile: isMobile,
-                        ),
-                      ],
-
-                      // Eredeti jogszabály szöveg (expandable)
-                      if (currentJogeset.eredetiJogszabalySzoveg != null &&
-                          currentJogeset
-                              .eredetiJogszabalySzoveg!.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        ExpansionTile(
-                          title: const Text(
-                            'Eredeti jogszabály szöveg',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Text(
-                                currentJogeset.eredetiJogszabalySzoveg!,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontStyle: FontStyle.italic,
-                                  color: Color(0xFF555555),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
+              child: isMobile && _pageController != null
+                  ? _buildMobilePagedContent(currentJogeset, isMobile)
+                  : _buildDesktopContent(currentJogeset, isMobile),
             ),
           ),
 
@@ -453,70 +376,411 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 ),
               ],
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _currentIndex > 0 ? _previousJogeset : null,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Előző'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? 16 : 24,
-                      vertical: isMobile ? 12 : 16,
-                    ),
+            child: isMobile && _pageController != null
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Előző jogeset gomb
+                      ElevatedButton.icon(
+                        onPressed: _currentIndex > 0 ? _previousJogeset : null,
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Előző jogeset'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      // Következő jogeset gomb
+                      ElevatedButton.icon(
+                        onPressed: _currentIndex < totalJogesetek - 1 ? _nextJogeset : null,
+                        icon: const Icon(Icons.arrow_forward),
+                        label: const Text('Következő jogeset'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _currentIndex > 0 ? _previousJogeset : null,
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Előző'),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 16 : 24,
+                            vertical: isMobile ? 12 : 16,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _currentIndex < totalJogesetek - 1 ? _nextJogeset : null,
+                        icon: const Icon(Icons.arrow_forward),
+                        label: const Text('Következő'),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 16 : 24,
+                            vertical: isMobile ? 12 : 16,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                ElevatedButton.icon(
-                  onPressed:
-                      _currentIndex < totalJogesetek - 1 ? _nextJogeset : null,
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('Következő'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? 16 : 24,
-                      vertical: isMobile ? 12 : 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  /// Komplexitás badge widget
-  Widget _buildKomplexitasBadge(String komplexitas) {
-    Color backgroundColor;
-    switch (komplexitas.toLowerCase()) {
-      case 'egyszerű':
-        backgroundColor = const Color(0xFF4CAF50); // zöld
-        break;
-      case 'közepes':
-        backgroundColor = const Color(0xFFFF9800); // narancs
-        break;
-      case 'komplex':
-        backgroundColor = const Color(0xFFF44336); // piros
-        break;
-      default:
-        backgroundColor = const Color(0xFFFF9800); // alapértelmezett: narancs
+  /// Mobilnézeti lapozható tartalom
+  Widget _buildMobilePagedContent(Jogeset currentJogeset, bool isMobile) {
+    final pages = <Widget>[];
+    
+    // Oldal 1: Tényállás
+    pages.add(_buildMobilePage(
+      title: 'Tényállás',
+      content: currentJogeset.tenyek,
+      isMobile: isMobile,
+    ));
+    
+    // Oldal 2: Jogi kérdés
+    pages.add(_buildMobilePageHighlighted(
+      title: 'Jogi kérdés',
+      content: currentJogeset.kerdes,
+      color: Colors.blue.shade50,
+      borderColor: Colors.blue.shade200,
+      isMobile: isMobile,
+    ));
+    
+    // Oldal 3: Megoldás
+    pages.add(_buildMobilePageHighlighted(
+      title: 'Megoldás',
+      content: currentJogeset.megoldas,
+      color: Colors.green.shade50,
+      borderColor: Colors.green.shade300,
+      isMobile: isMobile,
+    ));
+    
+    // Oldal 4: Eredeti jogszabály (ha van)
+    if (currentJogeset.eredetiJogszabalySzoveg != null &&
+        currentJogeset.eredetiJogszabalySzoveg!.isNotEmpty) {
+      pages.add(_buildMobilePage(
+        title: 'Eredeti jogszabály szöveg',
+        content: currentJogeset.eredetiJogszabalySzoveg!,
+        isMobile: isMobile,
+        isItalic: true,
+      ));
     }
+    
+    return PageView.builder(
+      controller: _pageController,
+      onPageChanged: (index) {
+        setState(() {
+          _currentPageIndex = index;
+        });
+      },
+      itemCount: pages.length,
+      itemBuilder: (context, index) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 900),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cím és komplexitás badge (csak első oldalon)
+                if (index == 0) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  currentJogeset.cim,
+                                  style: TextStyle(
+                                    fontSize: 16, // További csökkentés: 18-2
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF202122),
+                                  ),
+                                ),
+                                // Lapozási ikon és szöveg mobilnézetben
+                                if (isMobile && _pageController != null) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.swipe,
+                                        size: 14,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Lapozz jobbra a következő oldalért',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoRow(
+                    label: 'Alkalmazandó jogszabály:',
+                    value: currentJogeset.alkalmazandoJogszabaly,
+                    isMobile: true,
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                pages[index],
+                // Oldal számláló
+                const SizedBox(height: 24),
+                Center(
+                  child: Text(
+                    '${index + 1}/${pages.length}',
+                    style: TextStyle(
+                      fontSize: 12, // 14-2
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        komplexitas,
-        style: const TextStyle(
+  /// Asztali nézeti tartalom (eredeti)
+  Widget _buildDesktopContent(Jogeset currentJogeset, bool isMobile) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 900),
+        margin: const EdgeInsets.symmetric(horizontal: 0),
+        decoration: BoxDecoration(
           color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
+        padding: EdgeInsets.all(isMobile ? 20 : 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cím
+            Text(
+              currentJogeset.cim,
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 22, // Mobilnézetben tovább csökkentve: 18-2, asztali: 24-2
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF202122),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Tényállás
+            _buildSection(
+              title: 'Tényállás',
+              content: currentJogeset.tenyek,
+              isMobile: isMobile,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Kérdés (kiemelt)
+            _buildHighlightedSection(
+              title: 'Jogi kérdés',
+              content: currentJogeset.kerdes,
+              color: Colors.blue.shade50,
+              borderColor: Colors.blue.shade200,
+              isMobile: isMobile,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Alkalmazandó jogszabály
+            _buildInfoRow(
+              label: 'Alkalmazandó jogszabály:',
+              value: currentJogeset.alkalmazandoJogszabaly,
+              isMobile: isMobile,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Megoldás megjelenítése/elrejtése gomb
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: _toggleMegoldas,
+                icon: Icon(_isMegoldasVisible
+                    ? Icons.visibility_off
+                    : Icons.visibility),
+                label: Text(_isMegoldasVisible
+                    ? 'Megoldás elrejtése'
+                    : 'Megoldás megjelenítése'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 12),
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+
+            // Megoldás (kiemelt, feltételesen látható)
+            if (_isMegoldasVisible) ...[
+              const SizedBox(height: 24),
+              _buildHighlightedSection(
+                title: 'Megoldás',
+                content: currentJogeset.megoldas,
+                color: Colors.green.shade50,
+                borderColor: Colors.green.shade300,
+                isMobile: isMobile,
+              ),
+            ],
+
+            // Eredeti jogszabály szöveg (expandable)
+            if (currentJogeset.eredetiJogszabalySzoveg != null &&
+                currentJogeset.eredetiJogszabalySzoveg!.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              ExpansionTile(
+                title: const Text(
+                  'Eredeti jogszabály szöveg',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      currentJogeset.eredetiJogszabalySzoveg!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF555555),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Mobilnézeti oldal widget
+  Widget _buildMobilePage({
+    required String title,
+    required String content,
+    required bool isMobile,
+    bool isItalic = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14, // 16-2
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF202122),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Html(
+          data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
+          style: {
+            "div": Style(
+              fontSize: FontSize(12), // 14-2
+              color: const Color(0xFF444444),
+              lineHeight: const LineHeight(1.6),
+              padding: HtmlPaddings.zero,
+              margin: Margins.zero,
+              fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+            ),
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Mobilnézeti kiemelt oldal widget
+  Widget _buildMobilePageHighlighted({
+    required String title,
+    required String content,
+    required Color color,
+    required Color borderColor,
+    required bool isMobile,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color,
+        border: Border.all(color: borderColor, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14, // 16-2
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF202122),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Html(
+            data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
+            style: {
+              "div": Style(
+                fontSize: FontSize(12), // 14-2
+                color: const Color(0xFF444444),
+                lineHeight: const LineHeight(1.6),
+                padding: HtmlPaddings.zero,
+                margin: Margins.zero,
+              ),
+            },
+          ),
+        ],
       ),
     );
   }
@@ -533,7 +797,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         Text(
           title,
           style: TextStyle(
-            fontSize: isMobile ? 16 : 18,
+            fontSize: isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
             fontWeight: FontWeight.w600,
             color: const Color(0xFF202122),
           ),
@@ -543,7 +807,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
-              fontSize: FontSize(isMobile ? 14 : 16),
+              fontSize: FontSize(isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -576,7 +840,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Text(
             title,
             style: TextStyle(
-              fontSize: isMobile ? 16 : 18,
+              fontSize: isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
               fontWeight: FontWeight.w600,
               color: const Color(0xFF202122),
             ),
@@ -586,7 +850,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(isMobile ? 14 : 16),
+                fontSize: FontSize(isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
@@ -611,7 +875,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: isMobile ? 14 : 16,
+            fontSize: isMobile ? 12 : 16, // Mobilnézetben 2px-el kisebb (14-2)
             fontWeight: FontWeight.w600,
             color: const Color(0xFF202122),
           ),
@@ -622,7 +886,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             data: '<div style="text-align: justify;">${_escapeHtml(value)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(isMobile ? 14 : 16),
+                fontSize: FontSize(isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
                 color: const Color(0xFF444444),
                 padding: HtmlPaddings.zero,
                 margin: Margins.zero,

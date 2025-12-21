@@ -113,10 +113,12 @@ class Jogeset {
 class JogesetDocument {
   final String documentId;
   final List<Jogeset> jogesetek;
+  final String? title; // Dokumentum szintű title mező (opcionális)
 
   const JogesetDocument({
     required this.documentId,
     required this.jogesetek,
+    this.title,
   });
 
   /// Factory konstruktor Firestore dokumentumból való létrehozáshoz
@@ -126,9 +128,13 @@ class JogesetDocument {
         .map((item) => Jogeset.fromMap(item as Map<String, dynamic>))
         .toList();
 
+    // Dokumentum szintű title mező (ha van)
+    final title = map['title'] as String?;
+
     return JogesetDocument(
       documentId: documentId,
       jogesetek: jogesetek,
+      title: title,
     );
   }
 
@@ -144,5 +150,18 @@ class JogesetDocument {
   String get paragrafusDisplay {
     final normalized = documentId.replaceAll('_', ':');
     return '$normalized. §';
+  }
+
+  /// Dokumentum címének lekérése
+  /// Ha van dokumentum szintű title, azt adja vissza,
+  /// különben az első jogeset title mezőjét, vagy a paragrafus számot
+  String get displayTitle {
+    if (title != null && title!.isNotEmpty) {
+      return title!;
+    }
+    if (jogesetek.isNotEmpty && jogesetek.first.title.isNotEmpty) {
+      return jogesetek.first.title;
+    }
+    return paragrafusDisplay;
   }
 }
