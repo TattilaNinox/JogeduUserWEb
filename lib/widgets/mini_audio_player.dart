@@ -19,11 +19,15 @@ class MiniAudioPlayer extends StatefulWidget {
   /// Kompakt megjelenítés: kisebb ikonok, hátralévő idő elrejtése.
   final bool compact;
 
+  /// Nagy méretű megjelenítés: nagyobb ikonok, hangsúlyosabb vezérlők.
+  final bool large;
+
   const MiniAudioPlayer(
       {super.key,
       required this.audioUrl,
       this.deferInit = true,
-      this.compact = false});
+      this.compact = false,
+      this.large = false});
 
   @override
   State<MiniAudioPlayer> createState() => _MiniAudioPlayerState();
@@ -172,11 +176,12 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final double iconSize = widget.compact ? 18 : 22; // kompakt módban kisebb
+    final double iconSize = widget.large ? 32 : (widget.compact ? 18 : 22);
     final BoxConstraints btnSize = BoxConstraints(
-      minWidth: widget.compact ? 30 : 36,
-      minHeight: widget.compact ? 30 : 36,
+      minWidth: widget.large ? 48 : (widget.compact ? 30 : 36),
+      minHeight: widget.large ? 48 : (widget.compact ? 30 : 36),
     );
+    final double height = widget.large ? 56 : (widget.compact ? 28 : 36);
 
     if (_hasError) {
       return const Tooltip(
@@ -190,65 +195,81 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
       return Padding(
         padding: const EdgeInsets.only(right: 8),
         child: SizedBox(
-          height: 28,
+          height: height,
           child: _initializing
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? SizedBox(
+                  width: iconSize,
+                  height: iconSize,
+                  child: const CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.play_circle_fill,
-                          size: 22, color: Color(0xFF1E3A8A)),
-                      padding: EdgeInsets.zero,
-                      constraints: btnSize,
-                      tooltip: 'Hang lejátszása',
-                      onPressed: _ensureInitAndPlay,
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: Icon(
-                        _isLooping ? Icons.repeat_on : Icons.repeat,
-                        size: 20,
-                        color: _isLooping
-                            ? Colors.orange
-                            : const Color(0xFF1E3A8A),
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: btnSize,
-                      tooltip: _isLooping
-                          ? 'Ismétlés: bekapcsolva'
-                          : 'Ismétlés: kikapcsolva',
-                      onPressed: () async {
-                        setState(() => _isLooping = !_isLooping);
-                        if (_isInitialized) {
-                          await _audioPlayer.setReleaseMode(
-                            _isLooping ? ReleaseMode.loop : ReleaseMode.stop,
-                          );
-                        }
-                      },
-                    ),
-                  ],
+              : Center(
+                  child: widget.large
+                      ? IconButton(
+                          icon: const Icon(Icons.play_circle_fill,
+                              size: 48, color: Color(0xFF1E3A8A)),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 56,
+                            minHeight: 56,
+                          ),
+                          tooltip: 'Dialógus betöltése',
+                          onPressed: _ensureInitAndPlay,
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.play_circle_fill,
+                                  size: 22, color: Color(0xFF1E3A8A)),
+                              padding: EdgeInsets.zero,
+                              constraints: btnSize,
+                              tooltip: 'Hang lejátszása',
+                              onPressed: _ensureInitAndPlay,
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: Icon(
+                                _isLooping ? Icons.repeat_on : Icons.repeat,
+                                size: 20,
+                                color: _isLooping
+                                    ? Colors.orange
+                                    : const Color(0xFF1E3A8A),
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: btnSize,
+                              tooltip: _isLooping
+                                  ? 'Ismétlés: bekapcsolva'
+                                  : 'Ismétlés: kikapcsolva',
+                              onPressed: () async {
+                                setState(() => _isLooping = !_isLooping);
+                                if (_isInitialized) {
+                                  await _audioPlayer.setReleaseMode(
+                                    _isLooping
+                                        ? ReleaseMode.loop
+                                        : ReleaseMode.stop,
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
                 ),
         ),
       );
     }
 
     if (!_isInitialized) {
-      return const SizedBox(
-        width: 16,
-        height: 16,
-        child: CircularProgressIndicator(strokeWidth: 2),
+      return SizedBox(
+        width: iconSize,
+        height: iconSize,
+        child: const CircularProgressIndicator(strokeWidth: 2),
       );
     }
 
     return Padding(
         padding: const EdgeInsets.only(right: 8),
         child: SizedBox(
-          height: 36,
+          height: height,
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -264,9 +285,10 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                   constraints: btnSize,
                   tooltip: 'Vissza 10 mp',
                 ),
+                SizedBox(width: widget.large ? 8 : 0),
                 IconButton(
                   icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow,
-                      size: iconSize),
+                      size: widget.large ? 40 : iconSize),
                   onPressed: () async {
                     if (_isPlaying) {
                       await _audioPlayer.pause();
@@ -286,6 +308,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                   constraints: btnSize,
                   tooltip: _isPlaying ? 'Szünet' : 'Lejátszás',
                 ),
+                SizedBox(width: widget.large ? 8 : 0),
                 IconButton(
                   icon: Icon(Icons.forward_10, size: iconSize),
                   onPressed: () => _seekRelative(10),
@@ -294,6 +317,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                   constraints: btnSize,
                   tooltip: 'Előre 10 mp',
                 ),
+                SizedBox(width: widget.large ? 8 : 0),
                 IconButton(
                   icon: Icon(Icons.stop, size: iconSize),
                   onPressed: () async {
@@ -305,6 +329,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                   constraints: btnSize,
                   tooltip: 'Stop',
                 ),
+                SizedBox(width: widget.large ? 8 : 0),
                 IconButton(
                   icon: Icon(
                     _isLooping ? Icons.repeat_on : Icons.repeat,
@@ -324,13 +349,14 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                       : 'Ismétlés: kikapcsolva',
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 6),
+                  padding: EdgeInsets.only(left: widget.large ? 12 : 6),
                   child: Text(
                     _formatDuration((_duration - _position).isNegative
                         ? Duration.zero
                         : _duration - _position),
                     style: TextStyle(
-                      fontSize: widget.compact ? 11 : 12,
+                      fontSize: widget.large ? 14 : (widget.compact ? 11 : 12),
+                      fontWeight: widget.large ? FontWeight.bold : FontWeight.normal,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
