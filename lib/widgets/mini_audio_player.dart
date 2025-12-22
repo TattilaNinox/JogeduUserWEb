@@ -22,12 +22,16 @@ class MiniAudioPlayer extends StatefulWidget {
   /// Nagy méretű megjelenítés: nagyobb ikonok, hangsúlyosabb vezérlők.
   final bool large;
 
+  /// Automatikus lejátszás: ha igaz, automatikusan elindítja a lejátszást inicializálás után
+  final bool autoPlay;
+
   const MiniAudioPlayer(
       {super.key,
       required this.audioUrl,
       this.deferInit = true,
       this.compact = false,
-      this.large = false});
+      this.large = false,
+      this.autoPlay = false});
 
   @override
   State<MiniAudioPlayer> createState() => _MiniAudioPlayerState();
@@ -103,6 +107,15 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
 
       if (!mounted) return;
       setState(() => _isInitialized = true);
+
+      // Automatikus lejátszás, ha be van kapcsolva
+      if (widget.autoPlay) {
+        await _audioPlayer.play(UrlSource(
+          widget.audioUrl,
+          mimeType: 'audio/mpeg',
+        ));
+        setState(() => _expanded = true);
+      }
     } catch (e) {
       debugPrint('Hiba az audio inicializálásakor (audioplayers): $e');
       if (mounted) {
@@ -356,7 +369,8 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                         : _duration - _position),
                     style: TextStyle(
                       fontSize: widget.large ? 14 : (widget.compact ? 11 : 12),
-                      fontWeight: widget.large ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          widget.large ? FontWeight.bold : FontWeight.normal,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),

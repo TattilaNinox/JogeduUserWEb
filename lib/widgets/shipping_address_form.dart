@@ -55,7 +55,8 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
   void didUpdateWidget(ShippingAddressForm oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Ha a userData változott, frissítjük az adatokat
-    if (oldWidget.userData['shippingAddress'] != widget.userData['shippingAddress']) {
+    if (oldWidget.userData['shippingAddress'] !=
+        widget.userData['shippingAddress']) {
       _loadUserData();
     }
   }
@@ -137,7 +138,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
   /// Irányítószám változás figyelése
   void _onZipCodeChanged() {
     if (!mounted) return;
-    
+
     final zipCode = _zipCodeController.text.trim();
 
     // Csak akkor keresünk, ha pontosan 4 számjegy van
@@ -160,7 +161,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
     final cities = _postalCodes![zipCode];
 
     if (!mounted) return;
-    
+
     if (cities != null && cities.isNotEmpty) {
       if (cities.length == 1) {
         // Egy település: automatikusan kitöltjük
@@ -191,7 +192,9 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
 
   /// Település választó megjelenítése bottom sheet-ben
   Future<void> _showCitySelector() async {
-    if (!mounted || _availableCities == null || _availableCities!.isEmpty) return;
+    if (!mounted || _availableCities == null || _availableCities!.isEmpty) {
+      return;
+    }
 
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -204,7 +207,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                            '${_availableCities!.length} település található, válassz egyet:',
+                '${_availableCities!.length} település található, válassz egyet:',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -241,13 +244,13 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
   /// Szerkesztés indítása
   void _startEditing() {
     if (!mounted) return;
-    
+
     // Ha a név mező üres, automatikusan kitöltjük a felhasználó adataiból
     if (_nameController.text.trim().isEmpty) {
       final firstName = widget.userData['firstName']?.toString() ?? '';
       final lastName = widget.userData['lastName']?.toString() ?? '';
       final displayName = widget.userData['displayName']?.toString() ?? '';
-      
+
       String fullName = '';
       if (firstName.isNotEmpty && lastName.isNotEmpty) {
         fullName = '$lastName $firstName';
@@ -261,12 +264,12 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
           fullName = user!.email!.split('@')[0];
         }
       }
-      
+
       if (fullName.isNotEmpty) {
         _nameController.text = fullName;
       }
     }
-    
+
     if (mounted) {
       setState(() {
         _isEditing = true;
@@ -277,7 +280,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
   /// Szerkesztés megszakítása
   void _cancelEditing() {
     if (!mounted) return;
-    
+
     // Mezők törlése és szerkesztés mód kilépése
     setState(() {
       _nameController.clear();
@@ -304,7 +307,11 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
     final city = _cityController.text.trim();
     final address = _addressController.text.trim();
 
-    if (name.isEmpty || zipCode.isEmpty || zipCode.length != 4 || city.isEmpty || address.isEmpty) {
+    if (name.isEmpty ||
+        zipCode.isEmpty ||
+        zipCode.length != 4 ||
+        city.isEmpty ||
+        address.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -360,7 +367,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         setState(() {
           _isEditing = false;
         });
@@ -669,7 +676,8 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         labelText: 'Irányítószám *',
-                        prefixIcon: const Icon(Icons.markunread_mailbox, size: 20),
+                        prefixIcon:
+                            const Icon(Icons.markunread_mailbox, size: 20),
                         suffixIcon: _isLoadingPostalCodes
                             ? const Padding(
                                 padding: EdgeInsets.all(8),
@@ -721,10 +729,10 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                         prefixIcon: const Icon(Icons.location_city, size: 20),
                         suffixIcon: _availableCities != null
                             ? IconButton(
-                                icon: const Icon(Icons.arrow_drop_down, size: 20),
-                                onPressed: isFormEditable
-                                    ? _showCitySelector
-                                    : null,
+                                icon:
+                                    const Icon(Icons.arrow_drop_down, size: 20),
+                                onPressed:
+                                    isFormEditable ? _showCitySelector : null,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                               )
@@ -765,7 +773,8 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                        Icon(Icons.info_outline,
+                            size: 16, color: Colors.blue[700]),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -780,7 +789,8 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                           TextButton(
                             onPressed: _showCitySelector,
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
@@ -859,16 +869,19 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: _isSaving ? null : () {
-                        _formKey.currentState?.reset();
-                        _cancelEditing();
-                      },
+                      onPressed: _isSaving
+                          ? null
+                          : () {
+                              _formKey.currentState?.reset();
+                              _cancelEditing();
+                            },
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text('Mégse', style: TextStyle(fontSize: 14)),
+                      child:
+                          const Text('Mégse', style: TextStyle(fontSize: 14)),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
@@ -894,7 +907,8 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                                     AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Text('Mentés', style: TextStyle(fontSize: 14)),
+                          : const Text('Mentés',
+                              style: TextStyle(fontSize: 14)),
                     ),
                   ],
                 ),
@@ -902,9 +916,11 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
               // Szállítási adatok törlése gomb - minden felhasználónak elérhető
               Builder(
                 builder: (context) {
-                  final shippingAddress = widget.userData['shippingAddress'] as Map<String, dynamic>?;
-                  final hasShippingAddress = shippingAddress != null && shippingAddress.isNotEmpty;
-                  
+                  final shippingAddress = widget.userData['shippingAddress']
+                      as Map<String, dynamic>?;
+                  final hasShippingAddress =
+                      shippingAddress != null && shippingAddress.isNotEmpty;
+
                   if (hasShippingAddress && !_isEditing) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 12),
@@ -937,7 +953,8 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: ElevatedButton.icon(
-                    onPressed: _isGeneratingInvoice ? null : _generateTestInvoice,
+                    onPressed:
+                        _isGeneratingInvoice ? null : _generateTestInvoice,
                     icon: _isGeneratingInvoice
                         ? const SizedBox(
                             width: 16,
@@ -971,4 +988,3 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
     );
   }
 }
-

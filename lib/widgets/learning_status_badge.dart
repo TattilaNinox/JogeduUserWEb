@@ -4,7 +4,7 @@ class LearningStatusBadge extends StatelessWidget {
   final String state;
   final String lastRating;
   final bool isDue;
-  
+
   const LearningStatusBadge({
     super.key,
     required this.state,
@@ -47,7 +47,7 @@ class LearningStatusBadge extends StatelessWidget {
 
     // Ha esedékes, akkor kicsit kiemeljük
     if (isDue && state != 'NEW') {
-        backgroundColor = backgroundColor.withValues(alpha: 0.8);
+      backgroundColor = backgroundColor.withValues(alpha: 0.8);
     }
 
     return Container(

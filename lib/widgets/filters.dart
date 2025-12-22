@@ -69,7 +69,9 @@ class _FiltersState extends State<Filters> {
     _science = widget.selectedScience;
     _tag = widget.selectedTag;
     // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
-    _type = widget.selectedType == 'MP' ? 'memoriapalota_allomasok' : widget.selectedType;
+    _type = widget.selectedType == 'MP'
+        ? 'memoriapalota_allomasok'
+        : widget.selectedType;
   }
 
   @override
@@ -89,7 +91,9 @@ class _FiltersState extends State<Filters> {
     }
     if (widget.selectedType != oldWidget.selectedType) {
       // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
-      _type = widget.selectedType == 'MP' ? 'memoriapalota_allomasok' : widget.selectedType;
+      _type = widget.selectedType == 'MP'
+          ? 'memoriapalota_allomasok'
+          : widget.selectedType;
     }
   }
 
@@ -98,8 +102,9 @@ class _FiltersState extends State<Filters> {
     final outerPadding = widget.vertical
         ? const EdgeInsets.all(0.0)
         : const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0);
-    final gap =
-        widget.vertical ? const SizedBox(height: 16) : const SizedBox(width: 16);
+    final gap = widget.vertical
+        ? const SizedBox(height: 16)
+        : const SizedBox(width: 16);
 
     final List<Widget> children = [];
     void add(Widget w) {
@@ -216,25 +221,28 @@ class _FiltersState extends State<Filters> {
           menuStyle: MenuStyle(
             backgroundColor: WidgetStateProperty.all(Colors.white),
             elevation: WidgetStateProperty.all(8),
-            shadowColor: WidgetStateProperty.all(Colors.black.withValues(alpha: 0.1)),
+            shadowColor:
+                WidgetStateProperty.all(Colors.black.withValues(alpha: 0.1)),
             shape: WidgetStateProperty.all(
               RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
               ),
             ),
-            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 4)),
+            padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(vertical: 4)),
           ),
         ),
       ),
       child: DropdownButtonFormField<T>(
         key: ValueKey('${hint}_${items.length}_${items.join(",")}'),
-        value: effectiveValue,
+        initialValue: effectiveValue,
         decoration: InputDecoration(
           labelText: hint,
           filled: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -276,7 +284,8 @@ class _FiltersState extends State<Filters> {
             .map((e) => DropdownMenuItem<T>(
                   value: e,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     child: Text(
                       e.toString(),
                       style: const TextStyle(

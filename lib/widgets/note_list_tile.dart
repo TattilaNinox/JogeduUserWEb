@@ -21,7 +21,8 @@ class NoteListTile extends StatelessWidget {
   final bool isLocked; // Új paraméter a zárt állapot jelzésére
   final bool isLast; // Jelzi, hogy ez az utolsó elem a listában
   final String? customFromUrl; // Egyedi from URL (pl. TagDrillDownScreen-hez)
-  final int? jogesetCount; // Jogesetek száma egy dokumentumban (csak jogeset típusnál)
+  final int?
+      jogesetCount; // Jogesetek száma egy dokumentumban (csak jogeset típusnál)
   final String? category; // Kategória (csak jogeset típusnál)
 
   const NoteListTile({
@@ -61,7 +62,8 @@ class NoteListTile extends StatelessWidget {
       case 'jogeset':
         return Icons.gavel; // Kalapács ikon jogesetekhez
       case 'dialogus_fajlok':
-        return Icons.mic; // Mikrofon ikon dialogus fájlokhoz (zöld szín, mint teljes_dialogus)
+        return Icons
+            .mic; // Mikrofon ikon dialogus fájlokhoz (zöld szín, mint teljes_dialogus)
       default:
         return Icons.menu_book;
     }
@@ -285,7 +287,7 @@ class NoteListTile extends StatelessWidget {
   void _openJogesetListDialog(BuildContext context) {
     // A dokumentum ID-t használjuk (a kombinált ID-ból kivesszük a #-t és utána lévő részt)
     final documentId = id.contains('#') ? id.split('#')[0] : id;
-    
+
     showDialog(
       context: context,
       builder: (context) => JogesetListDialog(
@@ -310,7 +312,9 @@ class NoteListTile extends StatelessWidget {
           ),
         ),
         child: InkWell(
-          onTap: type == 'dialogus_fajlok' ? null : () => _open(context), // Dialogus fájlok esetén nincs navigáció
+          onTap: type == 'dialogus_fajlok'
+              ? null
+              : () => _open(context), // Dialogus fájlok esetén nincs navigáció
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -320,7 +324,8 @@ class NoteListTile extends StatelessWidget {
 
                 Widget audioWidget = const SizedBox.shrink();
                 // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
-                if (type == 'dialogus_fajlok' && (audioUrl?.isNotEmpty ?? false)) {
+                if (type == 'dialogus_fajlok' &&
+                    (audioUrl?.isNotEmpty ?? false)) {
                   audioWidget = Align(
                     alignment: Alignment.center,
                     child: MiniAudioPlayer(
@@ -368,7 +373,8 @@ class NoteListTile extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               // Jogesetek száma és metaadatok
-                              if (type == 'jogeset' && jogesetCount != null) ...[
+                              if (type == 'jogeset' &&
+                                  jogesetCount != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
                                   '$jogesetCount jogeset',
@@ -391,7 +397,9 @@ class NoteListTile extends StatelessWidget {
                           ),
                         ],
                         // List ikon jogesetekhez
-                        if (type == 'jogeset' && jogesetCount != null && jogesetCount! > 0) ...[
+                        if (type == 'jogeset' &&
+                            jogesetCount != null &&
+                            jogesetCount! > 0) ...[
                           const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.list, size: 20),
@@ -426,7 +434,8 @@ class NoteListTile extends StatelessWidget {
                         ],
                       ),
                       // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
-                      if (type == 'dialogus_fajlok' && (audioUrl?.isNotEmpty ?? false)) ...[
+                      if (type == 'dialogus_fajlok' &&
+                          (audioUrl?.isNotEmpty ?? false)) ...[
                         const SizedBox(height: 12),
                         audioWidget,
                       ] else if (hasAudio) ...[
@@ -452,7 +461,8 @@ class NoteListTile extends StatelessWidget {
                     ),
                     // Jobb oldali lejátszó - fix szélesség
                     // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
-                    if (type == 'dialogus_fajlok' && (audioUrl?.isNotEmpty ?? false)) ...[
+                    if (type == 'dialogus_fajlok' &&
+                        (audioUrl?.isNotEmpty ?? false)) ...[
                       const SizedBox(width: 12),
                       MiniAudioPlayer(
                         audioUrl: audioUrl!,

@@ -92,8 +92,7 @@ class _NotePagesScreenState extends State<NotePagesScreen> {
     if (pages.isNotEmpty) {
       final currentPage = pages[_currentPageIndex] as String;
       if (currentPage.contains('<script')) {
-        _webViewController = WebViewController()
-          ..loadHtmlString(currentPage);
+        _webViewController = WebViewController()..loadHtmlString(currentPage);
       }
     }
   }
@@ -119,13 +118,11 @@ class _NotePagesScreenState extends State<NotePagesScreen> {
   void _updatePageContent() {
     final data = _noteSnapshot!.data() as Map<String, dynamic>;
     final pages = data['pages'] as List<dynamic>? ?? [];
-    final currentPage = pages.isNotEmpty
-        ? pages[_currentPageIndex] as String
-        : '';
-        
+    final currentPage =
+        pages.isNotEmpty ? pages[_currentPageIndex] as String : '';
+
     if (currentPage.contains('<script')) {
-      _webViewController = WebViewController()
-        ..loadHtmlString(currentPage);
+      _webViewController = WebViewController()..loadHtmlString(currentPage);
     } else {
       _webViewController = null;
     }
@@ -169,7 +166,8 @@ class _NotePagesScreenState extends State<NotePagesScreen> {
             if (pages.isNotEmpty)
               Text(
                 'Oldal ${_currentPageIndex + 1} / ${pages.length}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             const SizedBox(height: 16),
             Expanded(

@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 /// Köteg (bundle) szerkesztő képernyő.
-/// 
+///
 /// Ez a képernyő szolgál új köteg létrehozására és meglévő köteg szerkesztésére.
 /// A kötegbe csak azonos kategóriájú és címkéjű jegyzetek adhatók hozzá.
 /// Az első hozzáadott jegyzet határozza meg a köteg kategóriáját és címkéit.
@@ -20,7 +20,7 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+
   List<String> _selectedNoteIds = [];
   Map<String, Map<String, dynamic>> _notesData = {};
   String? _bundleCategory;
@@ -40,7 +40,7 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
           .collection('bundles')
           .doc(widget.bundleId)
           .get();
-      
+
       if (doc.exists) {
         final data = doc.data()!;
         _nameController.text = data['name'] ?? '';
@@ -48,12 +48,12 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
         _selectedNoteIds = List<String>.from(data['noteIds'] ?? []);
         _bundleCategory = data['category'];
         _bundleTags = List<String>.from(data['tags'] ?? []);
-        
+
         // Betöltjük a kiválasztott jegyzetek adatait
         await _loadNotesData(_selectedNoteIds);
       }
     }
-    
+
     setState(() {
       _isLoading = false;
     });
@@ -65,30 +65,27 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
         .collection('notes')
         .where(FieldPath.documentId, whereIn: noteIds.isEmpty ? [''] : noteIds)
         .get();
-    
-    _notesData = {
-      for (var doc in notes.docs)
-        doc.id: doc.data()
-    };
+
+    _notesData = {for (var doc in notes.docs) doc.id: doc.data()};
   }
 
   /// Jegyzetek hozzáadása dialógus megnyitása
   Future<void> _showAddNotesDialog() async {
     // Lekérjük az összes jegyzetet
     Query query = FirebaseFirestore.instance.collection('notes');
-    
+
     // Ha már van kategória és címke beállítva, szűrjük a jegyzeteket
     if (_bundleCategory != null) {
       query = query.where('category', isEqualTo: _bundleCategory);
     }
-    
+
     final snapshot = await query.get();
     var availableNotes = snapshot.docs.where((doc) {
       // Kiszűrjük a már hozzáadott jegyzeteket
       if (_selectedNoteIds.contains(doc.id)) return false;
-      
+
       final data = doc.data() as Map<String, dynamic>;
-      
+
       // Ha van már címke beállítva, ellenőrizzük hogy megegyezik-e
       if (_bundleTags.isNotEmpty) {
         final noteTags = List<String>.from(data['tags'] ?? []);
@@ -98,7 +95,7 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
           if (!noteTags.contains(tag)) return false;
         }
       }
-      
+
       return true;
     }).toList();
 
@@ -108,7 +105,7 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _bundleCategory == null 
+            _bundleCategory == null
                 ? 'Nincs elérhető jegyzet'
                 : 'Nincs több azonos kategóriájú és címkéjű jegyzet',
           ),
@@ -130,7 +127,7 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
     if (selectedIds != null && selectedIds.isNotEmpty) {
       setState(() {
         _selectedNoteIds.addAll(selectedIds);
-        
+
         // Ha ez az első jegyzet, beállítjuk a kategóriát és címkéket
         if (_bundleCategory == null && selectedIds.isNotEmpty) {
           final firstNoteData = availableNotes
@@ -140,12 +137,13 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
           _bundleTags = List<String>.from(firstNoteData['tags'] ?? []);
         }
       });
-      
+
       // Betöltjük az új jegyzetek adatait és frissítjük a státuszukat
       await _loadNotesData(_selectedNoteIds);
       final batch = FirebaseFirestore.instance.batch();
       for (final noteId in selectedIds) {
-        final noteRef = FirebaseFirestore.instance.collection('notes').doc(noteId);
+        final noteRef =
+            FirebaseFirestore.instance.collection('notes').doc(noteId);
         batch.update(noteRef, {'status': 'Archived'});
       }
       await batch.commit();
@@ -177,12 +175,15 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
 
     if (confirmed == true) {
       // Frissítjük a jegyzet státuszát 'Draft'-ra
-      await FirebaseFirestore.instance.collection('notes').doc(noteId).update({'status': 'Draft', 'bundleId': FieldValue.delete()});
+      await FirebaseFirestore.instance
+          .collection('notes')
+          .doc(noteId)
+          .update({'status': 'Draft', 'bundleId': FieldValue.delete()});
 
       setState(() {
         _selectedNoteIds.remove(noteId);
         _notesData.remove(noteId);
-        
+
         // Ha ez volt az utolsó jegyzet, reseteljük a kategóriát és címkéket
         if (_selectedNoteIds.isEmpty) {
           _bundleCategory = null;
@@ -195,10 +196,11 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
   /// Köteg mentése
   Future<void> _saveBundle() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_selectedNoteIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Legalább egy jegyzetet hozzá kell adni!')),
+        const SnackBar(
+            content: Text('Legalább egy jegyzetet hozzá kell adni!')),
       );
       return;
     }
@@ -221,7 +223,9 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
       if (widget.bundleId == null) {
         // Új köteg létrehozása
         bundleData['createdAt'] = FieldValue.serverTimestamp();
-        final docRef = await FirebaseFirestore.instance.collection('bundles').add(bundleData);
+        final docRef = await FirebaseFirestore.instance
+            .collection('bundles')
+            .add(bundleData);
         bundleId = docRef.id;
       } else {
         // Meglévő köteg frissítése
@@ -235,7 +239,8 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
       // Jegyzetek bundleId mezőjének frissítése
       final batch = FirebaseFirestore.instance.batch();
       for (final noteId in _selectedNoteIds) {
-        final noteRef = FirebaseFirestore.instance.collection('notes').doc(noteId);
+        final noteRef =
+            FirebaseFirestore.instance.collection('notes').doc(noteId);
         batch.update(noteRef, {'bundleId': bundleId});
       }
       await batch.commit();
@@ -244,8 +249,8 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.bundleId == null 
-                  ? 'Köteg sikeresen létrehozva!' 
+              widget.bundleId == null
+                  ? 'Köteg sikeresen létrehozva!'
                   : 'Köteg sikeresen frissítve!',
             ),
           ),
@@ -280,7 +285,8 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.bundleId == null ? 'Új köteg' : 'Köteg szerkesztése'),
+        title:
+            Text(widget.bundleId == null ? 'Új köteg' : 'Köteg szerkesztése'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/bundles'),
@@ -364,7 +370,8 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                     Expanded(
                                       child: Text(
                                         _bundleCategory!,
-                                        style: const TextStyle(fontWeight: FontWeight.w500),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w500),
                                       ),
                                     ),
                                   ],
@@ -381,11 +388,16 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                       child: Wrap(
                                         spacing: 4,
                                         runSpacing: 4,
-                                        children: _bundleTags.map((tag) => Chip(
-                                          label: Text(tag),
-                                          padding: const EdgeInsets.all(4),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        )).toList(),
+                                        children: _bundleTags
+                                            .map((tag) => Chip(
+                                                  label: Text(tag),
+                                                  padding:
+                                                      const EdgeInsets.all(4),
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                ))
+                                            .toList(),
                                       ),
                                     ),
                                   ],
@@ -399,10 +411,11 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Jegyzetek fejléc
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: const BorderRadius.only(
@@ -423,15 +436,16 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                     Text(
                       'Jegyzetek (${_selectedNoteIds.length})',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     ElevatedButton.icon(
                       onPressed: _showAddNotesDialog,
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text('Jegyzet hozzáadása'),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                       ),
                     ),
                   ],
@@ -506,16 +520,21 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                 if (newIndex > oldIndex) {
                                   newIndex -= 1;
                                 }
-                                final noteId = _selectedNoteIds.removeAt(oldIndex);
+                                final noteId =
+                                    _selectedNoteIds.removeAt(oldIndex);
                                 _selectedNoteIds.insert(newIndex, noteId);
                               });
                             },
                             itemBuilder: (context, index) {
                               final noteId = _selectedNoteIds[index];
                               final noteData = _notesData[noteId];
-                              final title = noteData?['title'] ?? 'Ismeretlen jegyzet';
-                              final tags = (noteData?['tags'] as List?)?.take(2).join(', ') ?? '';
-                              
+                              final title =
+                                  noteData?['title'] ?? 'Ismeretlen jegyzet';
+                              final tags = (noteData?['tags'] as List?)
+                                      ?.take(2)
+                                      .join(', ') ??
+                                  '';
+
                               return ReorderableDragStartListener(
                                 key: ValueKey(noteId),
                                 index: index,
@@ -524,19 +543,23 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border:
+                                        Border.all(color: Colors.grey.shade200),
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                     child: Row(
                                       children: [
                                         // Törlés gomb - bal szélén
                                         Material(
                                           color: Colors.transparent,
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
                                           child: InkWell(
                                             onTap: () => _removeNote(noteId),
-                                            borderRadius: BorderRadius.circular(20),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
                                             child: Padding(
                                               padding: const EdgeInsets.all(8),
                                               child: Icon(
@@ -553,14 +576,17 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context).primaryColor.withAlpha(26),
+                                            color: Theme.of(context)
+                                                .primaryColor
+                                                .withAlpha(26),
                                             shape: BoxShape.circle,
                                           ),
                                           child: Center(
                                             child: Text(
                                               '${index + 1}',
                                               style: TextStyle(
-                                                color: Theme.of(context).primaryColor,
+                                                color: Theme.of(context)
+                                                    .primaryColor,
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 14,
                                               ),
@@ -571,12 +597,14 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                         // Tartalom
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
                                                 title,
-                                                style: const TextStyle(fontSize: 14),
+                                                style: const TextStyle(
+                                                    fontSize: 14),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -589,25 +617,31 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                                     color: Colors.grey.shade600,
                                                   ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ],
                                             ],
                                           ),
                                         ),
-                                        
+
                                         // Előnézet gomb
                                         IconButton(
                                           icon: const Icon(Icons.visibility),
                                           iconSize: 22.0,
                                           tooltip: 'Előnézet',
                                           onPressed: () {
-                                            final noteType = noteData?['type'] as String? ?? 'standard';
-                                            final returnPath = '/bundles/edit/${widget.bundleId}';
+                                            final noteType =
+                                                noteData?['type'] as String? ??
+                                                    'standard';
+                                            final returnPath =
+                                                '/bundles/edit/${widget.bundleId}';
                                             if (noteType == 'interactive') {
-                                              context.go('/interactive-note/$noteId?from=${Uri.encodeComponent(returnPath)}');
+                                              context.go(
+                                                  '/interactive-note/$noteId?from=${Uri.encodeComponent(returnPath)}');
                                             } else {
-                                              context.go('/note/$noteId?from=${Uri.encodeComponent(returnPath)}');
+                                              context.go(
+                                                  '/note/$noteId?from=${Uri.encodeComponent(returnPath)}');
                                             }
                                           },
                                         ),
@@ -616,17 +650,26 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                                           iconSize: 22.0,
                                           tooltip: 'Szerkesztés',
                                           onPressed: () {
-                                            final noteType = noteData?['type'] as String? ?? 'standard';
+                                            final noteType =
+                                                noteData?['type'] as String? ??
+                                                    'standard';
                                             String editPath;
                                             if (noteType == 'dynamic_quiz') {
                                               editPath = '/quiz/edit/$noteId';
-                                            } else if (noteType == 'dynamic_quiz_dual') {
-                                              editPath = '/quiz-dual/edit/$noteId';
+                                            } else if (noteType ==
+                                                'dynamic_quiz_dual') {
+                                              editPath =
+                                                  '/quiz-dual/edit/$noteId';
                                             } else {
                                               editPath = '/note/edit/$noteId';
                                             }
-                                            final returnPath = widget.bundleId == null ? '/bundles/create' : '/bundles/edit/${widget.bundleId}';
-                                            context.go('$editPath?from=${Uri.encodeComponent(returnPath)}');
+                                            final returnPath = widget
+                                                        .bundleId ==
+                                                    null
+                                                ? '/bundles/create'
+                                                : '/bundles/edit/${widget.bundleId}';
+                                            context.go(
+                                                '$editPath?from=${Uri.encodeComponent(returnPath)}');
                                           },
                                         ),
                                         const SizedBox(width: 24),
@@ -643,7 +686,7 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Mentés gombok
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -659,7 +702,8 @@ class _BundleEditScreenState extends State<BundleEditScreen> {
                       backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(widget.bundleId == null ? 'Létrehozás' : 'Mentés'),
+                    child:
+                        Text(widget.bundleId == null ? 'Létrehozás' : 'Mentés'),
                   ),
                 ],
               ),
@@ -758,8 +802,9 @@ class _NoteSelectionDialogState extends State<_NoteSelectionDialog> {
                         final data = doc.data() as Map<String, dynamic>;
                         final title = data['title'] ?? 'Névtelen';
                         final category = data['category'] ?? 'N/A';
-                        final tags = (data['tags'] as List?)?.join(', ') ?? 'N/A';
-                        
+                        final tags =
+                            (data['tags'] as List?)?.join(', ') ?? 'N/A';
+
                         return CheckboxListTile(
                           value: _selectedIds.contains(doc.id),
                           onChanged: (selected) {
@@ -772,7 +817,8 @@ class _NoteSelectionDialogState extends State<_NoteSelectionDialog> {
                             });
                           },
                           title: Text(title),
-                          subtitle: Text('Kategória: $category | Címkék: $tags'),
+                          subtitle:
+                              Text('Kategória: $category | Címkék: $tags'),
                         );
                       },
                     ),
@@ -794,4 +840,4 @@ class _NoteSelectionDialogState extends State<_NoteSelectionDialog> {
       ],
     );
   }
-} 
+}

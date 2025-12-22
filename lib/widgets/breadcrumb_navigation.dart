@@ -4,7 +4,7 @@ import '../utils/filter_storage.dart';
 
 /// Breadcrumb navigációs widget, amely megjeleníti a navigációs hierarchiát
 /// és lehetővé teszi a visszalépést bármely szintre.
-/// 
+///
 /// A breadcrumb a jegyzet aktuális kategóriáját és címkéjét mutatja.
 /// Amikor rákattintanak a kategóriára vagy címkére, akkor az adott kategóriára/címkére szűrt listára navigálnak.
 class BreadcrumbNavigation extends StatelessWidget {
@@ -23,35 +23,36 @@ class BreadcrumbNavigation extends StatelessWidget {
 
   /// Navigál az adott szintre (kategória vagy címke alapján)
   /// Amikor rákattintanak a kategóriára vagy címkére, akkor az adott kategóriára/címkére szűrt listára navigálnak
-  void _navigateToLevel(BuildContext context, {
+  void _navigateToLevel(
+    BuildContext context, {
     String? category,
     String? tag,
   }) {
     debugPrint('🔵 Breadcrumb navigáció: category=$category, tag=$tag');
-    
+
     final queryParams = <String, String>{};
-    
+
     // Kategória - csak akkor adjuk hozzá, ha van megadva
     if (category != null && category.isNotEmpty) {
       queryParams['category'] = category;
     }
-    
+
     // Címke - csak akkor adjuk hozzá, ha van megadva
     if (tag != null && tag.isNotEmpty) {
       queryParams['tag'] = tag;
       debugPrint('🔵 Breadcrumb: tag hozzáadva: $tag');
     }
-    
+
     // Tudomány - megőrizzük, ha van
     if (FilterStorage.science != null && FilterStorage.science!.isNotEmpty) {
       queryParams['science'] = FilterStorage.science!;
     }
-    
+
     final uri = Uri(
       path: '/notes',
       queryParameters: queryParams.isEmpty ? null : queryParams,
     );
-    
+
     debugPrint('🔵 Breadcrumb navigáció URL: ${uri.toString()}');
     context.go(uri.toString());
   }
@@ -79,7 +80,8 @@ class BreadcrumbNavigation extends StatelessWidget {
       items.add(BreadcrumbItem(
         label: effectiveCategory,
         onTap: () => _navigateToLevel(context, category: effectiveCategory),
-        isActive: noteTitle != null && (effectiveTag == null || effectiveTag.isEmpty),
+        isActive:
+            noteTitle != null && (effectiveTag == null || effectiveTag.isEmpty),
       ));
     }
 
@@ -165,7 +167,9 @@ class BreadcrumbNavigation extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: item.isActive
-                                ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                                ? Theme.of(context)
+                                    .primaryColor
+                                    .withValues(alpha: 0.1)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -213,4 +217,3 @@ class BreadcrumbItem {
     this.isActive = false,
   });
 }
-

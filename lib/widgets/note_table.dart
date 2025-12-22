@@ -422,7 +422,8 @@ class _NoteTableState extends State<NoteTable> {
 
                     // Az aktuális URL-t query paraméterként adjuk át (visszalépéshez)
                     final currentUri = GoRouterState.of(context).uri;
-                    final fromParam = Uri.encodeComponent(currentUri.toString());
+                    final fromParam =
+                        Uri.encodeComponent(currentUri.toString());
 
                     if (noteType == 'dynamic_quiz' ||
                         noteType == 'dynamic_quiz_dual') {
@@ -437,7 +438,8 @@ class _NoteTableState extends State<NoteTable> {
                     } else if (noteType == 'interactive') {
                       context.go('/interactive-note/${doc.id}?from=$fromParam');
                     } else if (noteType == 'memoriapalota_allomasok') {
-                      context.go('/memoriapalota-allomas/${doc.id}?from=$fromParam');
+                      context.go(
+                          '/memoriapalota-allomas/${doc.id}?from=$fromParam');
                     } else {
                       context.go('/note/${doc.id}?from=$fromParam');
                     }

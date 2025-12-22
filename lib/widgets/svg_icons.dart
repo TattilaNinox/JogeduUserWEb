@@ -60,8 +60,3 @@ class SvgIcons {
 </svg>
 ''';
 }
-
-
-
-
-

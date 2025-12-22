@@ -6,7 +6,7 @@ import '../models/flashcard_learning_data.dart';
 class LearningService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   // Cache a deck esedékes kártyáinak indexeire
   static final Map<String, List<int>> _dueCardsCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
@@ -25,16 +25,19 @@ class LearningService {
         return;
       }
 
-      debugPrint('LearningService: Updating learning data for cardId: $cardId, rating: $rating, categoryId: $categoryId');
+      debugPrint(
+          'LearningService: Updating learning data for cardId: $cardId, rating: $rating, categoryId: $categoryId');
 
       // Jelenlegi adatok lekérése
       final currentData = await _getCurrentLearningData(cardId, categoryId);
-      debugPrint('LearningService: Current data - state: ${currentData.state}, interval: ${currentData.interval}, easeFactor: ${currentData.easeFactor}');
-      
+      debugPrint(
+          'LearningService: Current data - state: ${currentData.state}, interval: ${currentData.interval}, easeFactor: ${currentData.easeFactor}');
+
       // Új állapot kalkulálása
       final newData = _calculateNextState(currentData, rating);
-      debugPrint('LearningService: New data - state: ${newData.state}, interval: ${newData.interval}, easeFactor: ${newData.easeFactor}');
-      
+      debugPrint(
+          'LearningService: New data - state: ${newData.state}, interval: ${newData.interval}, easeFactor: ${newData.easeFactor}');
+
       // Mentés az új útvonalra (users/{uid}/categories/{categoryId}/learning/{cardId})
       await _firestore
           .collection('users')
@@ -44,8 +47,9 @@ class LearningService {
           .collection('learning')
           .doc(cardId)
           .set(newData.toMap());
-      
-      debugPrint('LearningService: Successfully saved learning data to Firestore');
+
+      debugPrint(
+          'LearningService: Successfully saved learning data to Firestore');
 
       // Legacy dokumentum törlése, ha létezik
       await _firestore
@@ -57,12 +61,12 @@ class LearningService {
 
       // Deck és kategória statisztikák frissítése
       final cardIndex = cardId.split('#')[1]; // String index formátumban
-      await _updateDeckSnapshot(cardId.split('#')[0], cardIndex, rating, currentData.lastRating);
+      await _updateDeckSnapshot(
+          cardId.split('#')[0], cardIndex, rating, currentData.lastRating);
       await _updateCategoryStats(categoryId, rating, currentData.lastRating);
 
       // Cache invalidálása
       _invalidateDeckCache(cardId.split('#')[0]);
-
     } catch (e) {
       debugPrint('Error updating learning data: $e');
       rethrow;
@@ -72,7 +76,7 @@ class LearningService {
   /// Esedékes kártyák indexeinek lekérése egy deck-hez
   static Future<List<int>> getDueFlashcardIndicesForDeck(String deckId) async {
     // Cache ellenőrzése
-    if (_dueCardsCache.containsKey(deckId) && 
+    if (_dueCardsCache.containsKey(deckId) &&
         _cacheTimestamps.containsKey(deckId) &&
         DateTime.now().difference(_cacheTimestamps[deckId]!) < _cacheValidity) {
       return _dueCardsCache[deckId]!;
@@ -87,7 +91,8 @@ class LearningService {
       if (!deckDoc.exists) return [];
 
       final deckData = deckDoc.data() as Map<String, dynamic>;
-      final flashcards = List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
+      final flashcards =
+          List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
       final categoryId = deckData['category'] as String? ?? 'default';
 
       // Ne hagyjuk ki a Firestore lekérdezést kis pakliknál sem,
@@ -96,8 +101,8 @@ class LearningService {
 
       // Batch lekérdezés timeout-tal
       final learningDataMap = await _getBatchLearningDataWithTimeout(
-        deckId, 
-        flashcards.length, 
+        deckId,
+        flashcards.length,
         categoryId,
         const Duration(seconds: 30),
       );
@@ -108,8 +113,8 @@ class LearningService {
       // LEARNING és REVIEW állapotú esedékes kártyák
       for (int i = 0; i < flashcards.length; i++) {
         final learningData = learningDataMap[i];
-        if (learningData != null && 
-            learningData.state != 'NEW' && 
+        if (learningData != null &&
+            learningData.state != 'NEW' &&
             learningData.nextReview.seconds <= now.seconds) {
           dueIndices.add(i);
         }
@@ -117,7 +122,10 @@ class LearningService {
 
       // NEW kártyák (legfeljebb newCardLimit)
       int newCardCount = 0;
-      for (int i = 0; i < flashcards.length && newCardCount < SpacedRepetitionConfig.newCardLimit; i++) {
+      for (int i = 0;
+          i < flashcards.length &&
+              newCardCount < SpacedRepetitionConfig.newCardLimit;
+          i++) {
         final learningData = learningDataMap[i];
         if (learningData != null && learningData.state == 'NEW') {
           dueIndices.add(i);
@@ -130,14 +138,14 @@ class LearningService {
       _cacheTimestamps[deckId] = DateTime.now();
 
       return dueIndices;
-
     } catch (e) {
       debugPrint('Error getting due cards: $e');
       // Hiba esetén visszaadjuk az első 20 kártyát
       final deckDoc = await _firestore.collection('notes').doc(deckId).get();
       if (deckDoc.exists) {
         final deckData = deckDoc.data() as Map<String, dynamic>;
-        final flashcards = List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
+        final flashcards =
+            List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
         return List.generate(flashcards.length.clamp(0, 20), (i) => i);
       }
       return [];
@@ -145,7 +153,8 @@ class LearningService {
   }
 
   /// Batch lekérdezés timeout-tal
-  static Future<Map<int, FlashcardLearningData>> _getBatchLearningDataWithTimeout(
+  static Future<Map<int, FlashcardLearningData>>
+      _getBatchLearningDataWithTimeout(
     String deckId,
     int cardCount,
     String categoryId,
@@ -184,7 +193,8 @@ class LearningService {
       const chunkSize = 10;
       final learningFutures = <Future>[];
       for (var i = 0; i < allCardIds.length; i += chunkSize) {
-        final chunk = allCardIds.sublist(i, (i + chunkSize).clamp(0, allCardIds.length));
+        final chunk =
+            allCardIds.sublist(i, (i + chunkSize).clamp(0, allCardIds.length));
         learningFutures.add(_firestore
             .collection('users')
             .doc(user.uid)
@@ -218,7 +228,8 @@ class LearningService {
         final legacyIds = missingIndices.map((i) => '$deckId#$i').toList();
         final legacyFutures = <Future>[];
         for (var i = 0; i < legacyIds.length; i += chunkSize) {
-          final chunk = legacyIds.sublist(i, (i + chunkSize).clamp(0, legacyIds.length));
+          final chunk =
+              legacyIds.sublist(i, (i + chunkSize).clamp(0, legacyIds.length));
           legacyFutures.add(_firestore
               .collection('users')
               .doc(user.uid)
@@ -233,7 +244,8 @@ class LearningService {
             final cardId = doc.id;
             final index = int.tryParse(cardId.split('#').last) ?? -1;
             if (index >= 0) {
-              learningDataMap[index] = FlashcardLearningData.fromMap(doc.data());
+              learningDataMap[index] =
+                  FlashcardLearningData.fromMap(doc.data());
             }
           }
         }
@@ -247,7 +259,6 @@ class LearningService {
       }
 
       return learningDataMap;
-
     } catch (e) {
       debugPrint('Error getting batch learning data: $e');
       // Hiba esetén alapértelmezett adatokkal térünk vissza
@@ -278,7 +289,7 @@ class LearningService {
       // Kártya dokumentumok törlése
       for (int i = 0; i < cardCount; i++) {
         final cardId = '$deckId#$i';
-        
+
         // Új útvonal törlése
         final newPathRef = _firestore
             .collection('users')
@@ -321,7 +332,6 @@ class LearningService {
       _invalidateDeckCache(deckId);
 
       debugPrint('Successfully reset deck progress for deck: $deckId');
-
     } catch (e) {
       debugPrint('Error resetting deck progress: $e');
       rethrow;
@@ -329,7 +339,8 @@ class LearningService {
   }
 
   /// Jelenlegi tanulási adatok lekérése
-  static Future<FlashcardLearningData> _getCurrentLearningData(String cardId, String categoryId) async {
+  static Future<FlashcardLearningData> _getCurrentLearningData(
+      String cardId, String categoryId) async {
     try {
       final user = _auth.currentUser;
       if (user == null) {
@@ -363,7 +374,6 @@ class LearningService {
       }
 
       return _getDefaultLearningData();
-
     } catch (e) {
       debugPrint('Error getting current learning data: $e');
       return _getDefaultLearningData();
@@ -404,7 +414,7 @@ class LearningService {
         );
         newRepetitions = 0;
         newState = 'LEARNING';
-        
+
         if (current.state == 'REVIEW') {
           // REVIEW-ból visszaesés: lapse step (10 perc)
           newInterval = SpacedRepetitionConfig.lapseSteps.first;
@@ -419,31 +429,41 @@ class LearningService {
           SpacedRepetitionConfig.minEaseFactor,
           SpacedRepetitionConfig.maxEaseFactor,
         );
-        
+
         if (current.state == 'NEW' || current.state == 'LEARNING') {
           // NEW/LEARNING: következő learning step (10 perc)
           newState = 'LEARNING';
-          final currentStepIndex = SpacedRepetitionConfig.learningSteps.indexOf(current.interval);
-          if (currentStepIndex >= 0 && currentStepIndex < SpacedRepetitionConfig.learningSteps.length - 1) {
-            newInterval = SpacedRepetitionConfig.learningSteps[currentStepIndex + 1];
+          final currentStepIndex =
+              SpacedRepetitionConfig.learningSteps.indexOf(current.interval);
+          if (currentStepIndex >= 0 &&
+              currentStepIndex <
+                  SpacedRepetitionConfig.learningSteps.length - 1) {
+            newInterval =
+                SpacedRepetitionConfig.learningSteps[currentStepIndex + 1];
           } else {
             newInterval = SpacedRepetitionConfig.learningSteps.first;
           }
         } else {
           // REVIEW: kis növekedés (interval * 1.2, min 1 nap)
           newState = 'REVIEW';
-          newInterval = (current.interval * 1.2).clamp(1440, SpacedRepetitionConfig.maxInterval).round();
+          newInterval = (current.interval * 1.2)
+              .clamp(1440, SpacedRepetitionConfig.maxInterval)
+              .round();
         }
         break;
 
       case 'Good':
         if (current.state == 'NEW' || current.state == 'LEARNING') {
           // NEW/LEARNING: következő learning step vagy graduation
-          final currentStepIndex = SpacedRepetitionConfig.learningSteps.indexOf(current.interval);
-          if (currentStepIndex >= 0 && currentStepIndex < SpacedRepetitionConfig.learningSteps.length - 1) {
+          final currentStepIndex =
+              SpacedRepetitionConfig.learningSteps.indexOf(current.interval);
+          if (currentStepIndex >= 0 &&
+              currentStepIndex <
+                  SpacedRepetitionConfig.learningSteps.length - 1) {
             // Van még learning step
             newState = 'LEARNING';
-            newInterval = SpacedRepetitionConfig.learningSteps[currentStepIndex + 1];
+            newInterval =
+                SpacedRepetitionConfig.learningSteps[currentStepIndex + 1];
           } else {
             // Utolsó learning step: graduation REVIEW-ba
             newState = 'REVIEW';
@@ -463,16 +483,20 @@ class LearningService {
           SpacedRepetitionConfig.minEaseFactor,
           SpacedRepetitionConfig.maxEaseFactor,
         );
-        
+
         if (current.state == 'NEW' || current.state == 'LEARNING') {
           // NEW/LEARNING: azonnali graduation REVIEW-ba bónusz intervallummal
           newState = 'REVIEW';
-          newInterval = (4 * 24 * 60 * SpacedRepetitionConfig.easyBonus).round(); // 4 nap * easyBonus
+          newInterval = (4 * 24 * 60 * SpacedRepetitionConfig.easyBonus)
+              .round(); // 4 nap * easyBonus
           newRepetitions = current.repetitions + 1;
         } else {
           // REVIEW: bónusz növekedés (interval * easeFactor * easyBonus)
           newState = 'REVIEW';
-          newInterval = (current.interval * current.easeFactor * SpacedRepetitionConfig.easyBonus).round();
+          newInterval = (current.interval *
+                  current.easeFactor *
+                  SpacedRepetitionConfig.easyBonus)
+              .round();
           newRepetitions = current.repetitions + 1;
         }
         break;
@@ -515,7 +539,7 @@ class LearningService {
 
       await _firestore.runTransaction((transaction) async {
         final doc = await transaction.get(docRef);
-        final current = doc.exists 
+        final current = doc.exists
             ? DeckStats.fromMap(doc.data()!)
             : DeckStats(
                 again: 0,
@@ -545,18 +569,34 @@ class LearningService {
 
         // Előző rating kivonása
         switch (oldRating) {
-          case 'Again': again = (again - 1).clamp(0, double.infinity).toInt(); break;
-          case 'Hard': hard = (hard - 1).clamp(0, double.infinity).toInt(); break;
-          case 'Good': good = (good - 1).clamp(0, double.infinity).toInt(); break;
-          case 'Easy': easy = (easy - 1).clamp(0, double.infinity).toInt(); break;
+          case 'Again':
+            again = (again - 1).clamp(0, double.infinity).toInt();
+            break;
+          case 'Hard':
+            hard = (hard - 1).clamp(0, double.infinity).toInt();
+            break;
+          case 'Good':
+            good = (good - 1).clamp(0, double.infinity).toInt();
+            break;
+          case 'Easy':
+            easy = (easy - 1).clamp(0, double.infinity).toInt();
+            break;
         }
 
         // Új rating hozzáadása
         switch (newRating) {
-          case 'Again': again++; break;
-          case 'Hard': hard++; break;
-          case 'Good': good++; break;
-          case 'Easy': easy++; break;
+          case 'Again':
+            again++;
+            break;
+          case 'Hard':
+            hard++;
+            break;
+          case 'Good':
+            good++;
+            break;
+          case 'Easy':
+            easy++;
+            break;
         }
 
         final updatedStats = DeckStats(
@@ -570,7 +610,6 @@ class LearningService {
 
         transaction.set(docRef, updatedStats.toMap());
       });
-
     } catch (e) {
       debugPrint('Error updating deck snapshot: $e');
     }
@@ -597,7 +636,7 @@ class LearningService {
 
       await _firestore.runTransaction((transaction) async {
         final doc = await transaction.get(docRef);
-        final current = doc.exists 
+        final current = doc.exists
             ? CategoryStats.fromMap(doc.data()!)
             : CategoryStats(
                 againCount: 0,
@@ -610,14 +649,22 @@ class LearningService {
 
         // Előző rating kivonása
         switch (oldRating) {
-          case 'Again': againCount = (againCount - 1).clamp(0, double.infinity).toInt(); break;
-          case 'Hard': hardCount = (hardCount - 1).clamp(0, double.infinity).toInt(); break;
+          case 'Again':
+            againCount = (againCount - 1).clamp(0, double.infinity).toInt();
+            break;
+          case 'Hard':
+            hardCount = (hardCount - 1).clamp(0, double.infinity).toInt();
+            break;
         }
 
         // Új rating hozzáadása
         switch (newRating) {
-          case 'Again': againCount++; break;
-          case 'Hard': hardCount++; break;
+          case 'Again':
+            againCount++;
+            break;
+          case 'Hard':
+            hardCount++;
+            break;
         }
 
         final updatedStats = CategoryStats(
@@ -628,7 +675,6 @@ class LearningService {
 
         transaction.set(docRef, updatedStats.toMap());
       });
-
     } catch (e) {
       debugPrint('Error updating category stats: $e');
     }
@@ -651,7 +697,8 @@ class LearningService {
       if (!deckDoc.exists) return {};
 
       final deckData = deckDoc.data() as Map<String, dynamic>;
-      final flashcards = List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
+      final flashcards =
+          List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
       final categoryId = deckData['category'] as String? ?? 'default';
       final totalCards = flashcards.length;
 
@@ -667,8 +714,8 @@ class LearningService {
 
       // Batch lekérdezés a tanulási adatokhoz
       final learningDataMap = await _getBatchLearningDataWithTimeout(
-        deckId, 
-        totalCards, 
+        deckId,
+        totalCards,
         categoryId,
         const Duration(seconds: 30),
       );
@@ -714,7 +761,6 @@ class LearningService {
         'review': reviewCount,
         'due': dueCount,
       };
-
     } catch (e) {
       debugPrint('Error getting deck stats: $e');
       return {};

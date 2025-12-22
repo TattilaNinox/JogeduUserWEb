@@ -37,9 +37,7 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
       return;
     }
 
-    await FirebaseFirestore.instance
-        .collection('sciences')
-        .add({'name': name});
+    await FirebaseFirestore.instance.collection('sciences').add({'name': name});
     _scienceController.clear();
     _showSnackBar('Tudomány sikeresen hozzáadva.');
   }
@@ -51,7 +49,9 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
         title: const Text('Megerősítés'),
         content: Text('Biztosan törlöd a(z) "$name" tudományt?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Mégse')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Mégse')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -72,9 +72,13 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Tudomány átnevezése'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Új név')),
+        content: TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(labelText: 'Új név')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Mégse')),
+          TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Mégse')),
           ElevatedButton(
             onPressed: () async {
               final newName = ctrl.text.trim();
@@ -95,7 +99,10 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
                 );
                 return;
               }
-              await FirebaseFirestore.instance.collection('sciences').doc(docId).update({'name': newName});
+              await FirebaseFirestore.instance
+                  .collection('sciences')
+                  .doc(docId)
+                  .update({'name': newName});
               if (!mounted) return;
               if (dialogContext.mounted) {
                 Navigator.of(dialogContext).pop();
@@ -131,26 +138,35 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Tudományok kezelése', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const Text('Tudományok kezelése',
+                            style: TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 24),
                         Row(
                           children: [
                             Expanded(
                               child: TextField(
                                 controller: _scienceController,
-                                decoration: const InputDecoration(labelText: 'Új tudomány neve'),
+                                decoration: const InputDecoration(
+                                    labelText: 'Új tudomány neve'),
                               ),
                             ),
                             const SizedBox(width: 16),
-                            ElevatedButton(onPressed: _addScience, child: const Text('Hozzáadás')),
+                            ElevatedButton(
+                                onPressed: _addScience,
+                                child: const Text('Hozzáadás')),
                           ],
                         ),
                         const SizedBox(height: 24),
-                        const Text('Tudományok:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const Text('Tudományok:',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _searchController,
-                          decoration: const InputDecoration(labelText: 'Keresés tudományok között', prefixIcon: Icon(Icons.search)),
+                          decoration: const InputDecoration(
+                              labelText: 'Keresés tudományok között',
+                              prefixIcon: Icon(Icons.search)),
                           onChanged: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 16),
@@ -161,18 +177,24 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
                                 .orderBy('name')
                                 .snapshots(),
                             builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
                               }
-                              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                              if (!snapshot.hasData ||
+                                  snapshot.data!.docs.isEmpty) {
                                 return const Text('Nincs elérhető tudomány.');
                               }
                               final all = snapshot.data!.docs;
                               final filtered = all.where((d) {
                                 final name = d['name'] as String;
-                                return name.toLowerCase().contains(_searchController.text.toLowerCase());
+                                return name.toLowerCase().contains(
+                                    _searchController.text.toLowerCase());
                               }).toList();
-                              if (filtered.isEmpty) return const Text('Nincs találat a keresésre.');
+                              if (filtered.isEmpty) {
+                                return const Text('Nincs találat a keresésre.');
+                              }
                               return ListView.builder(
                                 itemCount: filtered.length,
                                 itemBuilder: (context, index) {
@@ -184,12 +206,16 @@ class _ScienceManagerScreenState extends State<ScienceManagerScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.blue),
-                                          onPressed: () => _showEditDialog(context, doc.id, name),
+                                          icon: const Icon(Icons.edit,
+                                              color: Colors.blue),
+                                          onPressed: () => _showEditDialog(
+                                              context, doc.id, name),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.red),
-                                          onPressed: () => _deleteScience(doc.id, name),
+                                          icon: const Icon(Icons.delete,
+                                              color: Colors.red),
+                                          onPressed: () =>
+                                              _deleteScience(doc.id, name),
                                         ),
                                       ],
                                     ),

@@ -40,32 +40,33 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
         .doc(widget.noteId)
         .snapshots()
         .listen(
-          _handleSnapshot,
-          onError: (error) {
-            // Firestore permission denied hiba (zárt jegyzet)
-            if (mounted) {
-              setState(() => _accessDenied = true);
-              _showAccessDeniedAndGoBack();
-            }
-          },
-        );
+      _handleSnapshot,
+      onError: (error) {
+        // Firestore permission denied hiba (zárt jegyzet)
+        if (mounted) {
+          setState(() => _accessDenied = true);
+          _showAccessDeniedAndGoBack();
+        }
+      },
+    );
   }
 
   void _setupIframe(String htmlContent) {
     // Minden alkalommal új view ID-t generálunk, amikor a tartalom változik
-    _viewId = 'interactive-note-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
-    
+    _viewId =
+        'interactive-note-iframe-${widget.noteId}-${DateTime.now().millisecondsSinceEpoch}';
+
     // Iframe elem létrehozása
     final iframeElement = web.HTMLIFrameElement()
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.border = 'none';
-    
+
     iframeElement.sandbox.add('allow-scripts');
     iframeElement.sandbox.add('allow-same-origin');
     iframeElement.sandbox.add('allow-forms');
     iframeElement.sandbox.add('allow-popups');
-    
+
     // Iframe src beállítása data URI-val
     if (htmlContent.isNotEmpty) {
       // Másolás/kijelölés tiltása iframe-en belül is (nehezítés)
@@ -137,13 +138,13 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
       iframeElement.src =
           'data:text/html;charset=utf-8,${Uri.encodeComponent(protectedHtml)}';
     }
-    
+
     // Platform view regisztrálása
     // ignore: undefined_prefixed_name
     ui_web.platformViewRegistry.registerViewFactory(
       _viewId,
       (int viewId) => iframeElement,
-        );
+    );
   }
 
   void _showAccessDeniedAndGoBack() {
@@ -201,24 +202,25 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
       // Új iframe-et hozunk létre az új tartalommal
       _setupIframe(htmlContentToLoad);
 
-    setState(() {
-      _noteSnapshot = snapshot;
+      setState(() {
+        _noteSnapshot = snapshot;
         _hasContent = true;
       });
-      } else {
+    } else {
       setState(() {
         _noteSnapshot = snapshot;
         _hasContent = false;
       });
-      }
+    }
   }
 
   void _handleQuizNavigation() {
     final data = _noteSnapshot!.data() as Map<String, dynamic>;
     final type = data['type'] as String? ?? '';
     final questionBankId = data['questionBankId'] as String?;
-    
-    if (questionBankId != null && (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual')) {
+
+    if (questionBankId != null &&
+        (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual')) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => QuizPage(
@@ -332,8 +334,8 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        type == 'dynamic_quiz_dual' 
-                            ? Icons.quiz_outlined 
+                        type == 'dynamic_quiz_dual'
+                            ? Icons.quiz_outlined
                             : Icons.quiz,
                         size: 80,
                         color: Theme.of(context).primaryColor,
@@ -349,7 +351,7 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        type == 'dynamic_quiz_dual' 
+                        type == 'dynamic_quiz_dual'
                             ? 'Dinamikus kétválaszos kvíz'
                             : 'Dinamikus kvíz',
                         style: TextStyle(
@@ -360,7 +362,9 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
                       ),
                       const SizedBox(height: 32),
                       ElevatedButton.icon(
-                        onPressed: questionBankId != null ? _handleQuizNavigation : null,
+                        onPressed: questionBankId != null
+                            ? _handleQuizNavigation
+                            : null,
                         icon: const Icon(Icons.play_arrow),
                         label: const Text('Kvíz Indítása'),
                         style: ElevatedButton.styleFrom(

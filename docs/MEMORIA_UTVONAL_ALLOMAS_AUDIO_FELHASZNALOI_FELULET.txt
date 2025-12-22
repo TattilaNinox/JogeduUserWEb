@@ -1,0 +1,345 @@
+================================================================================
+MEMÓRIAÚTVONAL ÁLLOMÁSOK AUDIO MEGJELENÍTÉSE - FELHASZNÁLÓI FELÜLET
+AI fejlesztői dokumentáció
+================================================================================
+
+FONTOS: Ez a dokumentáció a FELHASZNÁLÓI FELÜLET fejlesztéséhez szükséges.
+Az admin felületen már implementálva van az audio feltöltés/törlés funkció.
+A felhasználói felületen CSAK meg kell jeleníteni az audio fájlokat,
+NEM kell feltöltés/törlés funkciót implementálni.
+
+================================================================================
+1. ADATSTRUKTÚRA VÁLTOZÁSOK
+================================================================================
+
+Az állomások dokumentumaiban (memoriapalota_allomasok/{utvonalId}/allomasok/{allomasId})
+hozzá lett adva egy új opcionális mező:
+
+- audioUrl (String, opcionális)
+  Szerepe: Az állomáshoz tartozó hanganyag URL-je
+  Típus: String (HTTPS URL)
+  Tartalom: Firebase Storage download URL
+  Formátum: https://firebasestorage.googleapis.com/...
+  Megjegyzés: 
+    * Opcionális mező (lehet null vagy üres string)
+    * MP3 fájlok támogatottak
+    * Max 7 MB (transzkódolás után 32 kbps)
+    * Firebase Storage path: memoriapalota_allomasok/{utvonalId}/allomasok/{allomasId}/{fileName}
+
+================================================================================
+2. ÁLLOMÁSOK LEKÉRÉSE
+================================================================================
+
+Az állomások lekérése változatlan maradt, de most már tartalmazhatják az audioUrl mezőt.
+
+Service metódus: MemoriapalotaService.getAllomasokByUtvonalId(String utvonalId)
+
+Visszatérési érték: List<Map<String, dynamic>>
+
+Az állomások dokumentumai tartalmazhatják az alábbi mezőket:
+- id: String (dokumentum ID)
+- allomasSorszam: int (állomás sorszáma)
+- cim: String (állomás címe)
+- kulcsszo: String (kulcsszó)
+- tartalom: String (állomás tartalma)
+- audioUrl: String? (opcionális - hanganyag URL-je)
+- generaltDatum: Timestamp
+- science: String? (opcionális)
+- category: String? (opcionális)
+- tags: List<String>? (opcionális)
+- isFree: bool? (opcionális)
+
+PÉLDA KÓD:
+
+```dart
+// Állomások lekérése egy útvonalhoz
+final allomasok = await MemoriapalotaService.getAllomasokByUtvonalId(utvonalId);
+
+// Állomások feldolgozása
+for (final allomas in allomasok) {
+  final cim = allomas['cim'] as String? ?? '';
+  final kulcsszo = allomas['kulcsszo'] as String? ?? '';
+  final tartalom = allomas['tartalom'] as String? ?? '';
+  final audioUrl = allomas['audioUrl'] as String?; // ÚJ MEZŐ
+  
+  // Ellenőrizzük, hogy van-e hanganyag
+  final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
+  
+  if (hasAudio) {
+    // Van hanganyag - megjelenítjük az audio player-t
+    // Lásd: 3. fejezet
+  }
+}
+```
+
+================================================================================
+3. AUDIO PLAYER MEGJELENÍTÉSE
+================================================================================
+
+Az audio fájlok megjelenítéséhez használd a MiniAudioPlayer widget-et.
+
+IMPORT:
+```dart
+import 'package:orlomed_admin_web/widgets/mini_audio_player.dart';
+```
+
+WIDGET HASZNÁLAT:
+
+Alapvető használat (teljes méretben):
+```dart
+if (audioUrl != null && audioUrl.isNotEmpty) {
+  MiniAudioPlayer(audioUrl: audioUrl)
+}
+```
+
+Kompakt módban (kisebb ikonok, progress bar):
+```dart
+if (audioUrl != null && audioUrl.isNotEmpty) {
+  MiniAudioPlayer(
+    audioUrl: audioUrl,
+    compact: true,
+  )
+}
+```
+
+================================================================================
+4. MEGJELENÍTÉSI PÉLDÁK
+================================================================================
+
+4.1. LISTAELEMBEN (kompakt megjelenítés)
+
+Ha az állomásokat listában jeleníted meg, használd a kompakt módot:
+
+```dart
+ListTile(
+  title: Text(allomasCim),
+  subtitle: Text(allomasTartalom),
+  trailing: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      // Audio player (ha van hanganyag)
+      if (audioUrl != null && audioUrl.isNotEmpty)
+        SizedBox(
+          width: 120,
+          child: MiniAudioPlayer(
+            audioUrl: audioUrl,
+            compact: true,
+          ),
+        ),
+    ],
+  ),
+)
+```
+
+4.2. RÉSZLETES MEGJELENÍTÉSBEN (teljes méretben)
+
+Ha az állomás részleteit egy külön képernyőn vagy dialog-ban jeleníted meg:
+
+```dart
+Column(
+  children: [
+    // Cím és egyéb információk
+    Text(allomasCim, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    if (kulcsszo.isNotEmpty)
+      Text('Kulcsszó: $kulcsszo'),
+    
+    // Audio player (ha van hanganyag)
+    if (audioUrl != null && audioUrl.isNotEmpty) ...[
+      SizedBox(height: 16),
+      Container(
+        padding: EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: MiniAudioPlayer(audioUrl: audioUrl), // Teljes méretben
+      ),
+    ],
+    
+    // Tartalom
+    SizedBox(height: 16),
+    Text(allomasTartalom),
+  ],
+)
+```
+
+4.3. AUDIO JELÖLÉS IKON (opcionális)
+
+Ha csak egy kis ikont szeretnél megjeleníteni, hogy jelezd, hogy van hanganyag:
+
+```dart
+Row(
+  children: [
+    Text(allomasCim),
+    if (audioUrl != null && audioUrl.isNotEmpty)
+      Padding(
+        padding: EdgeInsets.only(left: 8),
+        child: Icon(
+          Icons.audiotrack,
+          size: 16,
+          color: Colors.green,
+        ),
+      ),
+  ],
+)
+```
+
+================================================================================
+5. NULL ELLENŐRZÉS ÉS BIZTONSÁGOS HASZNÁLAT
+================================================================================
+
+MINDIG ellenőrizd, hogy az audioUrl nem null és nem üres, mielőtt megjeleníted:
+
+```dart
+final audioUrl = allomas['audioUrl'] as String?;
+final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
+
+if (hasAudio) {
+  // Biztonságos használat
+  MiniAudioPlayer(audioUrl: audioUrl!)
+}
+```
+
+VAGY használhatod a null-safe operátort:
+
+```dart
+final audioUrl = allomas['audioUrl'] as String?;
+
+if (audioUrl != null && audioUrl.isNotEmpty) {
+  MiniAudioPlayer(audioUrl: audioUrl)
+}
+```
+
+================================================================================
+6. MINIAUDIOPLAYER WIDGET RÉSZLETES LEÍRÁSA
+================================================================================
+
+A MiniAudioPlayer widget a következő funkciókat biztosítja:
+
+- Lejátszás/Szünet gomb
+- Vissza 10 másodperc gomb
+- Előre 10 másodperc gomb
+- Progress bar (tekerhető)
+- Hátralévő idő megjelenítése
+- Stop gomb (csak nem compact módban)
+
+Paraméterek:
+- audioUrl (String, kötelező): A lejátszandó audio fájl URL-je
+- compact (bool, opcionális, default: false): Kompakt mód (kisebb ikonok, progress bar)
+
+Használat:
+```dart
+MiniAudioPlayer(
+  audioUrl: 'https://firebasestorage.googleapis.com/...',
+  compact: false, // vagy true kompakt módhoz
+)
+```
+
+================================================================================
+7. TELJES PÉLDA IMPLEMENTÁCIÓ
+================================================================================
+
+Ez egy teljes példa, hogyan jelenítsd meg az állomásokat audio player-rel:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:orlomed_admin_web/widgets/mini_audio_player.dart';
+import 'package:orlomed_admin_web/services/memoriapalota_service.dart';
+
+class AllomasListWidget extends StatelessWidget {
+  final String utvonalId;
+
+  const AllomasListWidget({required this.utvonalId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: MemoriapalotaService.getAllomasokByUtvonalId(utvonalId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return CircularProgressIndicator();
+        }
+
+        if (snapshot.hasError) {
+          return Text('Hiba: ${snapshot.error}');
+        }
+
+        final allomasok = snapshot.data ?? [];
+
+        return ListView.builder(
+          itemCount: allomasok.length,
+          itemBuilder: (context, index) {
+            final allomas = allomasok[index];
+            final cim = allomas['cim'] as String? ?? '';
+            final kulcsszo = allomas['kulcsszo'] as String? ?? '';
+            final tartalom = allomas['tartalom'] as String? ?? '';
+            final audioUrl = allomas['audioUrl'] as String?;
+            final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
+
+            return Card(
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ListTile(
+                title: Text(cim),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (kulcsszo.isNotEmpty)
+                      Text('Kulcsszó: $kulcsszo', style: TextStyle(fontStyle: FontStyle.italic)),
+                    SizedBox(height: 8),
+                    Text(tartalom),
+                    if (hasAudio) ...[
+                      SizedBox(height: 8),
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: MiniAudioPlayer(
+                          audioUrl: audioUrl!,
+                          compact: true,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+```
+
+================================================================================
+8. FONTOS MEGJEGYZÉSEK
+================================================================================
+
+1. CSAK MEGJELENÍTÉS: A felhasználói felületen CSAK az audio fájlokat kell
+   megjeleníteni. NEM kell feltöltés vagy törlés funkciót implementálni.
+
+2. OPCIONÁLIS MEZŐ: Az audioUrl opcionális mező. Mindig ellenőrizd, hogy
+   létezik-e és nem üres, mielőtt megjeleníted az audio player-t.
+
+3. FIREBASE STORAGE: Az audio fájlok Firebase Storage-ban vannak tárolva.
+   Az URL-ek közvetlenül használhatók a MiniAudioPlayer widget-ben.
+
+4. KOMPATIBILITÁS: A MiniAudioPlayer widget minden platformon működik
+   (web, Android, iOS), mivel az audioplayers csomagot használja.
+
+5. HIBAKEZELÉS: A MiniAudioPlayer automatikusan kezeli a hibákat.
+   Ha az URL érvénytelen vagy nem érhető el, egy hiba ikont jelenít meg.
+
+================================================================================
+9. KAPCSOLÓDÓ DOKUMENTÁCIÓK
+================================================================================
+
+- MiniAudioPlayer widget: lib/widgets/mini_audio_player.dart
+- MemoriapalotaService: lib/services/memoriapalota_service.dart
+- getAllomasokByUtvonalId metódus: lib/services/memoriapalota_service.dart:600
+
+================================================================================
+VÉGE
+================================================================================

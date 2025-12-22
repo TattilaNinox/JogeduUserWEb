@@ -75,7 +75,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Jogeset törlése'),
-        content: Text('Biztosan törölni szeretnéd ezt a jogesetet?\n\n${jogeset.cim}'),
+        content: Text(
+            'Biztosan törölni szeretnéd ezt a jogesetet?\n\n${jogeset.cim}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -108,7 +109,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
       }
 
       final data = docSnapshot.data()!;
-      final jogesetekList = List<Map<String, dynamic>>.from(data['jogesetek'] ?? []);
+      final jogesetekList =
+          List<Map<String, dynamic>>.from(data['jogesetek'] ?? []);
 
       // Töröljük a jogesetet az ID alapján
       jogesetekList.removeWhere((j) => (j['id'] as int?) == jogeset.id);
@@ -160,7 +162,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
               children: [
                 Expanded(
                   child: Text(
-                    _document?.displayTitle ?? JogesetService.denormalizeParagrafus(widget.documentId),
+                    _document?.displayTitle ??
+                        JogesetService.denormalizeParagrafus(widget.documentId),
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -180,7 +183,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                   ? const Center(child: CircularProgressIndicator())
                   : _document == null || _document!.jogesetek.isEmpty
                       ? const Center(
-                          child: Text('Nincs elérhető jogeset ebben a dokumentumban.'),
+                          child: Text(
+                              'Nincs elérhető jogeset ebben a dokumentumban.'),
                         )
                       : ListView.builder(
                           itemCount: _document!.jogesetek.length,
@@ -245,7 +249,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Html(
-                          data: '<div style="text-align: justify;">${_escapeHtml(jogeset.eredetiJogszabalySzoveg!)}</div>',
+                          data:
+                              '<div style="text-align: justify;">${_escapeHtml(jogeset.eredetiJogszabalySzoveg!)}</div>',
                           style: {
                             "div": Style(
                               fontSize: FontSize(14),
@@ -269,7 +274,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                 ),
                 const SizedBox(height: 8),
                 Html(
-                  data: '<div style="text-align: justify;">${_escapeHtml(jogeset.tenyek)}</div>',
+                  data:
+                      '<div style="text-align: justify;">${_escapeHtml(jogeset.tenyek)}</div>',
                   style: {
                     "div": Style(
                       fontSize: FontSize(14),
@@ -296,7 +302,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                     border: Border.all(color: Colors.blue.shade200),
                   ),
                   child: Html(
-                    data: '<div style="text-align: justify;">${_escapeHtml(jogeset.kerdes)}</div>',
+                    data:
+                        '<div style="text-align: justify;">${_escapeHtml(jogeset.kerdes)}</div>',
                     style: {
                       "div": Style(
                         fontSize: FontSize(14),
@@ -324,7 +331,8 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                     border: Border.all(color: Colors.green.shade200),
                   ),
                   child: Html(
-                    data: '<div style="text-align: justify;">${_escapeHtml(jogeset.megoldas)}</div>',
+                    data:
+                        '<div style="text-align: justify;">${_escapeHtml(jogeset.megoldas)}</div>',
                     style: {
                       "div": Style(
                         fontSize: FontSize(14),
@@ -357,4 +365,3 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
     );
   }
 }
-

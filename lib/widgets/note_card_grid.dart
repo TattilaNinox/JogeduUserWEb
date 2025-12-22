@@ -163,8 +163,8 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           // category
           if (widget.selectedCategory != null &&
               widget.selectedCategory!.isNotEmpty) {
-            allomasQuery =
-                allomasQuery.where('category', isEqualTo: widget.selectedCategory);
+            allomasQuery = allomasQuery.where('category',
+                isEqualTo: widget.selectedCategory);
           }
 
           // status
@@ -211,306 +211,302 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: allomasQuery?.snapshots(),
               builder: (context, allomasSnapshot) {
-                    // Dialogus fájlok stream builder
-                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: dialogusQuery?.snapshots(),
-                      builder: (context, dialogusSnapshot) {
-                        // Debug: találatok száma
-                        if (snapshot.hasData) {
-                          final docs = snapshot.data!.docs;
-                          debugPrint(
-                              '[NoteCardGrid] Found ${docs.length} notes');
-                          // Debug: típusok listája
-                          final types = docs
-                              .map((d) =>
-                                  d.data()['type'] as String? ?? 'unknown')
-                              .toSet();
-                          debugPrint('[NoteCardGrid] Note types found: $types');
-                        }
-                        if (allomasSnapshot.hasData) {
-                          debugPrint(
-                              '[NoteCardGrid] Found ${allomasSnapshot.data!.docs.length} allomasok');
-                        }
-                        if (dialogusSnapshot.hasData) {
-                          debugPrint(
-                              '[NoteCardGrid] Found ${dialogusSnapshot.data!.docs.length} dialogus_fajlok');
+                // Dialogus fájlok stream builder
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: dialogusQuery?.snapshots(),
+                  builder: (context, dialogusSnapshot) {
+                    // Debug: találatok száma
+                    if (snapshot.hasData) {
+                      final docs = snapshot.data!.docs;
+                      debugPrint('[NoteCardGrid] Found ${docs.length} notes');
+                      // Debug: típusok listája
+                      final types = docs
+                          .map((d) => d.data()['type'] as String? ?? 'unknown')
+                          .toSet();
+                      debugPrint('[NoteCardGrid] Note types found: $types');
+                    }
+                    if (allomasSnapshot.hasData) {
+                      debugPrint(
+                          '[NoteCardGrid] Found ${allomasSnapshot.data!.docs.length} allomasok');
+                    }
+                    if (dialogusSnapshot.hasData) {
+                      debugPrint(
+                          '[NoteCardGrid] Found ${dialogusSnapshot.data!.docs.length} dialogus_fajlok');
+                    }
+
+                    // Error handling minden snapshot-nál
+                    if (snapshot.hasError) {
+                      debugPrint(
+                          '[NoteCardGrid] Error in notes snapshot: ${snapshot.error}');
+                      return Center(
+                          child: Text(
+                              'Hiba az adatok betöltésekor: ${snapshot.error.toString()}'));
+                    }
+                    if (allomasSnapshot.hasError) {
+                      debugPrint(
+                          '[NoteCardGrid] Error in allomasok snapshot: ${allomasSnapshot.error}');
+                      // Folytatjuk, csak nem töltjük be az állomásokat
+                    }
+                    if (dialogusSnapshot.hasError) {
+                      debugPrint(
+                          '[NoteCardGrid] Error in dialogus snapshot: ${dialogusSnapshot.error}');
+                      // Folytatjuk, csak nem töltjük be a dialogus fájlokat
+                    }
+
+                    // Összegyűjtjük a notes dokumentumokat
+                    final notesDocs = (snapshot.data?.docs ??
+                            const <QueryDocumentSnapshot<
+                                Map<String, dynamic>>>[])
+                        .where((d) => !(d.data()['deletedAt'] != null))
+                        .where((d) => (d.data()['title'] ?? '')
+                            .toString()
+                            .toLowerCase()
+                            .contains(widget.searchText.toLowerCase()))
+                        .toList();
+
+                    // Összefésüljük a két listát
+                    // A fő útvonal dokumentumokat hozzáadjuk, de virtuálisan hozzáadjuk a type mezőt
+                    final allDocs =
+                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    allDocs.addAll(notesDocs);
+
+                    // Fő útvonal dokumentumok hozzáadása - csak akkor, ha nincs típus szűrő vagy az állomások típusa van kiválasztva
+                    if (shouldLoadAllomasok) {
+                      final allomasDocs = (allomasSnapshot.data?.docs ??
+                              const <QueryDocumentSnapshot<
+                                  Map<String, dynamic>>>[])
+                          .where((d) {
+                        final data = d.data();
+                        // Szűrés cím alapján (cim mező)
+                        final cim = (data['cim'] ?? '').toString();
+                        return cim
+                            .toLowerCase()
+                            .contains(widget.searchText.toLowerCase());
+                      }).toList();
+                      allDocs.addAll(allomasDocs);
+                    }
+
+                    // Dialogus fájl dokumentumok hozzáadása
+                    if (shouldLoadDialogus) {
+                      final dialogusDocs = (dialogusSnapshot.data?.docs ??
+                              const <QueryDocumentSnapshot<
+                                  Map<String, dynamic>>>[])
+                          .where((d) {
+                        final data = d.data();
+
+                        // Audio URL ellenőrzése
+                        final audioUrl = data['audioUrl'] as String?;
+                        if (audioUrl == null ||
+                            audioUrl.isEmpty ||
+                            audioUrl.trim().isEmpty) {
+                          return false;
                         }
 
-                        // Error handling minden snapshot-nál
-                        if (snapshot.hasError) {
-                          debugPrint('[NoteCardGrid] Error in notes snapshot: ${snapshot.error}');
-                          return Center(
-                              child: Text(
-                                  'Hiba az adatok betöltésekor: ${snapshot.error.toString()}'));
-                        }
-                        if (allomasSnapshot.hasError) {
-                          debugPrint('[NoteCardGrid] Error in allomasok snapshot: ${allomasSnapshot.error}');
-                          // Folytatjuk, csak nem töltjük be az állomásokat
-                        }
-                        if (dialogusSnapshot.hasError) {
-                          debugPrint('[NoteCardGrid] Error in dialogus snapshot: ${dialogusSnapshot.error}');
-                          // Folytatjuk, csak nem töltjük be a dialogus fájlokat
-                        }
+                        // Szűrés cím alapján (title vagy cim mező)
+                        final title =
+                            (data['title'] ?? data['cim'] ?? '').toString();
+                        return title
+                            .toLowerCase()
+                            .contains(widget.searchText.toLowerCase());
+                      }).toList();
+                      allDocs.addAll(dialogusDocs);
+                    }
 
-                        // Összegyűjtjük a notes dokumentumokat
-                        final notesDocs = (snapshot.data?.docs ??
-                                const <QueryDocumentSnapshot<
+                    // Típus szűrés
+                    final filteredDocs = widget.selectedType != null &&
+                            widget.selectedType!.isNotEmpty
+                        ? allDocs.where((d) {
+                            final data = d.data();
+                            // A fő útvonal dokumentumok a memoriapalota_allomasok kollekcióból jönnek
+                            if (d.reference.path
+                                    .contains('memoriapalota_allomasok') &&
+                                !d.reference.path.contains('/allomasok/')) {
+                              return widget.selectedType ==
+                                  'memoriapalota_allomasok';
+                            }
+                            // A dialogus fájl dokumentumok a dialogus_fajlok kollekcióból jönnek
+                            if (d.reference.path.contains('dialogus_fajlok')) {
+                              return widget.selectedType == 'dialogus_fajlok';
+                            }
+                            return data['type'] == widget.selectedType;
+                          }).toList()
+                        : allDocs;
+
+                    final docs = filteredDocs;
+
+                    if (!snapshot.hasData &&
+                        snapshot.connectionState != ConnectionState.active &&
+                        (!shouldLoadAllomasok || !allomasSnapshot.hasData) &&
+                        (!shouldLoadDialogus || !dialogusSnapshot.hasData)) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (docs.isEmpty) {
+                      return const Center(child: Text('Nincs találat.'));
+                    }
+
+                    // Hierarchikus csoportosítás: Kategória → Címkék hierarchia (tudomány szint nélkül, mert csak "Jogász" van)
+                    // A címkék hierarchikusan működnek: tags[0] = főcím, tags[1] = alcím, tags[2] = alcím az alcím alatt, stb.
+                    // Map<category, Map<firstTag, Map<secondTag, Map<thirdTag, ...>>>>
+                    final Map<String, Map<String, dynamic>> hierarchical = {};
+
+                    for (var d in docs) {
+                      // Ha dialogus_fajlok dokumentum, akkor a kategória mindig "Dialogus tags"
+                      // Ez biztosítja, hogy külön mappába kerüljenek
+                      final isDialogusFajl =
+                          d.reference.path.contains('dialogus_fajlok');
+
+                      final category = isDialogusFajl
+                          ? 'Dialogus tags'
+                          : (d.data()['category'] ?? 'Egyéb') as String;
+
+                      final tags = (d.data()['tags'] as List<dynamic>? ?? [])
+                          .cast<String>();
+
+                      hierarchical.putIfAbsent(category, () => {});
+
+                      // Címkék hierarchikus csoportosítása
+                      if (tags.isEmpty) {
+                        hierarchical[category]!
+                            .putIfAbsent(
+                                'Nincs címke',
+                                () => <QueryDocumentSnapshot<
                                     Map<String, dynamic>>>[])
-                            .where((d) => !(d.data()['deletedAt'] != null))
-                            .where((d) => (d.data()['title'] ?? '')
-                                .toString()
-                                .toLowerCase()
-                                .contains(widget.searchText.toLowerCase()))
-                            .toList();
+                            .add(d);
+                      } else {
+                        // A címkék sorrendje fontos: tags[0] = főcím, tags[1] = alcím, stb.
+                        // Hierarchikusan építjük fel: category -> tags[0] -> tags[1] -> tags[2] -> ... -> docs
+                        Map<String, dynamic> current = hierarchical[category]!;
 
-                        // Összefésüljük a két listát
-                        // A fő útvonal dokumentumokat hozzáadjuk, de virtuálisan hozzáadjuk a type mezőt
-                        final allDocs =
-                            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                        allDocs.addAll(notesDocs);
+                        for (int i = 0; i < tags.length; i++) {
+                          final tag = tags[i];
+                          final isLast = i == tags.length - 1;
 
-                        // Fő útvonal dokumentumok hozzáadása - csak akkor, ha nincs típus szűrő vagy az állomások típusa van kiválasztva
-                        if (shouldLoadAllomasok) {
-                          final allomasDocs = (allomasSnapshot.data?.docs ??
-                                  const <QueryDocumentSnapshot<
-                                      Map<String, dynamic>>>[])
-                              .where((d) {
-                            final data = d.data();
-                            // Szűrés cím alapján (cim mező)
-                            final cim = (data['cim'] ?? '').toString();
-                            return cim
-                                .toLowerCase()
-                                .contains(widget.searchText.toLowerCase());
-                          }).toList();
-                          allDocs.addAll(allomasDocs);
-                        }
-
-                        // Dialogus fájl dokumentumok hozzáadása
-                        if (shouldLoadDialogus) {
-                          final dialogusDocs = (dialogusSnapshot.data?.docs ??
-                                  const <QueryDocumentSnapshot<
-                                      Map<String, dynamic>>>[])
-                              .where((d) {
-                            final data = d.data();
-                            
-                            // Audio URL ellenőrzése
-                            final audioUrl = data['audioUrl'] as String?;
-                            if (audioUrl == null || audioUrl.isEmpty || audioUrl.trim().isEmpty) {
-                              return false;
-                            }
-                            
-                            // Szűrés cím alapján (title vagy cim mező)
-                            final title = (data['title'] ?? data['cim'] ?? '').toString();
-                            return title
-                                .toLowerCase()
-                                .contains(widget.searchText.toLowerCase());
-                          }).toList();
-                          allDocs.addAll(dialogusDocs);
-                        }
-
-                        // Típus szűrés
-                        final filteredDocs = widget.selectedType != null &&
-                                widget.selectedType!.isNotEmpty
-                            ? allDocs.where((d) {
-                                final data = d.data();
-                                // A fő útvonal dokumentumok a memoriapalota_allomasok kollekcióból jönnek
-                                if (d.reference.path
-                                        .contains('memoriapalota_allomasok') &&
-                                    !d.reference.path.contains('/allomasok/')) {
-                                  return widget.selectedType ==
-                                      'memoriapalota_allomasok';
+                          if (isLast) {
+                            // Ha ez az utolsó címke, akkor itt vannak a jegyzetek
+                            // Ha már létezik ez a kulcs és Map típusú, akkor az üres kulcs alá tesszük
+                            if (current.containsKey(tag)) {
+                              if (current[tag] is Map<String, dynamic>) {
+                                // Ha már Map van, akkor az üres kulcs alá tesszük a jegyzetet
+                                final map =
+                                    current[tag] as Map<String, dynamic>;
+                                if (!map.containsKey('')) {
+                                  map[''] = <QueryDocumentSnapshot<
+                                      Map<String, dynamic>>>[];
                                 }
-                                // A dialogus fájl dokumentumok a dialogus_fajlok kollekcióból jönnek
-                                if (d.reference.path
-                                    .contains('dialogus_fajlok')) {
-                                  return widget.selectedType ==
-                                      'dialogus_fajlok';
-                                }
-                                return data['type'] == widget.selectedType;
-                              }).toList()
-                            : allDocs;
-
-                        final docs = filteredDocs;
-
-                        if (!snapshot.hasData &&
-                            snapshot.connectionState !=
-                                ConnectionState.active &&
-                            (!shouldLoadAllomasok ||
-                                !allomasSnapshot.hasData) &&
-                            (!shouldLoadDialogus || !dialogusSnapshot.hasData)) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        }
-
-                        if (docs.isEmpty) {
-                          return const Center(child: Text('Nincs találat.'));
-                        }
-
-                        // Hierarchikus csoportosítás: Kategória → Címkék hierarchia (tudomány szint nélkül, mert csak "Jogász" van)
-                        // A címkék hierarchikusan működnek: tags[0] = főcím, tags[1] = alcím, tags[2] = alcím az alcím alatt, stb.
-                        // Map<category, Map<firstTag, Map<secondTag, Map<thirdTag, ...>>>>
-                        final Map<String, Map<String, dynamic>> hierarchical =
-                            {};
-
-                        for (var d in docs) {
-                          // Ha dialogus_fajlok dokumentum, akkor a kategória mindig "Dialogus tags"
-                          // Ez biztosítja, hogy külön mappába kerüljenek
-                          final isDialogusFajl = d.reference.path.contains('dialogus_fajlok');
-                          
-                          final category = isDialogusFajl 
-                              ? 'Dialogus tags' 
-                              : (d.data()['category'] ?? 'Egyéb') as String;
-                              
-                          final tags =
-                              (d.data()['tags'] as List<dynamic>? ?? [])
-                                  .cast<String>();
-
-                          hierarchical.putIfAbsent(category, () => {});
-
-                          // Címkék hierarchikus csoportosítása
-                          if (tags.isEmpty) {
-                            hierarchical[category]!
-                                .putIfAbsent(
-                                    'Nincs címke',
-                                    () => <QueryDocumentSnapshot<
-                                        Map<String, dynamic>>>[])
-                                .add(d);
-                          } else {
-                            // A címkék sorrendje fontos: tags[0] = főcím, tags[1] = alcím, stb.
-                            // Hierarchikusan építjük fel: category -> tags[0] -> tags[1] -> tags[2] -> ... -> docs
-                            Map<String, dynamic> current =
-                                hierarchical[category]!;
-
-                            for (int i = 0; i < tags.length; i++) {
-                              final tag = tags[i];
-                              final isLast = i == tags.length - 1;
-
-                              if (isLast) {
-                                // Ha ez az utolsó címke, akkor itt vannak a jegyzetek
-                                // Ha már létezik ez a kulcs és Map típusú, akkor az üres kulcs alá tesszük
-                                if (current.containsKey(tag)) {
-                                  if (current[tag] is Map<String, dynamic>) {
-                                    // Ha már Map van, akkor az üres kulcs alá tesszük a jegyzetet
-                                    final map =
-                                        current[tag] as Map<String, dynamic>;
-                                    if (!map.containsKey('')) {
-                                      map[''] = <QueryDocumentSnapshot<
-                                          Map<String, dynamic>>>[];
-                                    }
-                                    (map[''] as List<
-                                            QueryDocumentSnapshot<
-                                                Map<String, dynamic>>>)
-                                        .add(d);
-                                  } else {
-                                    // Ha lista van, akkor hozzáadjuk
-                                    (current[tag] as List<
-                                            QueryDocumentSnapshot<
-                                                Map<String, dynamic>>>)
-                                        .add(d);
-                                  }
-                                } else {
-                                  // Ha nem létezik, akkor létrehozzuk listaként
-                                  current[tag] = <QueryDocumentSnapshot<
-                                      Map<String, dynamic>>>[d];
-                                }
+                                (map[''] as List<
+                                        QueryDocumentSnapshot<
+                                            Map<String, dynamic>>>)
+                                    .add(d);
                               } else {
-                                // Ha nem az utolsó, akkor egy köztes szint
-                                if (!current.containsKey(tag)) {
-                                  current[tag] = <String, dynamic>{};
-                                } else if (current[tag] is! Map) {
-                                  // Ha véletlenül lista van, átalakítjuk Map-pé és összefésüljük
-                                  // Ez akkor történik, amikor egy jegyzetnek csak ["MP"] címkéje van,
-                                  // majd egy másik jegyzetnek ["MP", "Teszt"] címkéi vannak
-                                  final existingDocs = current[tag] as List<
-                                      QueryDocumentSnapshot<
-                                          Map<String, dynamic>>>;
-                                  current[tag] = <String, dynamic>{
-                                    '': existingDocs
-                                  };
-                                }
-                                current = current[tag] as Map<String, dynamic>;
+                                // Ha lista van, akkor hozzáadjuk
+                                (current[tag] as List<
+                                        QueryDocumentSnapshot<
+                                            Map<String, dynamic>>>)
+                                    .add(d);
                               }
+                            } else {
+                              // Ha nem létezik, akkor létrehozzuk listaként
+                              current[tag] =
+                                  <QueryDocumentSnapshot<Map<String, dynamic>>>[
+                                d
+                              ];
                             }
+                          } else {
+                            // Ha nem az utolsó, akkor egy köztes szint
+                            if (!current.containsKey(tag)) {
+                              current[tag] = <String, dynamic>{};
+                            } else if (current[tag] is! Map) {
+                              // Ha véletlenül lista van, átalakítjuk Map-pé és összefésüljük
+                              // Ez akkor történik, amikor egy jegyzetnek csak ["MP"] címkéje van,
+                              // majd egy másik jegyzetnek ["MP", "Teszt"] címkéi vannak
+                              final existingDocs = current[tag] as List<
+                                  QueryDocumentSnapshot<Map<String, dynamic>>>;
+                              current[tag] = <String, dynamic>{
+                                '': existingDocs
+                              };
+                            }
+                            current = current[tag] as Map<String, dynamic>;
                           }
                         }
+                      }
+                    }
 
-                        // Rendezés minden szinten - rekurzívan
-                        void sortDocs(Map<String, dynamic> level) {
-                          level.forEach((key, value) {
-                            if (value is List<
-                                QueryDocumentSnapshot<Map<String, dynamic>>>) {
-                              value.sort((a, b) {
-                                // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
-                                final isAllomasA = a.reference.path
-                                        .contains('memoriapalota_allomasok') &&
-                                    !a.reference.path.contains('/allomasok/');
-                                final isAllomasB = b.reference.path
-                                        .contains('memoriapalota_allomasok') &&
-                                    !b.reference.path.contains('/allomasok/');
-                                final isDialogusA = a.reference.path
-                                    .contains('dialogus_fajlok');
-                                final isDialogusB = b.reference.path
-                                    .contains('dialogus_fajlok');
-                                    
-                                final typeA = isAllomasA
-                                    ? 'memoriapalota_allomasok'
-                                    : (isDialogusA 
-                                            ? 'dialogus_fajlok' 
-                                            : (a.data()['type'] as String? ?? ''));
-                                final typeB = isAllomasB
-                                    ? 'memoriapalota_allomasok'
-                                    : (isDialogusB 
-                                            ? 'dialogus_fajlok' 
-                                            : (b.data()['type'] as String? ?? ''));
+                    // Rendezés minden szinten - rekurzívan
+                    void sortDocs(Map<String, dynamic> level) {
+                      level.forEach((key, value) {
+                        if (value is List<
+                            QueryDocumentSnapshot<Map<String, dynamic>>>) {
+                          value.sort((a, b) {
+                            // Fő útvonal dokumentumok típusának meghatározása (nem subcollection)
+                            final isAllomasA = a.reference.path
+                                    .contains('memoriapalota_allomasok') &&
+                                !a.reference.path.contains('/allomasok/');
+                            final isAllomasB = b.reference.path
+                                    .contains('memoriapalota_allomasok') &&
+                                !b.reference.path.contains('/allomasok/');
+                            final isDialogusA =
+                                a.reference.path.contains('dialogus_fajlok');
+                            final isDialogusB =
+                                b.reference.path.contains('dialogus_fajlok');
 
-                                // 'source' típus mindig a lista végére kerüljön
-                                final bool isSourceA = typeA == 'source';
-                                final bool isSourceB = typeB == 'source';
-                                if (isSourceA != isSourceB) {
-                                  return isSourceA
-                                      ? 1
-                                      : -1; // source után soroljuk
-                                }
-                                // ha mindkettő ugyanaz a forrás státusz, marad a korábbi logika
-                                final typeCompare = typeA.compareTo(typeB);
-                                if (typeCompare != 0) {
-                                  return typeCompare;
-                                }
-                                // Cím meghatározása: fő útvonal dokumentumoknál, fájloknál 'cim', egyébként 'title'
-                                final titleA = isAllomasA || isDialogusA
-                                    ? (a.data()['title'] ?? a.data()['cim'] ?? '').toString()
-                                    : (a.data()['title'] as String? ?? '');
-                                final titleB = isAllomasB || isDialogusB
-                                    ? (b.data()['title'] ?? b.data()['cim'] ?? '').toString()
-                                    : (b.data()['title'] as String? ?? '');
-                                return titleA.compareTo(titleB);
-                              });
-                            } else if (value is Map<String, dynamic>) {
-                              // Rekurzívan rendezzük az al-szinteket
-                              sortDocs(value);
+                            final typeA = isAllomasA
+                                ? 'memoriapalota_allomasok'
+                                : (isDialogusA
+                                    ? 'dialogus_fajlok'
+                                    : (a.data()['type'] as String? ?? ''));
+                            final typeB = isAllomasB
+                                ? 'memoriapalota_allomasok'
+                                : (isDialogusB
+                                    ? 'dialogus_fajlok'
+                                    : (b.data()['type'] as String? ?? ''));
+
+                            // 'source' típus mindig a lista végére kerüljön
+                            final bool isSourceA = typeA == 'source';
+                            final bool isSourceB = typeB == 'source';
+                            if (isSourceA != isSourceB) {
+                              return isSourceA ? 1 : -1; // source után soroljuk
                             }
+                            // ha mindkettő ugyanaz a forrás státusz, marad a korábbi logika
+                            final typeCompare = typeA.compareTo(typeB);
+                            if (typeCompare != 0) {
+                              return typeCompare;
+                            }
+                            // Cím meghatározása: fő útvonal dokumentumoknál, fájloknál 'cim', egyébként 'title'
+                            final titleA = isAllomasA || isDialogusA
+                                ? (a.data()['title'] ?? a.data()['cim'] ?? '')
+                                    .toString()
+                                : (a.data()['title'] as String? ?? '');
+                            final titleB = isAllomasB || isDialogusB
+                                ? (b.data()['title'] ?? b.data()['cim'] ?? '')
+                                    .toString()
+                                : (b.data()['title'] as String? ?? '');
+                            return titleA.compareTo(titleB);
                           });
+                        } else if (value is Map<String, dynamic>) {
+                          // Rekurzívan rendezzük az al-szinteket
+                          sortDocs(value);
                         }
+                      });
+                    }
 
-                        hierarchical.forEach((category, tags) {
-                          sortDocs(tags);
-                        });
+                    hierarchical.forEach((category, tags) {
+                      sortDocs(tags);
+                    });
 
-                        return ListView(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 0, vertical: 8),
-                          children: hierarchical.entries.map((categoryEntry) {
-                            return _CategorySection(
-                              key: ValueKey('category_${categoryEntry.key}'),
-                              category: categoryEntry.key,
-                              tagHierarchy: categoryEntry.value,
-                              selectedCategory: widget.selectedCategory,
-                              selectedTag: widget.selectedTag,
-                              hasPremiumAccess: hasPremiumAccess,
-                            );
-                          }).toList(),
+                    return ListView(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 0, vertical: 8),
+                      children: hierarchical.entries.map((categoryEntry) {
+                        return _CategorySection(
+                          key: ValueKey('category_${categoryEntry.key}'),
+                          category: categoryEntry.key,
+                          tagHierarchy: categoryEntry.value,
+                          selectedCategory: widget.selectedCategory,
+                          selectedTag: widget.selectedTag,
+                          hasPremiumAccess: hasPremiumAccess,
                         );
-                      },
+                      }).toList(),
                     );
                   },
                 );
@@ -518,6 +514,8 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             );
           },
         );
+      },
+    );
   }
 }
 

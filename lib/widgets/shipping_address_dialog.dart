@@ -40,7 +40,7 @@ class _ShippingAddressDialogContentState
   bool _isLoading = false;
   bool _isCompany = false; // Magánszemély (false) vagy jogi személy (true)
   bool _isLoadingUserData = true;
-  
+
   // Irányítószám-település adatok
   Map<String, List<String>>? _postalCodes;
   bool _isLoadingPostalCodes = false;
@@ -54,21 +54,21 @@ class _ShippingAddressDialogContentState
     // Irányítószám változás figyelése
     _zipCodeController.addListener(_onZipCodeChanged);
   }
-  
+
   Future<void> _loadPostalCodes() async {
     try {
       setState(() {
         _isLoadingPostalCodes = true;
       });
-      
-      final String jsonString = await rootBundle.loadString('assets/postal_codes.json');
+
+      final String jsonString =
+          await rootBundle.loadString('assets/postal_codes.json');
       final Map<String, dynamic> jsonData = json.decode(jsonString);
-      
+
       // Konvertálás Map<String, List<String>> formátumba
-      _postalCodes = jsonData.map((key, value) => 
-        MapEntry(key, List<String>.from(value as List))
-      );
-      
+      _postalCodes = jsonData
+          .map((key, value) => MapEntry(key, List<String>.from(value as List)));
+
       if (mounted) {
         setState(() {
           _isLoadingPostalCodes = false;
@@ -83,10 +83,10 @@ class _ShippingAddressDialogContentState
       }
     }
   }
-  
+
   void _onZipCodeChanged() {
     final zipCode = _zipCodeController.text.trim();
-    
+
     // Csak akkor keresünk, ha pontosan 4 számjegy van
     if (zipCode.length == 4 && RegExp(r'^\d{4}$').hasMatch(zipCode)) {
       _lookupCity(zipCode);
@@ -99,12 +99,12 @@ class _ShippingAddressDialogContentState
       }
     }
   }
-  
+
   void _lookupCity(String zipCode) {
     if (_postalCodes == null) return;
-    
+
     final cities = _postalCodes![zipCode];
-    
+
     if (cities != null && cities.isNotEmpty) {
       if (cities.length == 1) {
         // Egy település: automatikusan kitöltjük
@@ -135,13 +135,13 @@ class _ShippingAddressDialogContentState
             .collection('users')
             .doc(user.uid)
             .get();
-        
+
         if (userDoc.exists && mounted) {
           final userData = userDoc.data();
           final firstName = userData?['firstName']?.toString() ?? '';
           final lastName = userData?['lastName']?.toString() ?? '';
           final displayName = userData?['displayName']?.toString() ?? '';
-          
+
           // Név összeállítása: lastName firstName vagy displayName vagy email
           String fullName = '';
           if (firstName.isNotEmpty && lastName.isNotEmpty) {
@@ -153,7 +153,7 @@ class _ShippingAddressDialogContentState
           } else if (user.email != null) {
             fullName = user.email!.split('@')[0];
           }
-          
+
           if (fullName.isNotEmpty && mounted) {
             _nameController.text = fullName;
           }
@@ -206,16 +206,16 @@ class _ShippingAddressDialogContentState
               .collection('users')
               .doc(user.uid)
               .get();
-          
+
           final userData = userDoc.data();
-          final isAdmin = userData?['isAdmin'] == true || 
-                         user.email == 'tattila.ninox@gmail.com';
-          
+          final isAdmin = userData?['isAdmin'] == true ||
+              user.email == 'tattila.ninox@gmail.com';
+
           if (isAdmin) {
             // Admin felhasználó: számla generálása teszteléshez
             try {
-              final functions = FirebaseFunctions.instanceFor(
-                  region: 'europe-west1');
+              final functions =
+                  FirebaseFunctions.instanceFor(region: 'europe-west1');
               final callable =
                   functions.httpsCallable('generateInvoiceManually');
 
@@ -233,12 +233,12 @@ class _ShippingAddressDialogContentState
                 'planId': 'monthly_premium_prepaid',
                 'amount': 4350,
               });
-              
+
               final data = result.data as Map<String, dynamic>;
 
               if (mounted) {
                 Navigator.of(context).pop(null); // Bezárjuk a dialógot
-                
+
                 if (data['success'] == true) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -252,8 +252,8 @@ class _ShippingAddressDialogContentState
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                          'Hiba: ${data['error'] ?? 'Ismeretlen hiba'}'),
+                      content:
+                          Text('Hiba: ${data['error'] ?? 'Ismeretlen hiba'}'),
                       backgroundColor: Colors.red,
                       duration: const Duration(seconds: 5),
                     ),
@@ -347,7 +347,7 @@ class _ShippingAddressDialogContentState
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Információs szöveg
               Container(
                 padding: const EdgeInsets.all(12),
@@ -373,14 +373,16 @@ class _ShippingAddressDialogContentState
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Jogi személy checkbox
               Container(
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _isCompany ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
+                    color: _isCompany
+                        ? const Color(0xFF1E3A8A)
+                        : Colors.grey[300]!,
                     width: _isCompany ? 2 : 1,
                   ),
                 ),
@@ -411,11 +413,12 @@ class _ShippingAddressDialogContentState
                     });
                   },
                   controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Név mező
               if (_isLoadingUserData)
                 const Center(
@@ -447,7 +450,8 @@ class _ShippingAddressDialogContentState
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF1E3A8A), width: 2),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -462,7 +466,7 @@ class _ShippingAddressDialogContentState
                   },
                 ),
               const SizedBox(height: 16),
-              
+
               // Irányítószám és Település sorban
               Row(
                 children: [
@@ -477,14 +481,16 @@ class _ShippingAddressDialogContentState
                           decoration: InputDecoration(
                             labelText: 'Irányítószám *',
                             hintText: '2030',
-                            prefixIcon: Icon(Icons.pin, color: Colors.grey[600]),
+                            prefixIcon:
+                                Icon(Icons.pin, color: Colors.grey[600]),
                             suffixIcon: _isLoadingPostalCodes
                                 ? const Padding(
                                     padding: EdgeInsets.all(12.0),
                                     child: SizedBox(
                                       width: 20,
                                       height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
                                     ),
                                   )
                                 : null,
@@ -500,11 +506,13 @@ class _ShippingAddressDialogContentState
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF1E3A8A), width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Colors.red, width: 2),
+                              borderSide:
+                                  const BorderSide(color: Colors.red, width: 2),
                             ),
                             counterText: '', // Elrejtjük a karakter számlálót
                           ),
@@ -532,20 +540,25 @@ class _ShippingAddressDialogContentState
                       children: [
                         TextFormField(
                           controller: _cityController,
-                          enabled: !_isLoading && _availableCities == null, // Le van tiltva, ha több település van
-                          readOnly: _availableCities != null, // Csak olvasható, ha több település van
+                          enabled: !_isLoading &&
+                              _availableCities ==
+                                  null, // Le van tiltva, ha több település van
+                          readOnly: _availableCities !=
+                              null, // Csak olvasható, ha több település van
                           decoration: InputDecoration(
                             labelText: 'Település *',
-                            hintText: _availableCities != null 
-                                ? 'Válassz települést' 
+                            hintText: _availableCities != null
+                                ? 'Válassz települést'
                                 : 'Érd',
-                            prefixIcon: Icon(Icons.location_city, color: Colors.grey[600]),
+                            prefixIcon: Icon(Icons.location_city,
+                                color: Colors.grey[600]),
                             suffixIcon: _availableCities != null
-                                ? Icon(Icons.arrow_drop_down, color: Colors.grey[600])
+                                ? Icon(Icons.arrow_drop_down,
+                                    color: Colors.grey[600])
                                 : null,
                             filled: true,
-                            fillColor: _availableCities != null 
-                                ? Colors.blue[50] 
+                            fillColor: _availableCities != null
+                                ? Colors.blue[50]
                                 : Colors.grey[50],
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -557,11 +570,13 @@ class _ShippingAddressDialogContentState
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF1E3A8A), width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Colors.red, width: 2),
+                              borderSide:
+                                  const BorderSide(color: Colors.red, width: 2),
                             ),
                           ),
                           validator: (value) {
@@ -600,7 +615,8 @@ class _ShippingAddressDialogContentState
                         padding: const EdgeInsets.all(12.0),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                            Icon(Icons.info_outline,
+                                size: 16, color: Colors.blue[700]),
                             const SizedBox(width: 8),
                             Text(
                               '${_availableCities!.length} település található, válassz egyet:',
@@ -628,10 +644,12 @@ class _ShippingAddressDialogContentState
                                 });
                               },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.location_city, size: 18, color: Colors.grey[600]),
+                                    Icon(Icons.location_city,
+                                        size: 18, color: Colors.grey[600]),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
@@ -651,7 +669,7 @@ class _ShippingAddressDialogContentState
                 ),
               ],
               const SizedBox(height: 16),
-              
+
               // Utca, házszám
               TextFormField(
                 controller: _addressController,
@@ -672,7 +690,8 @@ class _ShippingAddressDialogContentState
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF1E3A8A), width: 2),
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -688,7 +707,7 @@ class _ShippingAddressDialogContentState
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Adószám
               TextFormField(
                 controller: _taxNumberController,
@@ -709,7 +728,8 @@ class _ShippingAddressDialogContentState
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF1E3A8A), width: 2),
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -726,7 +746,7 @@ class _ShippingAddressDialogContentState
                     : null,
               ),
               const SizedBox(height: 24),
-              
+
               // Gombok
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -736,7 +756,8 @@ class _ShippingAddressDialogContentState
                         ? null
                         : () => Navigator.of(context).pop(null),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
                     ),
                     child: const Text(
                       'Mégse',
@@ -749,7 +770,8 @@ class _ShippingAddressDialogContentState
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1E3A8A),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -761,7 +783,8 @@ class _ShippingAddressDialogContentState
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Row(
@@ -788,4 +811,3 @@ class _ShippingAddressDialogContentState
     );
   }
 }
-

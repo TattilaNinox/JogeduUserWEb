@@ -304,13 +304,14 @@ final _router = GoRouter(
       builder: (context, state) {
         final documentIdWithJogesetId = state.pathParameters['documentId']!;
         final from = state.uri.queryParameters['from'];
-        
+
         // Különválasztjuk a dokumentum ID-t és a jogeset ID-t
         final parts = documentIdWithJogesetId.split('#');
         final documentId = parts[0];
         final jogesetIdStr = parts.length > 1 ? parts[1] : null;
-        final jogesetId = jogesetIdStr != null ? int.tryParse(jogesetIdStr) : null;
-        
+        final jogesetId =
+            jogesetIdStr != null ? int.tryParse(jogesetIdStr) : null;
+
         return JogesetViewScreen(
           documentId: documentId,
           jogesetId: jogesetId,

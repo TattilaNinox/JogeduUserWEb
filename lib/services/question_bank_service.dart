@@ -14,7 +14,8 @@ class QuestionBankService {
           .get();
 
       if (!doc.exists) {
-        debugPrint('QuestionBankService: Question bank not found: $questionBankId');
+        debugPrint(
+            'QuestionBankService: Question bank not found: $questionBankId');
         return null;
       }
 
@@ -35,7 +36,8 @@ class QuestionBankService {
       // Fetch question bank
       final questionBank = await getQuestionBank(questionBankId);
       if (questionBank == null) {
-        debugPrint('QuestionBankService: Question bank not found, returning empty list');
+        debugPrint(
+            'QuestionBankService: Question bank not found, returning empty list');
         return [];
       }
 
@@ -56,12 +58,12 @@ class QuestionBankService {
       if (selectedQuestions.length < maxQuestions) {
         final remainingNeeded = maxQuestions - selectedQuestions.length;
         final selectedHashes = selectedQuestions.map((q) => q.hash).toSet();
-        
+
         final additionalQuestions = questionBank.questions
             .where((question) => !selectedHashes.contains(question.hash))
             .take(remainingNeeded)
             .toList();
-        
+
         selectedQuestions.addAll(additionalQuestions);
       }
 
@@ -70,17 +72,20 @@ class QuestionBankService {
         await _recordServedQuestions(userId, selectedQuestions);
       }
 
-      debugPrint('QuestionBankService: Selected ${selectedQuestions.length} questions for user $userId');
+      debugPrint(
+          'QuestionBankService: Selected ${selectedQuestions.length} questions for user $userId');
       return selectedQuestions;
     } catch (e) {
-      debugPrint('QuestionBankService: Error getting personalized questions: $e');
+      debugPrint(
+          'QuestionBankService: Error getting personalized questions: $e');
       // Fallback: return random questions from the full bank
       return await _getFallbackQuestions(questionBankId, maxQuestions);
     }
   }
 
   /// Get recently served questions (within last 1 hour)
-  static Future<List<ServedQuestion>> _getRecentlyServedQuestions(String userId) async {
+  static Future<List<ServedQuestion>> _getRecentlyServedQuestions(
+      String userId) async {
     try {
       final now = DateTime.now();
       final oneHourAgo = now.subtract(const Duration(hours: 1));
@@ -96,13 +101,15 @@ class QuestionBankService {
           .map((doc) => ServedQuestion.fromMap(doc.id, doc.data()))
           .toList();
     } catch (e) {
-      debugPrint('QuestionBankService: Error getting recently served questions: $e');
+      debugPrint(
+          'QuestionBankService: Error getting recently served questions: $e');
       return [];
     }
   }
 
   /// Record questions as served with TTL
-  static Future<void> _recordServedQuestions(String userId, List<Question> questions) async {
+  static Future<void> _recordServedQuestions(
+      String userId, List<Question> questions) async {
     try {
       final batch = _firestore.batch();
       final now = DateTime.now();
@@ -122,14 +129,16 @@ class QuestionBankService {
       }
 
       await batch.commit();
-      debugPrint('QuestionBankService: Recorded ${questions.length} questions as served');
+      debugPrint(
+          'QuestionBankService: Recorded ${questions.length} questions as served');
     } catch (e) {
       debugPrint('QuestionBankService: Error recording served questions: $e');
     }
   }
 
   /// Fallback method to get random questions when personalization fails
-  static Future<List<Question>> _getFallbackQuestions(String questionBankId, int maxQuestions) async {
+  static Future<List<Question>> _getFallbackQuestions(
+      String questionBankId, int maxQuestions) async {
     try {
       final questionBank = await getQuestionBank(questionBankId);
       if (questionBank == null) {
@@ -149,7 +158,7 @@ class QuestionBankService {
   static Future<void> clearExpiredServedQuestions(String userId) async {
     try {
       final now = DateTime.now();
-      
+
       final querySnapshot = await _firestore
           .collection('users')
           .doc(userId)
@@ -163,11 +172,12 @@ class QuestionBankService {
           batch.delete(doc.reference);
         }
         await batch.commit();
-        debugPrint('QuestionBankService: Cleared ${querySnapshot.docs.length} expired served questions');
+        debugPrint(
+            'QuestionBankService: Cleared ${querySnapshot.docs.length} expired served questions');
       }
     } catch (e) {
-      debugPrint('QuestionBankService: Error clearing expired served questions: $e');
+      debugPrint(
+          'QuestionBankService: Error clearing expired served questions: $e');
     }
   }
 }
-

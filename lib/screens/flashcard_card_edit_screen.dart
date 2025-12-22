@@ -13,7 +13,8 @@ class FlashcardCardEditScreen extends StatefulWidget {
   const FlashcardCardEditScreen({super.key, required this.cardId});
 
   @override
-  State<FlashcardCardEditScreen> createState() => _FlashcardCardEditScreenState();
+  State<FlashcardCardEditScreen> createState() =>
+      _FlashcardCardEditScreenState();
 }
 
 class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
@@ -25,7 +26,8 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
   bool _isSaving = false;
   Timer? _debounce;
 
-  DocumentReference get _cardRef => FirebaseFirestore.instance.collection('notes').doc(widget.cardId);
+  DocumentReference get _cardRef =>
+      FirebaseFirestore.instance.collection('notes').doc(widget.cardId);
 
   @override
   void initState() {
@@ -50,13 +52,17 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
         _htmlCtrl.text = data['html'] ?? '';
         _deckId = data['deckId'];
         if (data['audioUrl'] != null) {
-          _audio = {'url': data['audioUrl'], 'name': _extractFileName(data['audioUrl'])};
+          _audio = {
+            'url': data['audioUrl'],
+            'name': _extractFileName(data['audioUrl'])
+          };
         }
         setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hiba a kártya betöltésekor: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Hiba a kártya betöltésekor: $e')));
         context.pop();
       }
     }
@@ -65,7 +71,7 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
   String _extractFileName(String url) {
     try {
       return Uri.decodeComponent(url.split('%2F').last.split('?').first);
-    } catch(e) {
+    } catch (e) {
       return 'Ismeretlen fájlnév';
     }
   }
@@ -74,19 +80,21 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
     const typeGroup = XTypeGroup(label: 'MP3', extensions: ['mp3']);
     final file = await openFile(acceptedTypeGroups: [typeGroup]);
     if (file == null) return;
-    
+
     final bytes = await file.readAsBytes();
-    if (bytes.length > 10 * 1024 * 1024) { // 10 MB limit
+    if (bytes.length > 10 * 1024 * 1024) {
+      // 10 MB limit
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Max 10 MB MP3!')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Max 10 MB MP3!')));
       return;
     }
-    
+
     setState(() {
       _audio = {'name': file.name, 'bytes': bytes};
     });
   }
-  
+
   void _removeAudio() {
     setState(() {
       _audio = null;
@@ -96,12 +104,13 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
   Future<void> _saveCard() async {
     if (_isSaving) return;
     setState(() => _isSaving = true);
-    
+
     try {
       String? audioUrl;
       if (_audio != null) {
         if (_audio!.containsKey('bytes')) {
-          final ref = FirebaseStorage.instance.ref('notes/${widget.cardId}/${_audio!['name']}');
+          final ref = FirebaseStorage.instance
+              .ref('notes/${widget.cardId}/${_audio!['name']}');
           await ref.putData(_audio!['bytes']);
           audioUrl = await ref.getDownloadURL();
         } else if (_audio!.containsKey('url')) {
@@ -115,21 +124,22 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
         'audioUrl': audioUrl,
         'modified': Timestamp.now(),
       });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kártya mentve!')));
-        if(_deckId != null) context.go('/flashcard-decks/edit/$_deckId');
-      }
 
-    } catch(e) {
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hiba mentés közben: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Kártya mentve!')));
+        if (_deckId != null) context.go('/flashcard-decks/edit/$_deckId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Hiba mentés közben: $e')));
       }
     } finally {
-      if(mounted) setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
-  
+
   void _showPreview() {
     final audioPlayer = AudioPlayer();
     showDialog(
@@ -201,7 +211,12 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
           const SizedBox(width: 16),
           ElevatedButton.icon(
             onPressed: _isSaving ? null : _saveCard,
-            icon: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save),
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.save),
             label: const Text('Mentés'),
           ),
           const SizedBox(width: 16),
@@ -220,7 +235,8 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Hangfájl', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Hangfájl',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
@@ -243,7 +259,8 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
                     children: [
                       if (_audio != null)
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.redAccent),
+                          icon:
+                              const Icon(Icons.delete, color: Colors.redAccent),
                           onPressed: _removeAudio,
                           tooltip: 'Hangfájl eltávolítása',
                         ),
@@ -258,7 +275,8 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('HTML Kód', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('HTML Kód',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
               controller: _htmlCtrl,
@@ -273,4 +291,4 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
       ),
     );
   }
-} 
+}

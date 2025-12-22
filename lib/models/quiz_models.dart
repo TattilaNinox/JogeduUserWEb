@@ -132,7 +132,8 @@ class QuizResult {
     required this.questionResults,
   });
 
-  double get percentage => totalQuestions > 0 ? (score / totalQuestions) * 100 : 0.0;
+  double get percentage =>
+      totalQuestions > 0 ? (score / totalQuestions) * 100 : 0.0;
 }
 
 class QuestionResult {
@@ -148,4 +149,3 @@ class QuestionResult {
     required this.isCorrect,
   });
 }
-

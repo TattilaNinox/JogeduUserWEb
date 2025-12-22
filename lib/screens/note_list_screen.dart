@@ -203,31 +203,32 @@ class _NoteListScreenState extends State<NoteListScreen> {
         Query<Map<String, dynamic>> dialogusQuery = FirebaseConfig.firestore
             .collection('dialogus_fajlok')
             .where('science', isEqualTo: userScience);
-        
+
         if (isAdmin) {
-          dialogusQuery = dialogusQuery.where('status', whereIn: ['Published', 'Draft']);
+          dialogusQuery =
+              dialogusQuery.where('status', whereIn: ['Published', 'Draft']);
         } else {
           dialogusQuery = dialogusQuery.where('status', isEqualTo: 'Published');
         }
-        
+
         final dialogusSnapshot = await dialogusQuery.get();
         // debugPrint('🔵 dialogus_fajlok: ${dialogusSnapshot.docs.length} dokumentum található');
-        
+
         // Ellenőrizzük, van-e legalább egy dokumentum audioUrl-lel
         bool hasDialogusFiles = false;
         for (var doc in dialogusSnapshot.docs) {
           final data = doc.data();
           if (data['deletedAt'] != null) continue;
-          
+
           final audioUrl = data['audioUrl'] as String?;
           if (audioUrl != null && audioUrl.isNotEmpty) {
             hasDialogusFiles = true;
             break; // Elég egy érvényes dokumentum
           }
         }
-        
+
         // debugPrint('🔵 dialogus_fajlok: $validDocsCount érvényes dokumentum (audioUrl-lel)');
-        
+
         if (hasDialogusFiles) {
           categoriesSet.add('Dialogus tags');
           // debugPrint('🔵 "Dialogus tags" kategória hozzáadva');
@@ -245,28 +246,33 @@ class _NoteListScreenState extends State<NoteListScreen> {
         Query<Map<String, dynamic>> mpAllomasQuery = FirebaseConfig.firestore
             .collection('memoriapalota_allomasok')
             .where('science', isEqualTo: userScience);
-            
+
         if (isAdmin) {
-          mpAllomasQuery = mpAllomasQuery.where('status', whereIn: ['Published', 'Draft']);
+          mpAllomasQuery =
+              mpAllomasQuery.where('status', whereIn: ['Published', 'Draft']);
         } else {
-          mpAllomasQuery = mpAllomasQuery.where('status', isEqualTo: 'Published');
+          mpAllomasQuery =
+              mpAllomasQuery.where('status', isEqualTo: 'Published');
         }
-        
+
         final mpAllomasSnapshot = await mpAllomasQuery.get();
-        debugPrint('🔵 Memoriapalota_allomasok kategória keresés: ${mpAllomasSnapshot.docs.length} dokumentum');
-        
+        debugPrint(
+            '🔵 Memoriapalota_allomasok kategória keresés: ${mpAllomasSnapshot.docs.length} dokumentum');
+
         for (var doc in mpAllomasSnapshot.docs) {
           final data = doc.data();
           if (data['deletedAt'] != null) continue;
-          
+
           final category = data['category'] as String?;
           if (category != null && category.isNotEmpty) {
             categoriesSet.add(category);
-            debugPrint('🔵 Kategória hozzáadva memoriapalota_allomasok-ból: $category');
+            debugPrint(
+                '🔵 Kategória hozzáadva memoriapalota_allomasok-ból: $category');
           }
         }
       } catch (e) {
-        debugPrint('🔴 Hiba a memoriapalota_allomasok kategóriák betöltésekor: $e');
+        debugPrint(
+            '🔴 Hiba a memoriapalota_allomasok kategóriák betöltésekor: $e');
       }
 
       setState(() {
@@ -397,10 +403,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
         Query<Map<String, dynamic>> mpFajlQuery = FirebaseConfig.firestore
             .collection('memoriapalota_fajlok')
             .where('science', isEqualTo: userScience);
-        
+
         // Status szűrés hozzáadása a Firestore query-hez (szükséges a security rules miatt)
         if (isAdmin) {
-          mpFajlQuery = mpFajlQuery.where('status', whereIn: ['Published', 'Draft']);
+          mpFajlQuery =
+              mpFajlQuery.where('status', whereIn: ['Published', 'Draft']);
         } else {
           mpFajlQuery = mpFajlQuery.where('status', isEqualTo: 'Published');
         }

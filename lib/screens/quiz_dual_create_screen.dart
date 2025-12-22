@@ -352,7 +352,8 @@ class _QuizDualCreateScreenState extends State<QuizDualCreateScreen> {
     final bank = bankDoc.data()!;
     final questions = List<Map<String, dynamic>>.from(bank['questions'] ?? []);
     questions.shuffle();
-    final selectedQuestions = questions.take(10).map((q) => Question.fromMap(q)).toList();
+    final selectedQuestions =
+        questions.take(10).map((q) => Question.fromMap(q)).toList();
 
     if (selectedQuestions.isEmpty) {
       if (mounted) {
@@ -377,7 +378,8 @@ class _QuizDualCreateScreenState extends State<QuizDualCreateScreen> {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Előnézet eredménye: ${result.score}/${result.totalQuestions}'),
+                    content: Text(
+                        'Előnézet eredménye: ${result.score}/${result.totalQuestions}'),
                   ),
                 );
               },

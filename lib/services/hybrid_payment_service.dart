@@ -153,8 +153,8 @@ class HybridPaymentService {
   }
 
   /// Webes fizetés indítása
-  static Future<PaymentInitiationResult> _initiateWebPayment(
-      String planId, String userId, Map<String, String>? shippingAddress) async {
+  static Future<PaymentInitiationResult> _initiateWebPayment(String planId,
+      String userId, Map<String, String>? shippingAddress) async {
     if (!isWeb) {
       return const PaymentInitiationResult(
         success: false,

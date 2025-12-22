@@ -35,9 +35,11 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
       ..initialize().then((_) {
         // Az inicializálás befejeződése után...
         if (!mounted) return;
-        setState(() => _isInitialized = true); // ...jelezzük, hogy a UI felépülhet.
+        setState(
+            () => _isInitialized = true); // ...jelezzük, hogy a UI felépülhet.
         _controller.play(); // ...automatikusan elindítjuk a lejátszást.
-        _controller.addListener(_videoListener); // ...és hozzáadunk egy listenert.
+        _controller
+            .addListener(_videoListener); // ...és hozzáadunk egy listenert.
       });
   }
 
@@ -120,18 +122,23 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
                           child: SliderTheme(
                             data: SliderTheme.of(context).copyWith(
                               trackHeight: 2.0,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                              thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6.0),
+                              overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 12.0),
                               activeTrackColor: Colors.white,
                               inactiveTrackColor: Colors.white.withAlpha(77),
                               thumbColor: Colors.white,
                               overlayColor: Colors.white.withAlpha(51),
                             ),
                             child: Slider(
-                              value: _controller.value.position.inSeconds.toDouble(),
-                              max: _controller.value.duration.inSeconds.toDouble(),
+                              value: _controller.value.position.inSeconds
+                                  .toDouble(),
+                              max: _controller.value.duration.inSeconds
+                                  .toDouble(),
                               onChanged: (value) {
-                                _controller.seekTo(Duration(seconds: value.toInt()));
+                                _controller
+                                    .seekTo(Duration(seconds: value.toInt()));
                               },
                             ),
                           ),

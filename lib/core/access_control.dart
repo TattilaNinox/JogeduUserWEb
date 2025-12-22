@@ -24,7 +24,8 @@ class AccessControl {
 
       final userData = userDoc.data() ?? {};
       final userType = (userData['userType'] as String? ?? '').toLowerCase();
-      final isAdminEmail = user.email != null && allowedAdmins.contains(user.email);
+      final isAdminEmail =
+          user.email != null && allowedAdmins.contains(user.email);
       final isAdminBool = userData['isAdmin'] == true;
 
       return userType == 'admin' || isAdminEmail || isAdminBool;
@@ -36,7 +37,8 @@ class AccessControl {
 
   /// Szinkron admin ellenőrzés userData alapján (StreamBuilder-ekhez)
   /// Használja a már betöltött userData-t, hogy ne kelljen újra lekérdezni
-  static bool isAdminUserSync(Map<String, dynamic>? userData, String? userEmail) {
+  static bool isAdminUserSync(
+      Map<String, dynamic>? userData, String? userEmail) {
     if (userData == null) {
       return userEmail != null && allowedAdmins.contains(userEmail);
     }
@@ -61,4 +63,3 @@ class AccessControl {
     return isProduction;
   }
 }
-

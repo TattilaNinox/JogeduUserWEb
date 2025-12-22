@@ -55,6 +55,3 @@ class TrialPeriodBanner extends StatelessWidget {
     );
   }
 }
-
-
-

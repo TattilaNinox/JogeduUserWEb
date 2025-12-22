@@ -101,12 +101,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final dialogusDocs = dialogusSnapshot.data!.docs
-                    .where((d) {
-                      final data = d.data();
-                      return data['deletedAt'] == null;
-                    })
-                    .toList();
+                final dialogusDocs = dialogusSnapshot.data!.docs.where((d) {
+                  final data = d.data();
+                  return data['deletedAt'] == null;
+                }).toList();
 
                 // Admin ellenőrzés - StreamBuilder-ben szinkron módon
                 final user = FirebaseAuth.instance.currentUser;
@@ -116,16 +114,20 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 }
 
                 // Feldolgozzuk a dialogus fájlokat: category mező alapján csoportosítás
-                final categoryMap = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+                final categoryMap = <String,
+                    List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
 
-                debugPrint('🔵 CategoryTagsScreen: ${dialogusDocs.length} dialogus_fajlok dokumentum betöltve');
-                
+                debugPrint(
+                    '🔵 CategoryTagsScreen: ${dialogusDocs.length} dialogus_fajlok dokumentum betöltve');
+
                 for (var doc in dialogusDocs) {
                   final data = doc.data();
-                  
+
                   // Szűrés: csak azok a dokumentumok, amelyeknek van audioUrl-je
                   final audioUrl = data['audioUrl'] as String?;
-                  if (audioUrl == null || audioUrl.isEmpty || audioUrl.trim().isEmpty) {
+                  if (audioUrl == null ||
+                      audioUrl.isEmpty ||
+                      audioUrl.trim().isEmpty) {
                     debugPrint('🔴 Dokumentum ${doc.id}: nincs audioUrl');
                     continue;
                   }
@@ -133,7 +135,8 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                   // Státusz szűrés
                   final status = data['status'] as String? ?? 'Draft';
                   if (!isAdmin && status != 'Published') {
-                    debugPrint('🔴 Dokumentum ${doc.id}: státusz nem Published ($status)');
+                    debugPrint(
+                        '🔴 Dokumentum ${doc.id}: státusz nem Published ($status)');
                     continue;
                   }
 
@@ -144,13 +147,16 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                   if (category.isNotEmpty && category.trim().isNotEmpty) {
                     categoryMap.putIfAbsent(category, () => []);
                     categoryMap[category]!.add(doc);
-                    debugPrint('🔵 Dokumentum ${doc.id}: hozzáadva a $category kategóriához');
+                    debugPrint(
+                        '🔵 Dokumentum ${doc.id}: hozzáadva a $category kategóriához');
                   } else {
-                    debugPrint('🔴 Dokumentum ${doc.id}: nincs category mező vagy üres');
+                    debugPrint(
+                        '🔴 Dokumentum ${doc.id}: nincs category mező vagy üres');
                   }
                 }
-                
-                debugPrint('🔵 CategoryTagsScreen: ${categoryMap.length} kategória található');
+
+                debugPrint(
+                    '🔵 CategoryTagsScreen: ${categoryMap.length} kategória található');
 
                 if (categoryMap.isEmpty) {
                   return const Center(child: Text('Nincs találat.'));
@@ -193,152 +199,186 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                         if (!notesSnapshot.hasData &&
                             !jogesetSnapshot.hasData &&
                             !allomasSnapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         }
 
-                    // Összefésüljük a két kollekciót
-                    final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              
-              if (notesSnapshot.hasData) {
-                allDocs.addAll(notesSnapshot.data!.docs
-                    .where((d) => d.data()['deletedAt'] == null)
-                    .toList());
-              }
-              
-              // Összegyűjtjük a tags[0] címkéket
-              final tagMap =
-                  <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-              
-              // Jogesetek címkéinek külön kezelése
-              final jogesetTagMap = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+                        // Összefésüljük a két kollekciót
+                        final allDocs =
+                            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-              // Notes dokumentumok feldolgozása
-              for (var doc in allDocs) {
-                final data = doc.data();
-                final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
+                        if (notesSnapshot.hasData) {
+                          allDocs.addAll(notesSnapshot.data!.docs
+                              .where((d) => d.data()['deletedAt'] == null)
+                              .toList());
+                        }
 
-                if (tags.isNotEmpty) {
-                  final firstTag = tags[0];
-                  tagMap.putIfAbsent(firstTag, () => []);
-                  tagMap[firstTag]!.add(doc);
-                }
-              }
-              
-              // Jogeset dokumentumok feldolgozása
-              // Admin ellenőrzés szükséges a státusz szűréshez
-              final user = FirebaseAuth.instance.currentUser;
-              bool isAdmin = false;
-              if (user != null) {
-                isAdmin = AccessControl.allowedAdmins.contains(user.email);
-              }
-              
-              // Jogesetek feldolgozása (ha vannak)
-              if (jogesetSnapshot.hasData) {
-                final jogesetDocs = jogesetSnapshot.data!.docs
-                    .where((d) => d.data()['deletedAt'] == null)
-                    .toList();
-                final processedJogesetDocs = _processJogesetDocuments(jogesetDocs, isAdmin: isAdmin);
-                
-                // Az első jogeset címkéit használjuk a dokumentum címkéjeként
-                for (var doc in processedJogesetDocs) {
-                  final data = doc.data();
-                  final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
-                  
-                  // Megkeressük az első megfelelő jogesetet a címkék meghatározásához
-                  Map<String, dynamic>? firstMatchingJogeset;
-                  for (var jogesetData in jogesetekList) {
-                    final jogeset = jogesetData as Map<String, dynamic>;
-                    
-                    final category = jogeset['category'] as String? ?? '';
-                    if (category != widget.category) continue;
-                    
-                    final status = jogeset['status'] as String? ?? 'Draft';
-                    if (!isAdmin && status != 'Published') continue;
-                    
-                    firstMatchingJogeset = jogeset;
-                    break;
-                  }
-                  
-                  if (firstMatchingJogeset != null) {
-                    final tags = (firstMatchingJogeset['tags'] as List<dynamic>? ?? []).cast<String>();
-                    
-                    if (tags.isNotEmpty) {
-                      final firstTag = tags[0];
-                      jogesetTagMap.putIfAbsent(firstTag, () => []);
-                      jogesetTagMap[firstTag]!.add(doc);
-                    }
-                  }
-                }
-              }
-              
-              // Állomások feldolgozása (ha vannak)
-              final allomasTagMap = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-              if (allomasSnapshot.hasData) {
-                final allomasDocs = allomasSnapshot.data!.docs
-                    .where((d) => d.data()['deletedAt'] == null)
-                    .toList();
-                
-                for (var doc in allomasDocs) {
-                  final data = doc.data();
-                  final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
-                  
-                  if (tags.isNotEmpty) {
-                    final firstTag = tags[0];
-                    allomasTagMap.putIfAbsent(firstTag, () => []);
-                    allomasTagMap[firstTag]!.add(doc);
-                  }
-                }
-              }
-              
-              // Összevonjuk a három tag map-et
-              final allTags = <String>{};
-              allTags.addAll(tagMap.keys);
-              allTags.addAll(jogesetTagMap.keys);
-              allTags.addAll(allomasTagMap.keys);
-              
-              if (allTags.isEmpty && allDocs.isEmpty) {
-                return const Center(child: Text('Nincs találat.'));
-              }
+                        // Összegyűjtjük a tags[0] címkéket
+                        final tagMap = <String,
+                            List<
+                                QueryDocumentSnapshot<Map<String, dynamic>>>>{};
 
-              // Rendezés
-              final sortedTags = allTags.toList()..sort();
+                        // Jogesetek címkéinek külön kezelése
+                        final jogesetTagMap = <String,
+                            List<
+                                QueryDocumentSnapshot<Map<String, dynamic>>>>{};
 
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  ...sortedTags.map((tag) {
-                    // Összevonjuk a notes, jogeset és állomás dokumentumokat
-                    final notesDocs = tagMap[tag] ?? [];
-                    final jogesetDocs = jogesetTagMap[tag] ?? [];
-                    final allomasDocs = allomasTagMap[tag] ?? [];
-                    final totalCount = notesDocs.length + jogesetDocs.length + allomasDocs.length;
-                    
-                    // Ellenőrizzük, van-e mélyebb szintű címke
-                    final hasDeepTags = notesDocs.any((doc) {
-                          final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
-                          return tags.length > 1;
-                        }) ||
-                        jogesetDocs.any((doc) {
+                        // Notes dokumentumok feldolgozása
+                        for (var doc in allDocs) {
                           final data = doc.data();
-                          final jogesetekList = data['jogesetek'] as List<dynamic>? ?? [];
-                          if (jogesetekList.isEmpty) return false;
-                          final firstJogeset = jogesetekList.first as Map<String, dynamic>;
-                          final tags = (firstJogeset['tags'] as List<dynamic>? ?? []).cast<String>();
-                          return tags.length > 1;
-                        }) ||
-                        allomasDocs.any((doc) {
-                          final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
-                          return tags.length > 1;
-                        });
-                    
-                    return _buildTagCard(tag, notesDocs, jogesetDocs, allomasDocs, totalCount, hasDeepTags);
-                  }),
-                ],
-              );
+                          final tags = (data['tags'] as List<dynamic>? ?? [])
+                              .cast<String>();
+
+                          if (tags.isNotEmpty) {
+                            final firstTag = tags[0];
+                            tagMap.putIfAbsent(firstTag, () => []);
+                            tagMap[firstTag]!.add(doc);
+                          }
+                        }
+
+                        // Jogeset dokumentumok feldolgozása
+                        // Admin ellenőrzés szükséges a státusz szűréshez
+                        final user = FirebaseAuth.instance.currentUser;
+                        bool isAdmin = false;
+                        if (user != null) {
+                          isAdmin =
+                              AccessControl.allowedAdmins.contains(user.email);
+                        }
+
+                        // Jogesetek feldolgozása (ha vannak)
+                        if (jogesetSnapshot.hasData) {
+                          final jogesetDocs = jogesetSnapshot.data!.docs
+                              .where((d) => d.data()['deletedAt'] == null)
+                              .toList();
+                          final processedJogesetDocs = _processJogesetDocuments(
+                              jogesetDocs,
+                              isAdmin: isAdmin);
+
+                          // Az első jogeset címkéit használjuk a dokumentum címkéjeként
+                          for (var doc in processedJogesetDocs) {
+                            final data = doc.data();
+                            final jogesetekList =
+                                data['jogesetek'] as List<dynamic>? ?? [];
+
+                            // Megkeressük az első megfelelő jogesetet a címkék meghatározásához
+                            Map<String, dynamic>? firstMatchingJogeset;
+                            for (var jogesetData in jogesetekList) {
+                              final jogeset =
+                                  jogesetData as Map<String, dynamic>;
+
+                              final category =
+                                  jogeset['category'] as String? ?? '';
+                              if (category != widget.category) continue;
+
+                              final status =
+                                  jogeset['status'] as String? ?? 'Draft';
+                              if (!isAdmin && status != 'Published') continue;
+
+                              firstMatchingJogeset = jogeset;
+                              break;
+                            }
+
+                            if (firstMatchingJogeset != null) {
+                              final tags = (firstMatchingJogeset['tags']
+                                          as List<dynamic>? ??
+                                      [])
+                                  .cast<String>();
+
+                              if (tags.isNotEmpty) {
+                                final firstTag = tags[0];
+                                jogesetTagMap.putIfAbsent(firstTag, () => []);
+                                jogesetTagMap[firstTag]!.add(doc);
+                              }
+                            }
+                          }
+                        }
+
+                        // Állomások feldolgozása (ha vannak)
+                        final allomasTagMap = <String,
+                            List<
+                                QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+                        if (allomasSnapshot.hasData) {
+                          final allomasDocs = allomasSnapshot.data!.docs
+                              .where((d) => d.data()['deletedAt'] == null)
+                              .toList();
+
+                          for (var doc in allomasDocs) {
+                            final data = doc.data();
+                            final tags = (data['tags'] as List<dynamic>? ?? [])
+                                .cast<String>();
+
+                            if (tags.isNotEmpty) {
+                              final firstTag = tags[0];
+                              allomasTagMap.putIfAbsent(firstTag, () => []);
+                              allomasTagMap[firstTag]!.add(doc);
+                            }
+                          }
+                        }
+
+                        // Összevonjuk a három tag map-et
+                        final allTags = <String>{};
+                        allTags.addAll(tagMap.keys);
+                        allTags.addAll(jogesetTagMap.keys);
+                        allTags.addAll(allomasTagMap.keys);
+
+                        if (allTags.isEmpty && allDocs.isEmpty) {
+                          return const Center(child: Text('Nincs találat.'));
+                        }
+
+                        // Rendezés
+                        final sortedTags = allTags.toList()..sort();
+
+                        return ListView(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          children: [
+                            ...sortedTags.map((tag) {
+                              // Összevonjuk a notes, jogeset és állomás dokumentumokat
+                              final notesDocs = tagMap[tag] ?? [];
+                              final jogesetDocs = jogesetTagMap[tag] ?? [];
+                              final allomasDocs = allomasTagMap[tag] ?? [];
+                              final totalCount = notesDocs.length +
+                                  jogesetDocs.length +
+                                  allomasDocs.length;
+
+                              // Ellenőrizzük, van-e mélyebb szintű címke
+                              final hasDeepTags = notesDocs.any((doc) {
+                                    final tags =
+                                        (doc.data()['tags'] as List<dynamic>? ??
+                                                [])
+                                            .cast<String>();
+                                    return tags.length > 1;
+                                  }) ||
+                                  jogesetDocs.any((doc) {
+                                    final data = doc.data();
+                                    final jogesetekList =
+                                        data['jogesetek'] as List<dynamic>? ??
+                                            [];
+                                    if (jogesetekList.isEmpty) return false;
+                                    final firstJogeset = jogesetekList.first
+                                        as Map<String, dynamic>;
+                                    final tags = (firstJogeset['tags']
+                                                as List<dynamic>? ??
+                                            [])
+                                        .cast<String>();
+                                    return tags.length > 1;
+                                  }) ||
+                                  allomasDocs.any((doc) {
+                                    final tags =
+                                        (doc.data()['tags'] as List<dynamic>? ??
+                                                [])
+                                            .cast<String>();
+                                    return tags.length > 1;
+                                  });
+
+                              return _buildTagCard(tag, notesDocs, jogesetDocs,
+                                  allomasDocs, totalCount, hasDeepTags);
+                            }),
+                          ],
+                        );
+                      },
+                    );
                   },
                 );
-              },
-            );
               },
             ),
     );
@@ -361,7 +401,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
     Query<Map<String, dynamic>> query = FirebaseConfig.firestore
         .collection('dialogus_fajlok')
         .where('science', isEqualTo: userScience);
-    
+
     // Státusz szűrés kliens oldalon történik (admin/nem-admin különbség miatt)
     return query;
   }
@@ -371,8 +411,8 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   /// a category, tags, status mezők a tömb elemeiben vannak, nem a dokumentum szinten.
   /// Ezért csak science alapján szűrünk, a többi szűrést kliens oldalon végezzük.
   Query<Map<String, dynamic>> _buildJogesetQuery() {
-    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
-        .collection('jogesetek');
+    Query<Map<String, dynamic>> query =
+        FirebaseConfig.firestore.collection('jogesetek');
     // Megjegyzés: Ha van index a science mezőre a dokumentum szinten, akkor használhatjuk,
     // de valószínűleg nincs, ezért minden dokumentumot lekérdezünk és kliens oldalon szűrünk
 
@@ -405,10 +445,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
 
       // Szűrjük a jogeseteket kategória és státusz alapján
       final matchingJogesetek = <Map<String, dynamic>>[];
-      
+
       for (var jogesetData in jogesetekList) {
         final jogeset = jogesetData as Map<String, dynamic>;
-        
+
         // Kategória szűrés
         final category = jogeset['category'] as String? ?? '';
         if (category != widget.category) {
@@ -441,7 +481,6 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
       List<QueryDocumentSnapshot<Map<String, dynamic>>> allomasDocs,
       int totalCount,
       bool hasDeepTags) {
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       elevation: 0,
@@ -494,8 +533,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
 
   /// Kategória kártya widget építése (Dialogus tags esetén)
   Widget _buildCategoryCard(
-      String category,
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+      String category, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       elevation: 0,

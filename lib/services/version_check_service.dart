@@ -60,7 +60,7 @@ class VersionCheckService {
     } catch (e) {
       debugPrint('[VersionCheck] Failed to get package info: $e');
       // Fallback érték hiba esetén
-      _currentVersion = '1.0.1+10'; 
+      _currentVersion = '1.0.1+10';
     }
   }
 

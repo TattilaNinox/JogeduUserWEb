@@ -16,7 +16,8 @@ class DeckListScreen extends StatelessWidget {
             padding: const EdgeInsets.only(right: 16.0),
             child: ElevatedButton.icon(
               onPressed: () {
-                final newDeckRef = FirebaseFirestore.instance.collection('notes').doc();
+                final newDeckRef =
+                    FirebaseFirestore.instance.collection('notes').doc();
                 newDeckRef.set({
                   'title': 'Új pakli',
                   'type': 'deck',
@@ -54,7 +55,8 @@ class DeckListScreen extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text('Nincsenek tanulókártya paklik.'));
+                  return const Center(
+                      child: Text('Nincsenek tanulókártya paklik.'));
                 }
                 final docs = snapshot.data!.docs;
                 return ListView.builder(
@@ -72,7 +74,8 @@ class DeckListScreen extends StatelessWidget {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.edit),
-                            onPressed: () => context.go('/decks/edit/${doc.id}'),
+                            onPressed: () =>
+                                context.go('/decks/edit/${doc.id}'),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
@@ -90,4 +93,4 @@ class DeckListScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

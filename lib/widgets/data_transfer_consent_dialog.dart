@@ -51,7 +51,8 @@ class _DataTransferConsentDialogState extends State<DataTransferConsentDialog> {
     final screenSize = MediaQuery.of(context).size;
     final isMobile = screenSize.width < 600;
     final dialogHeight = isMobile
-        ? screenSize.height * 0.4 // Mobil: 40% (kisebb, hogy kiférjen a 2 checkbox)
+        ? screenSize.height *
+            0.4 // Mobil: 40% (kisebb, hogy kiférjen a 2 checkbox)
         : (screenSize.height * 0.5).clamp(200.0, 450.0);
     final fontSize = isMobile ? 11.0 : 13.0;
     final titleSize = isMobile ? 13.0 : 15.0;

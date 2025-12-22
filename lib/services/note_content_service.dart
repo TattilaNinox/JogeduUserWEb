@@ -7,10 +7,7 @@ class NoteContentService {
   /// Get note content preview for a given noteId
   static Future<String?> getNoteContentPreview(String noteId) async {
     try {
-      final doc = await _firestore
-          .collection('notes')
-          .doc(noteId)
-          .get();
+      final doc = await _firestore.collection('notes').doc(noteId).get();
 
       if (!doc.exists) {
         debugPrint('NoteContentService: Note not found: $noteId');
@@ -18,7 +15,7 @@ class NoteContentService {
       }
 
       final data = doc.data() as Map<String, dynamic>;
-      
+
       // Try to get content from 'content' field first
       final content = data['content'] as String?;
       if (content != null && content.isNotEmpty) {
@@ -47,7 +44,8 @@ class NoteContentService {
     // Remove HTML tags and get plain text
     String plainText = content
         .replaceAll(RegExp(r'<[^>]*>'), ' ') // Remove HTML tags
-        .replaceAll(RegExp(r'\s+'), ' ') // Replace multiple spaces with single space
+        .replaceAll(
+            RegExp(r'\s+'), ' ') // Replace multiple spaces with single space
         .trim();
 
     // Limit to 200 characters
@@ -67,8 +65,8 @@ class NoteContentService {
   static String decryptContent(String encryptedContent) {
     // This is a placeholder - in a real implementation, you would use
     // the actual encryption service to decrypt the content
-    debugPrint('NoteContentService: Content appears to be encrypted, decryption not implemented');
+    debugPrint(
+        'NoteContentService: Content appears to be encrypted, decryption not implemented');
     return 'Titkosított tartalom - dekódolás szükséges';
   }
 }
-

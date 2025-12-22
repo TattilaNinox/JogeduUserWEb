@@ -12,9 +12,11 @@ import 'package:image/image.dart' as img;
 import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/firebase_config.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
+import '../widgets/mini_audio_player.dart';
 
 // Top-level függvény a compute-hoz - gyorsított, egyszerűsített verzió
 Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
@@ -22,24 +24,24 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
   if (imageBytes.length <= 200 * 1024) {
     return imageBytes;
   }
-  
+
   try {
     // Kép dekódolása
     final decodedImage = img.decodeImage(imageBytes);
     if (decodedImage == null) {
       throw Exception('Nem sikerült dekódolni a képet');
     }
-    
+
     // Agresszív kezdeti beállítások - gyors tömörítés
     final originalSizeKB = imageBytes.length / 1024;
     const targetSizeKB = 200.0;
     final sizeRatio = originalSizeKB / targetSizeKB;
-    
+
     // Kezdeti értékek - agresszívabb tömörítés
     int targetWidth = decodedImage.width;
     int targetHeight = decodedImage.height;
     int quality = 70; // Alacsonyabb kezdeti minőség
-    
+
     // Agresszív méret csökkentés azonnal
     if (sizeRatio > 3) {
       // Nagyon nagy kép: jelentősen csökkentjük
@@ -60,7 +62,7 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
       targetHeight = (decodedImage.height * scale).round();
       quality = 70;
     }
-    
+
     // Maximum méret korlátozás - agresszívabb
     if (targetWidth > 1000) {
       final scale = 1000.0 / targetWidth;
@@ -72,18 +74,21 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
       targetHeight = 1000;
       targetWidth = (targetWidth * scale).round();
     }
-    
+
     // Egyszerű, gyors tömörítés - max 2 iteráció
     Uint8List? compressed;
     int maxIterations = 2; // Csak 2 iteráció a gyorsaságért
     int iteration = 0;
-    
-    while (iteration < maxIterations && (compressed == null || compressed.length > 200 * 1024)) {
+
+    while (iteration < maxIterations &&
+        (compressed == null || compressed.length > 200 * 1024)) {
       iteration++;
-      
+
       // Kép átméretezése (ha szükséges) - csak egyszer
       img.Image resizedImage;
-      if (iteration == 1 && (targetWidth != decodedImage.width || targetHeight != decodedImage.height)) {
+      if (iteration == 1 &&
+          (targetWidth != decodedImage.width ||
+              targetHeight != decodedImage.height)) {
         resizedImage = img.copyResize(
           decodedImage,
           width: targetWidth,
@@ -104,12 +109,12 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
         );
         quality = 50; // Alacsony minőség második iterációban
       }
-      
+
       // JPEG formátumban kódolás
       compressed = Uint8List.fromList(
         img.encodeJpg(resizedImage, quality: quality),
       );
-      
+
       // Ha még mindig túl nagy, agresszívabb csökkentés
       if (compressed.length > 200 * 1024 && iteration < maxIterations) {
         quality = 40; // Nagyon alacsony minőség
@@ -119,17 +124,18 @@ Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
         break;
       }
     }
-    
+
     // Ha még mindig túl nagy, akkor elfogadjuk (max 250 KB)
     if (compressed != null && compressed.length <= 250 * 1024) {
       return compressed;
     }
-    
+
     // Ha még mindig túl nagy, akkor hiba
     if (compressed == null || compressed.length > 250 * 1024) {
-      throw Exception('A kép mérete még tömörítés után is meghaladja a 250 KB-ot (${(compressed?.length ?? 0) / 1024} KB). Kérlek, válassz egy kisebb képet!');
+      throw Exception(
+          'A kép mérete még tömörítés után is meghaladja a 250 KB-ot (${(compressed?.length ?? 0) / 1024} KB). Kérlek, válassz egy kisebb képet!');
     }
-    
+
     return compressed;
   } catch (e) {
     rethrow;
@@ -158,23 +164,54 @@ class _MemoriapalotaAllomasViewScreenState
   bool _isLoading = true;
   String _currentHtmlContent = '';
   String _viewId = '';
-  
+  web.HTMLIFrameElement? _iframeElement;
+  bool _isModalOpen = false;
+
   // Képfeltöltés state változók
   String? _currentImageUrl;
   bool _isUploadingImage = false;
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   // Progress dialog state változók
   double _uploadProgress = 0.0;
   String _uploadPhase = ''; // 'loading', 'compressing', 'uploading'
-  
+
   // Tananyag megnyitás state
   bool _isContentOpen = false;
-  
+
   // Jegyzet adatok breadcrumb-hoz
   String? _noteTitle;
   String? _noteCategory;
   String? _noteTag;
+
+  // Audio lejátszás state változók
+  String? _currentAudioUrl;
+  bool _autoPlayAudio = false;
+  int _audioPlayerKeyCounter =
+      0; // Kulcs számláló az audio player újraépítéséhez
+
+  void _setIframePointerEventsEnabled(bool enabled) {
+    if (!kIsWeb) return;
+    try {
+      _iframeElement?.style.pointerEvents = enabled ? 'auto' : 'none';
+    } catch (_) {
+      // no-op
+    }
+  }
+
+  void _beginModalBlock() {
+    if (!mounted) return;
+    if (_isModalOpen) return;
+    setState(() => _isModalOpen = true);
+    _setIframePointerEventsEnabled(false);
+  }
+
+  void _endModalBlock() {
+    if (!mounted) return;
+    if (!_isModalOpen) return;
+    setState(() => _isModalOpen = false);
+    _setIframePointerEventsEnabled(true);
+  }
 
   @override
   void initState() {
@@ -182,9 +219,40 @@ class _MemoriapalotaAllomasViewScreenState
     // FONTOS: Betöltjük a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
     _loadFiltersFromUrl();
     _loadNoteData();
+    _loadAudioSettings();
     _loadAllomasok();
   }
-  
+
+  /// Betölti az audio beállításokat SharedPreferences-ből
+  Future<void> _loadAudioSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _autoPlayAudio =
+              prefs.getBool('memoriapalota_auto_play_audio') ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Hiba az audio beállítások betöltésekor: $e');
+    }
+  }
+
+  /// Elmenti az audio beállításokat SharedPreferences-be
+  Future<void> _saveAudioSettings(bool autoPlay) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('memoriapalota_auto_play_audio', autoPlay);
+      if (mounted) {
+        setState(() {
+          _autoPlayAudio = autoPlay;
+        });
+      }
+    } catch (e) {
+      debugPrint('Hiba az audio beállítások mentésekor: $e');
+    }
+  }
+
   /// Betölti a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
   /// Ez biztosítja, hogy a breadcrumb és visszalépés gombok működjenek
   void _loadFiltersFromUrl() {
@@ -192,11 +260,11 @@ class _MemoriapalotaAllomasViewScreenState
       try {
         final fromUri = Uri.parse(Uri.decodeComponent(widget.from!));
         final queryParams = fromUri.queryParameters;
-        
+
         // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
         final type = queryParams['type'];
         final normalizedType = type == 'MP' ? 'memoriapalota_allomasok' : type;
-        
+
         // Beállítjuk a FilterStorage értékeit az URL query paramétereiből
         FilterStorage.searchText = queryParams['q'];
         FilterStorage.status = queryParams['status'];
@@ -204,7 +272,7 @@ class _MemoriapalotaAllomasViewScreenState
         FilterStorage.science = queryParams['science'];
         FilterStorage.tag = queryParams['tag'];
         FilterStorage.type = normalizedType;
-        
+
         debugPrint('🔵 MemoriapalotaAllomasViewScreen _loadFiltersFromUrl:');
         debugPrint('   from=${widget.from}');
         debugPrint('   tag=${FilterStorage.tag}');
@@ -215,7 +283,7 @@ class _MemoriapalotaAllomasViewScreenState
       }
     }
   }
-  
+
   /// Betölti a jegyzet adatait breadcrumb-hoz
   /// Először a notes kollekcióból próbálja, ha nem találja, akkor a memoriapalota_allomasok kollekcióból
   Future<void> _loadNoteData() async {
@@ -225,7 +293,7 @@ class _MemoriapalotaAllomasViewScreenState
           .collection('notes')
           .doc(widget.noteId)
           .get();
-      
+
       // Ha nem található a notes kollekcióban, próbáljuk a memoriapalota_allomasok kollekcióból
       if (!noteDoc.exists) {
         noteDoc = await FirebaseConfig.firestore
@@ -233,15 +301,16 @@ class _MemoriapalotaAllomasViewScreenState
             .doc(widget.noteId)
             .get();
       }
-      
+
       if (noteDoc.exists && mounted) {
         final data = noteDoc.data();
         if (data != null) {
           final title = data['title'] as String?;
           final category = data['category'] as String?;
           final tags = data['tags'] as List<dynamic>?;
-          final tag = tags != null && tags.isNotEmpty ? tags.first.toString() : null;
-          
+          final tag =
+              tags != null && tags.isNotEmpty ? tags.first.toString() : null;
+
           // Debug: ellenőrizzük, hogy milyen adatokat kaptunk
           debugPrint('🔵 MemoriapalotaAllomasViewScreen _loadNoteData:');
           debugPrint('   noteId=${widget.noteId}');
@@ -249,15 +318,16 @@ class _MemoriapalotaAllomasViewScreenState
           debugPrint('   category=$category');
           debugPrint('   tags=$tags');
           debugPrint('   tag=$tag');
-          
-            setState(() {
-              _noteTitle = title;
-              _noteCategory = category;
-              _noteTag = tag;
-            });
+
+          setState(() {
+            _noteTitle = title;
+            _noteCategory = category;
+            _noteTag = tag;
+          });
         }
       } else {
-        debugPrint('🔴 MemoriapalotaAllomasViewScreen: A jegyzet nem található sem a notes, sem a memoriapalota_allomasok kollekcióban (noteId=${widget.noteId})');
+        debugPrint(
+            '🔴 MemoriapalotaAllomasViewScreen: A jegyzet nem található sem a notes, sem a memoriapalota_allomasok kollekcióban (noteId=${widget.noteId})');
       }
     } catch (e) {
       // Csendben kezeljük a hibát, nem akadályozza meg az oldal betöltését
@@ -265,28 +335,34 @@ class _MemoriapalotaAllomasViewScreenState
     }
   }
 
-  void _setupIframe(String cim, String kulcsszo, String tartalom, {int? sorszam}) {
+  void _setupIframe(String cim, String kulcsszo, String tartalom,
+      {int? sorszam}) {
     // FONTOS: Ellenőrizzük, hogy web platformon vagyunk-e!
     if (!kIsWeb) {
       // Ha nem web platform, nem hozunk létre iframe-et
       return;
     }
-    
+
     // FONTOS: Minden alkalommal egyedi view ID-t kell generálni!
-    _viewId = 'memoriapalota-allomas-iframe-${DateTime.now().millisecondsSinceEpoch}';
-    
+    _viewId =
+        'memoriapalota-allomas-iframe-${DateTime.now().millisecondsSinceEpoch}';
+
     // Iframe elem létrehozása
     final iframeElement = web.HTMLIFrameElement()
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.border = 'none'
       ..style.backgroundColor = 'transparent';
-    
+    // IMPORTANT (Flutter Web): a platform view (iframe) képes "ráülni" a Flutter UI-ra,
+    // ezért dialógusok megnyitásakor ideiglenesen letiltjuk a pointer eseményeket.
+    _iframeElement = iframeElement;
+    _setIframePointerEventsEnabled(!_isModalOpen);
+
     iframeElement.sandbox.add('allow-scripts');
     iframeElement.sandbox.add('allow-same-origin');
     iframeElement.sandbox.add('allow-forms');
     iframeElement.sandbox.add('allow-popups');
-    
+
     // FONTOS: Teljes HTML dokumentum létrehozása CSS stílusokkal
     // PONTOSAN a dokumentumban leírt CSS-t használjuk (docs/MEMORIA_ALLOMAS_MEGJELENITES_WEB_USER_BEMUTATO.txt)
     final fullHtml = '''
@@ -518,7 +594,9 @@ class _MemoriapalotaAllomasViewScreenState
     /* RESPONZÍV DESIGN */
     @media screen and (max-width: 768px) {
       body {
-        padding: 1em;
+        /* kicsi extra tér felül, hogy "ne legyen levágva" érzés */
+        /* extra alsó padding: a lejátszó sáv miatt feljebb lehessen tekerni */
+        padding: 2em 1em 4em 1em;
       }
     }
   </style>
@@ -648,11 +726,12 @@ class _MemoriapalotaAllomasViewScreenState
 </body>
 </html>
 ''';
-    
+
     // FONTOS: Az iframe src-jét data URI formátumban kell beállítani!
     // FONTOS: A HTML tartalmat MINDIG Uri.encodeComponent()-tel kell kódolni!
-    iframeElement.src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(fullHtml)}';
-    
+    iframeElement.src =
+        'data:text/html;charset=utf-8,${Uri.encodeComponent(fullHtml)}';
+
     // FONTOS: Platform view regisztrálása MINDIG az iframe src beállítása UTÁN!
     // ignore: undefined_prefixed_name
     ui_web.platformViewRegistry.registerViewFactory(
@@ -660,7 +739,6 @@ class _MemoriapalotaAllomasViewScreenState
       (int viewId) => iframeElement,
     );
   }
-
 
   Future<void> _loadAllomasok() async {
     // A widget.noteId az utvonalId (a fő útvonal dokumentum ID-ja)
@@ -693,12 +771,12 @@ class _MemoriapalotaAllomasViewScreenState
 
     // Megjelenítjük az első állomást (ez már betölti a képet is)
     await _displayCurrentAllomas();
-    
+
     // Várunk egy kicsit, hogy az iframe betöltődhessen
     // Az iframe betöltése aszinkron, ezért egy rövid késleltetést használunk
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
-    
+
     // Most már beállíthatjuk, hogy a loading screen eltűnjön
     setState(() {
       _isLoading = false;
@@ -706,48 +784,64 @@ class _MemoriapalotaAllomasViewScreenState
   }
 
   Future<void> _displayCurrentAllomas() async {
-    if (_allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
+    if (_allomasok.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _allomasok.length) {
       return;
     }
 
     final currentAllomas = _allomasok[_currentIndex];
     final data = currentAllomas.data() as Map<String, dynamic>;
-    
+
     // Az állomások adatai
     final cim = data['cim'] as String? ?? 'Állomás';
     final kulcsszo = data['kulcsszo'] as String? ?? '';
     final tartalom = data['tartalom'] as String? ?? '';
     final sorszam = data['allomasSorszam'] as int?;
-    
+    final audioUrl = data['audioUrl'] as String?;
+
+    // Audio URL frissítése
+    final previousAudioUrl = _currentAudioUrl;
+    final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
+
     // Új iframe-et hozunk létre az új tartalommal (teljes HTML dokumentummal)
     _setupIframe(cim, kulcsszo, tartalom, sorszam: sorszam);
-    
+
     // Betöltjük a felhasználó képét az aktuális állomáshoz és megvárjuk
     await _loadUserImage();
-    
+
     // Frissítjük a tartalmat és újraépítjük a view-t
     if (mounted) {
       setState(() {
-        _currentHtmlContent = tartalom.isNotEmpty ? tartalom : '<p>Nincs tartalom.</p>';
+        _currentHtmlContent =
+            tartalom.isNotEmpty ? tartalom : '<p>Nincs tartalom.</p>';
+        _currentAudioUrl = hasAudio ? audioUrl : null;
+        // Új kulcs generálása az audio player újraépítéséhez (ha változott az URL)
+        if (previousAudioUrl != _currentAudioUrl) {
+          _audioPlayerKeyCounter++;
+        }
       });
     }
   }
-  
+
   // Felhasználó képének betöltése
   Future<void> _loadUserImage() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
+    if (user == null ||
+        _allomasok.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _allomasok.length) {
       setState(() {
         _currentImageUrl = null;
       });
       return;
     }
-    
+
     try {
       final currentAllomas = _allomasok[_currentIndex];
       final allomasId = currentAllomas.id;
       final utvonalId = widget.noteId;
-      
+
       final imageDoc = await FirebaseConfig.firestore
           .collection('memoriapalota_allomasok')
           .doc(utvonalId)
@@ -756,7 +850,7 @@ class _MemoriapalotaAllomasViewScreenState
           .collection('userImages')
           .doc(user.uid)
           .get();
-      
+
       if (imageDoc.exists && mounted) {
         final imageUrl = imageDoc.data()?['imageUrl'] as String?;
         setState(() {
@@ -782,177 +876,186 @@ class _MemoriapalotaAllomasViewScreenState
       }
     }
   }
-  
+
   // Kép választási dialog megjelenítése
   Future<void> _showImagePickerDialog() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Be kell jelentkezned a képfeltöltéshez!')),
+        const SnackBar(
+            content: Text('Be kell jelentkezned a képfeltöltéshez!')),
       );
       return;
     }
-    
+
     if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Kép kiválasztása'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!kIsWeb)
+
+    _beginModalBlock();
+    try {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Kép kiválasztása'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!kIsWeb)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    _pickImageFromCamera();
+                  },
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text('Fotó készítése'),
+                ),
+              const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () {
+                onPressed: () async {
+                  debugPrint('=== TextButton onPressed START ===');
+
+                  // Bezárjuk a dialógust AZONNAL
                   Navigator.of(dialogContext).pop();
-                  _pickImageFromCamera();
-                },
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Fotó készítése'),
-              ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () async {
-                debugPrint('=== TextButton onPressed START ===');
-                
-                // Bezárjuk a dialógust AZONNAL
-                Navigator.of(dialogContext).pop();
-                debugPrint('Dialog closed');
-                
-                // Várunk egy kicsit, hogy a dialógus biztosan bezáródjon
-                await Future.delayed(const Duration(milliseconds: 300));
-                
-                if (!mounted) {
-                  debugPrint('Not mounted after delay');
-                  return;
-                }
-                
-                // Web-en közvetlenül a file_selector-t hívjuk meg
-                if (kIsWeb) {
-                  debugPrint('Web: Starting file selection directly...');
-                  
-                  try {
-                    debugPrint('Opening file selector...');
-                    const typeGroup = XTypeGroup(
-                      label: 'Képek',
-                      extensions: ['jpg', 'jpeg', 'png', 'webp'],
-                    );
-                    
-                    final file = await openFile(acceptedTypeGroups: [typeGroup]);
-                    debugPrint('File selector returned: ${file?.name ?? "NULL"}');
-                    
-                    if (file == null) {
-                      debugPrint('User cancelled');
-                      return;
-                    }
-                    
-                    if (!mounted) return;
-                    
-                    debugPrint('Reading file bytes...');
-                    final bytes = await file.readAsBytes();
-                    debugPrint('File bytes read: ${bytes.length} bytes');
-                    
-                    if (bytes.isEmpty) {
+                  debugPrint('Dialog closed');
+
+                  // Várunk egy kicsit, hogy a dialógus biztosan bezáródjon
+                  await Future.delayed(const Duration(milliseconds: 300));
+
+                  if (!mounted) {
+                    debugPrint('Not mounted after delay');
+                    return;
+                  }
+
+                  // Web-en közvetlenül a file_selector-t hívjuk meg
+                  if (kIsWeb) {
+                    debugPrint('Web: Starting file selection directly...');
+
+                    try {
+                      debugPrint('Opening file selector...');
+                      const typeGroup = XTypeGroup(
+                        label: 'Képek',
+                        extensions: ['jpg', 'jpeg', 'png', 'webp'],
+                      );
+
+                      final file =
+                          await openFile(acceptedTypeGroups: [typeGroup]);
+                      debugPrint(
+                          'File selector returned: ${file?.name ?? "NULL"}');
+
+                      if (file == null) {
+                        debugPrint('User cancelled');
+                        return;
+                      }
+
+                      if (!mounted) return;
+
+                      debugPrint('Reading file bytes...');
+                      final bytes = await file.readAsBytes();
+                      debugPrint('File bytes read: ${bytes.length} bytes');
+
+                      if (bytes.isEmpty) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('A fájl üres!'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      if (!mounted) return;
+
+                      // Lokális blob URL létrehozása az optimistic UI-hoz
+                      final localImageUrl = _createLocalImageUrl(bytes);
+
+                      debugPrint('Starting image processing...');
+                      await _processAndUploadImage(bytes,
+                          localImageUrl: localImageUrl);
+                      debugPrint('Image processing completed');
+                    } catch (e, stackTrace) {
+                      debugPrint('ERROR in file selector: $e');
+                      debugPrint('Stack trace: $stackTrace');
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('A fájl üres!'),
+                          SnackBar(
+                            content: Text('Hiba: $e'),
                             backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 5),
                           ),
                         );
                       }
-                      return;
                     }
-                    
-                    if (!mounted) return;
-                    
-                    // Lokális blob URL létrehozása az optimistic UI-hoz
-                    final localImageUrl = _createLocalImageUrl(bytes);
-                    
-                    debugPrint('Starting image processing...');
-                    await _processAndUploadImage(bytes, localImageUrl: localImageUrl);
-                    debugPrint('Image processing completed');
-                    
-                  } catch (e, stackTrace) {
-                    debugPrint('ERROR in file selector: $e');
-                    debugPrint('Stack trace: $stackTrace');
+                  } else {
+                    // Mobil: image_picker
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Hiba: $e'),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 5),
-                        ),
-                      );
+                      await _pickImageFromFile();
                     }
                   }
-                } else {
-                  // Mobil: image_picker
-                  if (mounted) {
-                    await _pickImageFromFile();
-                  }
-                }
-                
-                debugPrint('=== TextButton onPressed END ===');
-              },
-              icon: const Icon(Icons.photo_library),
-              label: kIsWeb 
-                  ? const Text('Fájlból választás')
-                  : const Text('Galériából választás'),
-            ),
-            if (_currentImageUrl != null) ...[
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  _deleteImage();
+
+                  debugPrint('=== TextButton onPressed END ===');
                 },
-                icon: const Icon(Icons.delete, color: Colors.red),
-                label: const Text('Kép törlése', style: TextStyle(color: Colors.red)),
+                icon: const Icon(Icons.photo_library),
+                label: kIsWeb
+                    ? const Text('Fájlból választás')
+                    : const Text('Galériából választás'),
               ),
+              if (_currentImageUrl != null) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    _deleteImage();
+                  },
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  label: const Text('Kép törlése',
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _endModalBlock();
+    }
   }
-  
+
   // Web fájl kiválasztás közvetlenül (dialógus nélkül)
   Future<void> _pickImageFromFileWebDirect() async {
     debugPrint('=== _pickImageFromFileWebDirect START ===');
-    
+
     if (!mounted) {
       debugPrint('ERROR: Widget not mounted');
       return;
     }
-    
+
     try {
       debugPrint('Opening file selector directly...');
       const typeGroup = XTypeGroup(
         label: 'Képek',
         extensions: ['jpg', 'jpeg', 'png', 'webp'],
       );
-      
+
       final file = await openFile(acceptedTypeGroups: [typeGroup]);
       debugPrint('File selector returned: ${file?.name ?? "NULL"}');
-      
+
       if (file == null) {
         debugPrint('User cancelled');
         return;
       }
-      
+
       if (!mounted) {
         debugPrint('ERROR: Widget not mounted after file selection');
         return;
       }
-      
+
       debugPrint('Reading file bytes...');
       final bytes = await file.readAsBytes();
       debugPrint('File bytes read: ${bytes.length} bytes');
-      
+
       if (bytes.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -964,16 +1067,15 @@ class _MemoriapalotaAllomasViewScreenState
         }
         return;
       }
-      
+
       if (!mounted) return;
-      
+
       // Lokális blob URL létrehozása az optimistic UI-hoz
       final localImageUrl = _createLocalImageUrl(bytes);
-      
+
       debugPrint('Starting image processing...');
       await _processAndUploadImage(bytes, localImageUrl: localImageUrl);
       debugPrint('Image processing completed');
-      
     } catch (e, stackTrace) {
       debugPrint('ERROR in file selector: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -988,24 +1090,26 @@ class _MemoriapalotaAllomasViewScreenState
       }
     }
   }
-  
+
   // Mobil kamera megnyitása
   Future<void> _pickImageFromCamera() async {
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kamera csak mobil eszközökön érhető el!')),
+        const SnackBar(
+            content: Text('Kamera csak mobil eszközökön érhető el!')),
       );
       return;
     }
-    
+
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.camera,
         maxWidth: 1200,
         maxHeight: 1200,
-        imageQuality: 70, // Mobil eszközön alacsonyabb minőség a gyorsabb feldolgozásért
+        imageQuality:
+            70, // Mobil eszközön alacsonyabb minőség a gyorsabb feldolgozásért
       );
-      
+
       if (image != null) {
         final bytes = await image.readAsBytes();
         await _processAndUploadImage(bytes);
@@ -1018,46 +1122,48 @@ class _MemoriapalotaAllomasViewScreenState
       }
     }
   }
-  
+
   // Mobil galéria kiválasztás (image_picker)
   Future<void> _pickImageFromFile() async {
     debugPrint('=== _pickImageFromFile START ===');
     debugPrint('kIsWeb: $kIsWeb');
-    
+
     if (!mounted) {
       debugPrint('ERROR: Widget not mounted, returning');
       return;
     }
-    
+
     try {
       Uint8List? bytes;
-      
+
       // Egységesen image_picker-t használunk web-en és mobilon is
       debugPrint('Opening image picker (gallery)...');
-      
+
       try {
         final XFile? image = await _imagePicker.pickImage(
           source: ImageSource.gallery,
           maxWidth: 1200,
           maxHeight: 1200,
-          imageQuality: kIsWeb ? 85 : 70, // Mobil eszközön alacsonyabb minőség a gyorsabb feldolgozásért
+          imageQuality: kIsWeb
+              ? 85
+              : 70, // Mobil eszközön alacsonyabb minőség a gyorsabb feldolgozásért
         );
-        
+
         debugPrint('Image picker returned: ${image?.path ?? "NULL"}');
-        
+
         if (image == null) {
           debugPrint('User cancelled image selection');
           return;
         }
-        
+
         debugPrint('Image path: ${image.path}');
         debugPrint('Image name: ${image.name}');
-        
+
         if (!mounted) {
           debugPrint('ERROR: Widget not mounted after image selection');
           return;
         }
-        
+
         // Azonnal mutassunk üzenetet
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1065,11 +1171,10 @@ class _MemoriapalotaAllomasViewScreenState
             duration: Duration(seconds: 2),
           ),
         );
-        
+
         debugPrint('Reading image bytes...');
         bytes = await image.readAsBytes();
         debugPrint('Image bytes read: ${bytes.length} bytes');
-        
       } catch (e, stackTrace) {
         debugPrint('ERROR in image picker: $e');
         debugPrint('Stack trace: $stackTrace');
@@ -1084,7 +1189,7 @@ class _MemoriapalotaAllomasViewScreenState
         }
         return;
       }
-      
+
       if (bytes.isEmpty) {
         debugPrint('ERROR: Bytes is empty!');
         if (mounted) {
@@ -1097,19 +1202,18 @@ class _MemoriapalotaAllomasViewScreenState
         }
         return;
       }
-      
+
       if (!mounted) {
         debugPrint('ERROR: Widget not mounted before processing');
         return;
       }
-      
+
       debugPrint('=== Starting _processAndUploadImage ===');
       debugPrint('Bytes length: ${bytes.length}');
-      
+
       await _processAndUploadImage(bytes);
-      
+
       debugPrint('=== _processAndUploadImage COMPLETED ===');
-      
     } catch (e, stackTrace) {
       debugPrint('=== FATAL ERROR in _pickImageFromFile ===');
       debugPrint('Error: $e');
@@ -1124,29 +1228,38 @@ class _MemoriapalotaAllomasViewScreenState
         );
       }
     }
-    
+
     debugPrint('=== _pickImageFromFile END ===');
   }
-  
+
   // Lokális data URL létrehozása web-en (optimistic UI)
   String? _createLocalImageUrl(Uint8List imageBytes) {
     if (!kIsWeb) return null;
-    
+
     try {
       // Base64 kódolás a data URL-hez
       final base64 = base64Encode(imageBytes);
       // MIME típus meghatározása az első bájtok alapján
       String mimeType = 'image/jpeg';
       if (imageBytes.length >= 4) {
-        if (imageBytes[0] == 0x89 && imageBytes[1] == 0x50 && imageBytes[2] == 0x4E && imageBytes[3] == 0x47) {
+        if (imageBytes[0] == 0x89 &&
+            imageBytes[1] == 0x50 &&
+            imageBytes[2] == 0x4E &&
+            imageBytes[3] == 0x47) {
           mimeType = 'image/png';
-        } else if (imageBytes[0] == 0x47 && imageBytes[1] == 0x49 && imageBytes[2] == 0x46) {
+        } else if (imageBytes[0] == 0x47 &&
+            imageBytes[1] == 0x49 &&
+            imageBytes[2] == 0x46) {
           mimeType = 'image/gif';
-        } else if (imageBytes.length >= 12 && 
-                   imageBytes[0] == 0x52 && imageBytes[1] == 0x49 && 
-                   imageBytes[2] == 0x46 && imageBytes[3] == 0x46 &&
-                   imageBytes[8] == 0x57 && imageBytes[9] == 0x45 && 
-                   imageBytes[10] == 0x42 && imageBytes[11] == 0x50) {
+        } else if (imageBytes.length >= 12 &&
+            imageBytes[0] == 0x52 &&
+            imageBytes[1] == 0x49 &&
+            imageBytes[2] == 0x46 &&
+            imageBytes[3] == 0x46 &&
+            imageBytes[8] == 0x57 &&
+            imageBytes[9] == 0x45 &&
+            imageBytes[10] == 0x42 &&
+            imageBytes[11] == 0x50) {
           mimeType = 'image/webp';
         }
       }
@@ -1156,9 +1269,10 @@ class _MemoriapalotaAllomasViewScreenState
       return null;
     }
   }
-  
+
   // Progress dialog megjelenítése
   void _showUploadProgressDialog() {
+    _beginModalBlock();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1187,7 +1301,8 @@ class _MemoriapalotaAllomasViewScreenState
                     value: _uploadProgress > 0 ? _uploadProgress : null,
                     minHeight: 6,
                     backgroundColor: Colors.grey[200],
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -1202,9 +1317,12 @@ class _MemoriapalotaAllomasViewScreenState
           },
         ),
       ),
-    );
+    ).then((_) {
+      // Ha bezáródott a dialog, visszaadjuk az iframe pointer-t
+      _endModalBlock();
+    });
   }
-  
+
   // Progress dialog frissítése
   void _updateUploadProgress(double progress, String phase) {
     if (mounted) {
@@ -1214,11 +1332,13 @@ class _MemoriapalotaAllomasViewScreenState
       });
     }
   }
-  
+
   // Kép tömörítése és feltöltése - optimalizált verzió optimistic UI-val
-  Future<void> _processAndUploadImage(Uint8List imageBytes, {String? localImageUrl}) async {
-    debugPrint('_processAndUploadImage called, bytes length: ${imageBytes.length}');
-    
+  Future<void> _processAndUploadImage(Uint8List imageBytes,
+      {String? localImageUrl}) async {
+    debugPrint(
+        '_processAndUploadImage called, bytes length: ${imageBytes.length}');
+
     if (imageBytes.isEmpty) {
       debugPrint('Image bytes is empty!');
       if (mounted) {
@@ -1228,16 +1348,16 @@ class _MemoriapalotaAllomasViewScreenState
       }
       return;
     }
-    
+
     if (!mounted) {
       debugPrint('Widget not mounted, returning');
       return;
     }
-    
+
     // Optimistic UI: azonnal megjelenítjük a képet lokálisan
     String? tempUrl = localImageUrl ?? _createLocalImageUrl(imageBytes);
     String? previousImageUrl = _currentImageUrl;
-    
+
     setState(() {
       _isUploadingImage = true;
       if (tempUrl != null) {
@@ -1246,16 +1366,17 @@ class _MemoriapalotaAllomasViewScreenState
       _uploadProgress = 0.0;
       _uploadPhase = 'loading';
     });
-    
+
     // Progress dialog megjelenítése
     _showUploadProgressDialog();
-    
+
     // Animált progress - folyamatosan növekszik, még akkor is, ha a tényleges művelet blokkoló
     StreamSubscription? progressTimer;
     try {
       double simulatedProgress = 0.0;
       progressTimer = Stream.periodic(const Duration(milliseconds: 100), (i) {
-        simulatedProgress = (i * 0.01).clamp(0.0, 0.95); // Max 95%-ig, hogy legyen hely a tényleges progressnek
+        simulatedProgress = (i * 0.01).clamp(
+            0.0, 0.95); // Max 95%-ig, hogy legyen hely a tényleges progressnek
         return simulatedProgress;
       }).listen((progress) {
         if (mounted && progress > _uploadProgress) {
@@ -1263,54 +1384,58 @@ class _MemoriapalotaAllomasViewScreenState
         }
       });
       _updateUploadProgress(0.1, 'loading');
-      debugPrint('Starting compression, original size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
-      
+      debugPrint(
+          'Starting compression, original size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
+
       // Kép tömörítése 200 KB alá
       _updateUploadProgress(0.33, 'compressing');
-      
+
       // Timeout hozzáadása mobil eszközön (15 másodperc - rövidebb, hogy gyorsabban jelezzen hibát)
       final compressedBytes = await _compressImage(imageBytes).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('A kép tömörítése túl sokáig tartott. Kérlek, próbálj egy kisebb képet vagy újraindítsd az alkalmazást!');
+          throw Exception(
+              'A kép tömörítése túl sokáig tartott. Kérlek, próbálj egy kisebb képet vagy újraindítsd az alkalmazást!');
         },
       );
-      
-      debugPrint('Compression done, compressed size: ${compressedBytes != null ? (compressedBytes.length / 1024).toStringAsFixed(1) : "null"} KB');
-      
+
+      debugPrint(
+          'Compression done, compressed size: ${compressedBytes != null ? (compressedBytes.length / 1024).toStringAsFixed(1) : "null"} KB');
+
       if (compressedBytes == null) {
         throw Exception('Nem sikerült tömöríteni a képet');
       }
-      
+
       // Méret ellenőrzés - 2 MB-ig engedjük
       if (compressedBytes.length > 2 * 1024 * 1024) {
-        throw Exception('A kép mérete túl nagy (${(compressedBytes.length / 1024 / 1024).toStringAsFixed(1)} MB). Kérlek, válassz kisebb képet!');
+        throw Exception(
+            'A kép mérete túl nagy (${(compressedBytes.length / 1024 / 1024).toStringAsFixed(1)} MB). Kérlek, válassz kisebb képet!');
       }
-      
+
       _updateUploadProgress(0.66, 'uploading');
       debugPrint('Starting upload to Firebase Storage');
-      
+
       // Feltöltés
       await _uploadImageToStorage(compressedBytes);
-      
+
       _updateUploadProgress(1.0, 'uploading');
       debugPrint('Upload completed successfully');
-      
+
       // Progress timer leállítása
       progressTimer.cancel();
-      
+
       // Progress dialog bezárása
       if (mounted) {
         Navigator.of(context).pop(); // Progress dialog bezárása
       }
-      
+
       // Sikeres feltöltés után frissítjük a state-et
       if (mounted) {
         setState(() {
           _isUploadingImage = false;
           // _currentImageUrl már frissítve van az _uploadImageToStorage-ban
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Kép sikeresen feltöltve!'),
@@ -1327,7 +1452,7 @@ class _MemoriapalotaAllomasViewScreenState
       debugPrint('=== Hiba a képfeltöltéskor ===');
       debugPrint('Error: $e');
       debugPrint('Stack trace: $stackTrace');
-      
+
       // Progress dialog bezárása
       if (mounted) {
         try {
@@ -1336,26 +1461,30 @@ class _MemoriapalotaAllomasViewScreenState
           debugPrint('Error closing dialog: $navError');
         }
       }
-      
+
       // Hiba esetén visszaállítjuk az előző állapotot
       if (mounted) {
         setState(() {
           _isUploadingImage = false;
           _currentImageUrl = previousImageUrl; // Visszaállítjuk az előző képet
         });
-        
+
         // Részletes hibaüzenet megjelenítése
         String errorMessage = 'Hiba a képfeltöltéskor';
-        if (e.toString().contains('timeout') || e.toString().contains('Timeout')) {
+        if (e.toString().contains('timeout') ||
+            e.toString().contains('Timeout')) {
           errorMessage = 'A művelet túl sokáig tartott. Kérlek, próbáld újra!';
-        } else if (e.toString().contains('permission') || e.toString().contains('Permission')) {
-          errorMessage = 'Nincs jogosultság a képfeltöltéshez. Ellenőrizd a beállításokat!';
-        } else if (e.toString().contains('network') || e.toString().contains('Network')) {
+        } else if (e.toString().contains('permission') ||
+            e.toString().contains('Permission')) {
+          errorMessage =
+              'Nincs jogosultság a képfeltöltéshez. Ellenőrizd a beállításokat!';
+        } else if (e.toString().contains('network') ||
+            e.toString().contains('Network')) {
           errorMessage = 'Hálózati hiba. Ellenőrizd az internetkapcsolatot!';
         } else {
           errorMessage = 'Hiba: ${e.toString()}';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -1374,24 +1503,25 @@ class _MemoriapalotaAllomasViewScreenState
       }
     }
   }
-  
+
   // Kép tömörítése 200 KB alá - gyorsított verzió
   Future<Uint8List?> _compressImage(Uint8List imageBytes) async {
     // Ha már 200 KB alatt van, visszaadja
     if (imageBytes.length <= 200 * 1024) {
       return imageBytes;
     }
-    
+
     try {
-      debugPrint('Starting image compression, platform: ${kIsWeb ? "web" : "mobile"}, size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
-      
+      debugPrint(
+          'Starting image compression, platform: ${kIsWeb ? "web" : "mobile"}, size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
+
       Uint8List? compressed;
-      
+
       if (kIsWeb) {
         // Web-en a compute nem mindig működik megfelelően
         // Kis késleltetés, hogy az UI frissülhessen
         await Future.delayed(const Duration(milliseconds: 50));
-        
+
         // Aszinkron módon futtatjuk, hogy ne blokkolja a UI-t
         compressed = await Future(() => _compressImageInIsolate(imageBytes));
       } else {
@@ -1400,18 +1530,21 @@ class _MemoriapalotaAllomasViewScreenState
         try {
           // Kis késleltetés, hogy az UI frissülhessen
           await Future.delayed(const Duration(milliseconds: 100));
-          compressed = await compute(_compressImageInIsolate, imageBytes).timeout(
+          compressed =
+              await compute(_compressImageInIsolate, imageBytes).timeout(
             const Duration(seconds: 10),
             onTimeout: () {
               throw Exception('Tömörítés timeout');
             },
           );
         } catch (e) {
-          debugPrint('Compute failed or timeout, trying direct compression: $e');
+          debugPrint(
+              'Compute failed or timeout, trying direct compression: $e');
           // Ha a compute nem működik vagy timeout, próbáljuk közvetlenül
           // Kis késleltetés, hogy az UI frissülhessen
           await Future.delayed(const Duration(milliseconds: 100));
-          compressed = await Future(() => _compressImageInIsolate(imageBytes)).timeout(
+          compressed =
+              await Future(() => _compressImageInIsolate(imageBytes)).timeout(
             const Duration(seconds: 10),
             onTimeout: () {
               throw Exception('Tömörítés timeout (közvetlen)');
@@ -1419,8 +1552,9 @@ class _MemoriapalotaAllomasViewScreenState
           );
         }
       }
-      
-      debugPrint('Compression completed: ${compressed?.length ?? 0} bytes (${(compressed?.length ?? 0) / 1024} KB)');
+
+      debugPrint(
+          'Compression completed: ${compressed?.length ?? 0} bytes (${(compressed?.length ?? 0) / 1024} KB)');
       return compressed;
     } catch (e, stackTrace) {
       debugPrint('Hiba a tömörítéskor: $e');
@@ -1428,25 +1562,29 @@ class _MemoriapalotaAllomasViewScreenState
       rethrow;
     }
   }
-  
+
   // Firebase Storage-ba feltöltés
   Future<void> _uploadImageToStorage(Uint8List imageBytes) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('Nincs bejelentkezve felhasználó!');
     }
-    
-    if (_allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
+
+    if (_allomasok.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _allomasok.length) {
       throw Exception('Nincs kiválasztott állomás!');
     }
-    
+
     final currentAllomas = _allomasok[_currentIndex];
     final allomasId = currentAllomas.id;
     final utvonalId = widget.noteId;
-    
-    debugPrint('Uploading image to Storage: memoriapalota_images/$utvonalId/$allomasId/${user.uid}/image.jpg');
-    debugPrint('Image size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
-    
+
+    debugPrint(
+        'Uploading image to Storage: memoriapalota_images/$utvonalId/$allomasId/${user.uid}/image.jpg');
+    debugPrint(
+        'Image size: ${(imageBytes.length / 1024).toStringAsFixed(1)} KB');
+
     // Régi kép törlése (ha van)
     if (_currentImageUrl != null && _currentImageUrl!.startsWith('https://')) {
       try {
@@ -1459,21 +1597,24 @@ class _MemoriapalotaAllomasViewScreenState
         // Ha nem sikerül törölni, folytatjuk
       }
     }
-    
+
     // Új kép feltöltése
     final ref = FirebaseStorage.instance.ref(
       'memoriapalota_images/$utvonalId/$allomasId/${user.uid}/image.jpg',
     );
-    
+
     debugPrint('Starting upload to Firebase Storage...');
     try {
-      await ref.putData(
+      await ref
+          .putData(
         imageBytes,
         SettableMetadata(contentType: 'image/jpeg'),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          throw Exception('A képfeltöltés túl sokáig tartott. Kérlek, próbáld újra!');
+          throw Exception(
+              'A képfeltöltés túl sokáig tartott. Kérlek, próbáld újra!');
         },
       );
       debugPrint('Upload to Storage completed');
@@ -1481,21 +1622,22 @@ class _MemoriapalotaAllomasViewScreenState
       debugPrint('Error uploading to Storage: $e');
       rethrow;
     }
-    
+
     debugPrint('Getting download URL...');
     final imageUrl = await ref.getDownloadURL().timeout(
       const Duration(seconds: 10),
       onTimeout: () {
-        throw Exception('Nem sikerült lekérni a kép URL-jét. Kérlek, próbáld újra!');
+        throw Exception(
+            'Nem sikerült lekérni a kép URL-jét. Kérlek, próbáld újra!');
       },
     );
     debugPrint('Download URL obtained: $imageUrl');
-    
+
     // Firestore-ba mentés
     debugPrint('Saving to Firestore...');
     await _saveImageUrlToFirestore(imageUrl);
     debugPrint('Saved to Firestore successfully');
-    
+
     // State frissítése
     if (mounted) {
       setState(() {
@@ -1503,24 +1645,27 @@ class _MemoriapalotaAllomasViewScreenState
       });
     }
   }
-  
+
   // Firestore-ba mentés
   Future<void> _saveImageUrlToFirestore(String imageUrl) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('Nincs bejelentkezve felhasználó!');
     }
-    
-    if (_allomasok.isEmpty || _currentIndex < 0 || _currentIndex >= _allomasok.length) {
+
+    if (_allomasok.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _allomasok.length) {
       throw Exception('Nincs kiválasztott állomás!');
     }
-    
+
     final currentAllomas = _allomasok[_currentIndex];
     final allomasId = currentAllomas.id;
     final utvonalId = widget.noteId;
-    
-    debugPrint('Saving to Firestore: memoriapalota_allomasok/$utvonalId/allomasok/$allomasId/userImages/${user.uid}');
-    
+
+    debugPrint(
+        'Saving to Firestore: memoriapalota_allomasok/$utvonalId/allomasok/$allomasId/userImages/${user.uid}');
+
     try {
       await FirebaseConfig.firestore
           .collection('memoriapalota_allomasok')
@@ -1530,33 +1675,33 @@ class _MemoriapalotaAllomasViewScreenState
           .collection('userImages')
           .doc(user.uid)
           .set({
-            'imageUrl': imageUrl,
-            'uploadedAt': Timestamp.now(),
-          })
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception('A Firestore mentés túl sokáig tartott. Kérlek, próbáld újra!');
-            },
-          );
+        'imageUrl': imageUrl,
+        'uploadedAt': Timestamp.now(),
+      }).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception(
+              'A Firestore mentés túl sokáig tartott. Kérlek, próbáld újra!');
+        },
+      );
       debugPrint('Firestore save completed');
     } catch (e) {
       debugPrint('Error saving to Firestore: $e');
       rethrow;
     }
   }
-  
+
   // Kép törlése
   Future<void> _deleteImage() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _currentImageUrl == null) {
       return;
     }
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
       // Storage-ból törlés
       try {
@@ -1565,13 +1710,15 @@ class _MemoriapalotaAllomasViewScreenState
       } catch (e) {
         // Ha nem sikerül törölni, folytatjuk
       }
-      
+
       // Firestore-ból törlés
-      if (_allomasok.isNotEmpty && _currentIndex >= 0 && _currentIndex < _allomasok.length) {
+      if (_allomasok.isNotEmpty &&
+          _currentIndex >= 0 &&
+          _currentIndex < _allomasok.length) {
         final currentAllomas = _allomasok[_currentIndex];
         final allomasId = currentAllomas.id;
         final utvonalId = widget.noteId;
-        
+
         await FirebaseConfig.firestore
             .collection('memoriapalota_allomasok')
             .doc(utvonalId)
@@ -1581,7 +1728,7 @@ class _MemoriapalotaAllomasViewScreenState
             .doc(user.uid)
             .delete();
       }
-      
+
       if (mounted) {
         setState(() {
           _currentImageUrl = null;
@@ -1604,7 +1751,7 @@ class _MemoriapalotaAllomasViewScreenState
       }
     }
   }
-  
+
   // Tartalom overlay megjelenítése
   void _showContentOverlayDialog() {
     if (_currentHtmlContent.isEmpty || _viewId.isEmpty) {
@@ -1613,7 +1760,8 @@ class _MemoriapalotaAllomasViewScreenState
       );
       return;
     }
-    
+
+    _beginModalBlock();
     showDialog(
       context: context,
       barrierColor: Colors.black87,
@@ -1674,7 +1822,7 @@ class _MemoriapalotaAllomasViewScreenState
           ),
         ),
       ),
-    );
+    ).then((_) => _endModalBlock());
   }
 
   Future<void> _goToPrevious() async {
@@ -1682,6 +1830,8 @@ class _MemoriapalotaAllomasViewScreenState
       setState(() {
         _currentIndex--;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
+        // Új kulcs generálása az audio player újraépítéséhez
+        _audioPlayerKeyCounter++;
       });
       await _displayCurrentAllomas();
     }
@@ -1692,13 +1842,203 @@ class _MemoriapalotaAllomasViewScreenState
       setState(() {
         _currentIndex++;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
+        // Új kulcs generálása az audio player újraépítéséhez
+        _audioPlayerKeyCounter++;
       });
       await _displayCurrentAllomas();
     }
   }
-  
+
+  /// Ellenőrzi, hogy van-e legalább egy állomás audioUrl-jével
+  bool _hasAnyAudio() {
+    for (var allomas in _allomasok) {
+      final data = allomas.data() as Map<String, dynamic>;
+      final audioUrl = data['audioUrl'] as String?;
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Audio beállítások dialógus megjelenítése
+  Future<void> _showAudioSettingsDialog() async {
+    bool tempAutoPlay = _autoPlayAudio;
+
+    if (!mounted) return;
+
+    _beginModalBlock();
+    try {
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Audio beállítások'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Automatikus audio lejátszás állomások közötti léptetéskor',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    Switch(
+                      value: tempAutoPlay,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          tempAutoPlay = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  tempAutoPlay
+                      ? 'Az állomások közötti léptetéskor automatikusan elindul az audio lejátszása.'
+                      : 'Az állomások közötti léptetéskor nem indul el automatikusan az audio lejátszása.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Mégse'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await _saveAudioSettings(tempAutoPlay);
+                  if (mounted && dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                },
+                child: const Text('Mentés'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      _endModalBlock();
+    }
+  }
+
+  /// Mobilnézet alsó sáv: audio player vagy "Nincs hanganyag" üzenet
+  Widget _buildMobileBottomBar() {
+    final hasAudio = _currentAudioUrl != null && _currentAudioUrl!.isNotEmpty;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasAudio) ...[
+          MiniAudioPlayer(
+            key: ValueKey('audio_player_$_audioPlayerKeyCounter'),
+            audioUrl: _currentAudioUrl!,
+            compact: false,
+            large: true,
+            deferInit: false,
+            autoPlay: _autoPlayAudio,
+          ),
+        ] else ...[
+          const Text(
+            'Nincs hanganyag',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMobilePagerTopBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: _currentIndex > 0 ? _goToPrevious : null,
+            icon: const Icon(Icons.chevron_left),
+            iconSize: 30,
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            tooltip: 'Előző állomás',
+          ),
+          Text(
+            '${_currentIndex + 1} / ${_allomasok.length}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          IconButton(
+            onPressed: _currentIndex < _allomasok.length - 1 ? _goToNext : null,
+            icon: const Icon(Icons.chevron_right),
+            iconSize: 30,
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            tooltip: 'Következő állomás',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Desktopnézet alsó sáv: előző-következő gombok
+  Widget _buildDesktopBottomBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _currentIndex > 0 ? _goToPrevious : null,
+          icon: const Icon(Icons.arrow_back),
+          label: const Text('Előző'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 12,
+            ),
+          ),
+        ),
+        Text(
+          '${_currentIndex + 1} / ${_allomasok.length}',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        ElevatedButton.icon(
+          onPressed: _currentIndex < _allomasok.length - 1 ? _goToNext : null,
+          icon: const Icon(Icons.arrow_forward),
+          label: const Text('Következő'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _toggleContent() {
-    debugPrint('_toggleContent called - current state: _isContentOpen=$_isContentOpen');
+    debugPrint(
+        '_toggleContent called - current state: _isContentOpen=$_isContentOpen');
     setState(() {
       _isContentOpen = !_isContentOpen;
       debugPrint('_toggleContent - new state: _isContentOpen=$_isContentOpen');
@@ -1736,7 +2076,7 @@ class _MemoriapalotaAllomasViewScreenState
     // Az állomásoknak 'cim' mezőjük van
     final title = data['cim'] as String? ?? 'Állomás';
     final allomasSorszam = data['allomasSorszam'] as int? ?? 0;
-    
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
@@ -1776,7 +2116,7 @@ class _MemoriapalotaAllomasViewScreenState
             // CSAK FilterStorage-ban tárolt előző oldal szűrőit használjuk, SOHA ne a jegyzet aktuális értékeit!
             final effectiveTag = FilterStorage.tag;
             final effectiveCategory = FilterStorage.category;
-            
+
             if (effectiveTag != null && effectiveTag.isNotEmpty) {
               // Először próbáljuk a címkére, ha van
               final uri = Uri(
@@ -1795,7 +2135,8 @@ class _MemoriapalotaAllomasViewScreenState
                 },
               );
               context.go(uri.toString());
-            } else if (effectiveCategory != null && effectiveCategory.isNotEmpty) {
+            } else if (effectiveCategory != null &&
+                effectiveCategory.isNotEmpty) {
               // Ha nincs címke, de van kategória, akkor a kategóriára lépünk vissza
               final uri = Uri(
                 path: '/notes',
@@ -1851,15 +2192,17 @@ class _MemoriapalotaAllomasViewScreenState
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.add_photo_alternate),
-            onPressed: _isUploadingImage ? null : () {
-              debugPrint('=== IconButton onPressed START ===');
-              if (kIsWeb) {
-                // Web-en közvetlenül a file_selector-t hívjuk meg, dialógus nélkül
-                _pickImageFromFileWebDirect();
-              } else {
-                _showImagePickerDialog();
-              }
-            },
+            onPressed: _isUploadingImage
+                ? null
+                : () {
+                    debugPrint('=== IconButton onPressed START ===');
+                    if (kIsWeb) {
+                      // Web-en közvetlenül a file_selector-t hívjuk meg, dialógus nélkül
+                      _pickImageFromFileWebDirect();
+                    } else {
+                      _showImagePickerDialog();
+                    }
+                  },
             tooltip: 'Kép feltöltése',
           ),
           // Tartalom megtekintése gomb (csak ha nincs kép, vagy overlay dialog-hoz)
@@ -1868,6 +2211,13 @@ class _MemoriapalotaAllomasViewScreenState
               icon: const Icon(Icons.menu_book),
               onPressed: _showContentOverlayDialog,
               tooltip: 'Tartalom megtekintése',
+            ),
+          // Audio beállítások gomb (csak ha van legalább egy állomás audioUrl-jével)
+          if (_hasAnyAudio())
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: _showAudioSettingsDialog,
+              tooltip: 'Audio beállítások',
             ),
         ],
       ),
@@ -1882,263 +2232,313 @@ class _MemoriapalotaAllomasViewScreenState
             noteTitle: _noteTitle,
             noteId: widget.noteId,
           ),
+          if (isMobile) _buildMobilePagerTopBar(),
+          // Audio player desktopnézetben (ha van audio)
+          if (!isMobile &&
+              _currentAudioUrl != null &&
+              _currentAudioUrl!.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.audiotrack, size: 20, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: MiniAudioPlayer(
+                      key: ValueKey('audio_player_$_audioPlayerKeyCounter'),
+                      audioUrl: _currentAudioUrl!,
+                      deferInit: false,
+                      autoPlay: _autoPlayAudio,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Tartalom
           Expanded(
             child: Stack(
               children: [
                 // Kép háttérben (ha van)
-          if (_currentImageUrl != null)
-            Positioned.fill(
-              child: Container(
-                color: Colors.white,
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Image.network(
-                        _currentImageUrl!,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          debugPrint('Image load error: $error');
-                          return Center(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.error_outline,
-                                    color: Colors.red,
-                                    size: 48,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Nem sikerült betölteni a képet',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                                  ),
-                                  if (kIsWeb)
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 4.0),
-                                      child: Text(
-                                        '(CORS hiba vagy hozzáférési hiba)',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                                      ),
+                if (_currentImageUrl != null)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.white,
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Image.network(
+                              _currentImageUrl!,
+                              fit: BoxFit.contain,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                debugPrint('Image load error: $error');
+                                return Center(
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.error_outline,
+                                          color: Colors.red,
+                                          size: 48,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Nem sikerült betölteni a képet',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        if (kIsWeb)
+                                          const Padding(
+                                            padding: EdgeInsets.only(top: 4.0),
+                                            child: Text(
+                                              '(CORS hiba vagy hozzáférési hiba)',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey),
+                                            ),
+                                          ),
+                                        const SizedBox(height: 8),
+                                        // Hiba részletek és URL megjelenítése
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: SelectableText(
+                                            'Hiba: $error\n\nKattints az Újrapróbálás gombra!',
+                                            style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.black54),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        ElevatedButton.icon(
+                                          onPressed: () {
+                                            setState(() {
+                                              if (_currentImageUrl != null) {
+                                                // Cache busting timestamp hozzáadása az URL-hez
+                                                final timestamp = DateTime.now()
+                                                    .millisecondsSinceEpoch;
+                                                if (_currentImageUrl!
+                                                    .contains('cache_bust=')) {
+                                                  _currentImageUrl =
+                                                      _currentImageUrl!.replaceAll(
+                                                          RegExp(
+                                                              r'cache_bust=\d+'),
+                                                          'cache_bust=$timestamp');
+                                                } else {
+                                                  final separator =
+                                                      _currentImageUrl!
+                                                              .contains('?')
+                                                          ? '&'
+                                                          : '?';
+                                                  _currentImageUrl =
+                                                      '$_currentImageUrl${separator}cache_bust=$timestamp';
+                                                }
+                                              }
+                                            });
+                                          },
+                                          icon: const Icon(Icons.refresh),
+                                          label: const Text(
+                                              'Újrapróbálás (Cache törlés)'),
+                                        ),
+                                      ],
                                     ),
-                                  const SizedBox(height: 8),
-                                  // Hiba részletek és URL megjelenítése
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: SelectableText(
-                                      'Hiba: $error\n\nKattints az Újrapróbálás gombra!',
-                                      style: const TextStyle(fontSize: 10, color: Colors.black54),
-                                      textAlign: TextAlign.center,
-                                    ),
                                   ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        if (_currentImageUrl != null) {
-                                          // Cache busting timestamp hozzáadása az URL-hez
-                                          final timestamp = DateTime.now().millisecondsSinceEpoch;
-                                          if (_currentImageUrl!.contains('cache_bust=')) {
-                                            _currentImageUrl = _currentImageUrl!.replaceAll(
-                                              RegExp(r'cache_bust=\d+'), 
-                                              'cache_bust=$timestamp'
-                                            );
-                                          } else {
-                                            final separator = _currentImageUrl!.contains('?') ? '&' : '?';
-                                            _currentImageUrl = '$_currentImageUrl${separator}cache_bust=$timestamp';
-                                          }
+                                );
+                              },
+                            ),
+                          ),
+                          // Törlés gomb a kép jobb felső sarkában
+                          Positioned(
+                            top: 16,
+                            right: 16,
+                            child: Material(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(20),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: _isUploadingImage
+                                    ? null
+                                    : () async {
+                                        _beginModalBlock();
+                                        bool? shouldDelete;
+                                        try {
+                                          // Megerősítő dialógus
+                                          shouldDelete = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Kép törlése'),
+                                              content: const Text(
+                                                  'Biztosan törölni szeretnéd ezt a képet?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(context)
+                                                          .pop(false),
+                                                  child: const Text('Mégse'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(context)
+                                                          .pop(true),
+                                                  style: TextButton.styleFrom(
+                                                    foregroundColor: Colors.red,
+                                                  ),
+                                                  child: const Text('Törlés'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        } finally {
+                                          _endModalBlock();
                                         }
-                                      });
-                                    },
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('Újrapróbálás (Cache törlés)'),
-                                  ),
-                                ],
+
+                                        if (shouldDelete == true && mounted) {
+                                          await _deleteImage();
+                                        }
+                                      },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  child: _isUploadingImage
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.delete,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
                     ),
-                    // Törlés gomb a kép jobb felső sarkában
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: Material(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(20),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: _isUploadingImage ? null : () async {
-                            // Megerősítő dialógus
-                            final shouldDelete = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Kép törlése'),
-                                content: const Text('Biztosan törölni szeretnéd ezt a képet?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(false),
-                                    child: const Text('Mégse'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(true),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                    ),
-                                    child: const Text('Törlés'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            
-                            if (shouldDelete == true && mounted) {
-                              await _deleteImage();
-                            }
-                          },
+                  ),
+                // HTML tartalom előtérben félig átlátszó háttérrel (ha meg van nyitva VAGY nincs kép)
+                if (_isContentOpen || _currentImageUrl == null)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 72, // Helyet hagyunk az alsó sávnak
+                    child: Stack(
+                      children: [
+                        GestureDetector(
+                          onTap: _currentImageUrl != null
+                              ? _toggleContent
+                              : null, // Csak ha van kép, bezárható kattintással
                           child: Container(
-                            padding: const EdgeInsets.all(8),
-                            child: _isUploadingImage
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
+                            decoration: BoxDecoration(
+                              color: _currentImageUrl != null
+                                  ? Colors.white.withValues(
+                                      alpha:
+                                          0.85) // Félig átlátszó fehér, ha van kép
+                                  : Colors.white, // Fehér háttér, ha nincs kép
+                            ),
+                            child: kIsWeb &&
+                                    _currentHtmlContent.isNotEmpty &&
+                                    _viewId.isNotEmpty
+                                ? HtmlElementView(
+                                    key: ValueKey('iframe_$_viewId'),
+                                    viewType: _viewId,
                                   )
-                                : const Icon(
-                                    Icons.delete,
-                                    color: Colors.white,
-                                    size: 20,
+                                : const Center(
+                                    child: Text(
+                                      'Nem sikerült betölteni a tartalmat',
+                                      style: TextStyle(
+                                          color: Colors.red, fontSize: 16),
+                                    ),
                                   ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-          // HTML tartalom előtérben félig átlátszó háttérrel (ha meg van nyitva VAGY nincs kép)
-          if (_isContentOpen || _currentImageUrl == null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 80, // Helyet hagyunk a navigációs gomboknak
-              child: GestureDetector(
-                onTap: _currentImageUrl != null ? _toggleContent : null, // Csak ha van kép, bezárható kattintással
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _currentImageUrl != null 
-                        ? Colors.white.withValues(alpha: 0.85) // Félig átlátszó fehér, ha van kép
-                        : Colors.white, // Fehér háttér, ha nincs kép
-                  ),
-                  child: kIsWeb && _currentHtmlContent.isNotEmpty && _viewId.isNotEmpty
-                      ? HtmlElementView(
-                          key: ValueKey('iframe_$_viewId'),
-                          viewType: _viewId,
-                        )
-                      : const Center(
-                          child: Text(
-                            'Nem sikerült betölteni a tartalmat',
-                            style: TextStyle(color: Colors.red, fontSize: 16),
+                  )
+                else
+                  // Alapállapot: csak a kép és egy gomb a tananyag megnyitásához (ha van kép)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 72,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Spacer(),
+                              ElevatedButton.icon(
+                                onPressed: _toggleContent,
+                                icon: const Icon(Icons.menu_book),
+                                label: const Text(
+                                  'Tananyag megnyitása',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                            ],
                           ),
                         ),
-                ),
-              ),
-            )
-          else
-            // Alapállapot: csak a kép és egy gomb a tananyag megnyitásához (ha van kép)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 80,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: _toggleContent,
-                      icon: const Icon(Icons.menu_book),
-                      label: const Text(
-                        'Tananyag megnyitása',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
+                      ],
+                    ),
+                  ),
+                // Navigációs gombok alul (desktop) vagy audio player (mobil)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: isMobile
+                        ? const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          )
+                        : const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, -2),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                  ],
+                    child: isMobile
+                        ? _buildMobileBottomBar()
+                        : _buildDesktopBottomBar(),
+                  ),
                 ),
-              ),
-            ),
-          // Navigációs gombok alul
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _currentIndex > 0 ? _goToPrevious : null,
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('Előző'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${_currentIndex + 1} / ${_allomasok.length}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  ElevatedButton.icon(
-                    onPressed:
-                        _currentIndex < _allomasok.length - 1 ? _goToNext : null,
-                    icon: const Icon(Icons.arrow_forward),
-                    label: const Text('Következő'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
               ],
             ),
           ),
@@ -2147,4 +2547,3 @@ class _MemoriapalotaAllomasViewScreenState
     );
   }
 }
-

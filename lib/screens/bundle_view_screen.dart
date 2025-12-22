@@ -8,7 +8,7 @@ import 'dart:async';
 import '../widgets/audio_preview_player.dart';
 
 /// Köteg (bundle) megjelenítő képernyő prezentáció módban.
-/// 
+///
 /// Ez a képernyő prezentációszerűen jeleníti meg a kötegben lévő jegyzeteket.
 /// A felhasználó navigálhat előre-hátra a jegyzetek között, mint egy diavetítésben.
 class BundleViewScreen extends StatefulWidget {
@@ -25,46 +25,48 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
   DocumentSnapshot? _bundleSnapshot;
   String _bundleName = '';
   List<String> _noteIds = [];
-  bool _isLoadingNotes = true; // Flag, hogy ne jelenjen meg az üres üzenet betöltés közben
-  bool _isLoadingInProgress = false; // Flag, hogy ne töltse be többször az adatokat
-  
+  bool _isLoadingNotes =
+      true; // Flag, hogy ne jelenjen meg az üres üzenet betöltés közben
+  bool _isLoadingInProgress =
+      false; // Flag, hogy ne töltse be többször az adatokat
+
   // Jegyzetek adatai
   Map<String, Map<String, dynamic>> _notesData = {};
   int _currentIndex = 0;
   String _currentHtmlContent = '';
-  
+
   // HTML megjelenítés
   late final String _viewId;
   bool _hasContent = false;
-  
+
   // Stream subscriptions
   StreamSubscription<DocumentSnapshot>? _bundleSubscription;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     // Az ID-t a state objektum hash kódjából generáljuk, hogy mindig egyedi legyen.
     // Így elkerüljük a platform view cache-elési problémákat.
     _viewId = "bundle-view-iframe-$hashCode";
-    
+
     // A view factory-t úgy módosítjuk, hogy mindig új iframe-et hozzon létre
     // az aktuális HTML tartalommal.
     // ignore: undefined_prefixed_name
-    ui_web.platformViewRegistry
-        .registerViewFactory(_viewId, (int viewId) {
-          final web.HTMLIFrameElement iframeElement = web.HTMLIFrameElement();
-          iframeElement
-            ..style.width = '100%'
-            ..style.height = '100%'
-            ..style.border = 'none'
-            ..src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(_currentHtmlContent)}';
-          return iframeElement;
-        });
-    
+    ui_web.platformViewRegistry.registerViewFactory(_viewId, (int viewId) {
+      final web.HTMLIFrameElement iframeElement = web.HTMLIFrameElement();
+      iframeElement
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.border = 'none'
+        ..src =
+            'data:text/html;charset=utf-8,${Uri.encodeComponent(_currentHtmlContent)}';
+      return iframeElement;
+    });
+
     _loadBundle();
   }
-  
+
   /// Betölti a köteg és a benne lévő jegyzetek adatait
   Future<void> _loadBundle() async {
     _bundleSubscription = FirebaseFirestore.instance
@@ -73,41 +75,41 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
         .snapshots()
         .listen((snapshot) async {
       if (!mounted) return;
-      
+
       // Ha már betöltés folyamatban van, ne kezdjük el újra
       if (_isLoadingInProgress) return;
-      
+
       if (snapshot.exists) {
         final data = snapshot.data() as Map<String, dynamic>;
         _bundleName = data['name'] ?? 'Névtelen köteg';
         final noteIds = List<String>.from(data['noteIds'] ?? []);
-        
+
         // Betöltés közben ne jelenjen meg az üres üzenet - csak a loading flag-et állítjuk be
         setState(() {
           _isLoadingNotes = true;
           _isLoadingInProgress = true;
           // NE állítsuk be a _bundleSnapshot-ot még, amíg nem töltődtek be az adatok!
         });
-        
+
         // Betöltjük a jegyzetek adatait
-          await _loadNotesData();
+        await _loadNotesData();
         if (!mounted) return;
-        
+
         // Beállítjuk a state-et, hogy betöltse az iframe-et
         setState(() {
           _bundleSnapshot = snapshot;
           _noteIds = noteIds;
           // Még nem állítjuk le a loading flag-et, várjuk meg az iframe betöltését
         });
-        
+
         // Betöltjük az aktuális jegyzet tartalmát
         _loadCurrentNote();
-        
+
         // Várunk egy kicsit, hogy az iframe betöltődhessen
         // Az iframe betöltése aszinkron, ezért egy rövid késleltetést használunk
         await Future.delayed(const Duration(milliseconds: 300));
         if (!mounted) return;
-        
+
         // Most már beállíthatjuk, hogy a loading screen eltűnjön
         setState(() {
           _isLoadingNotes = false;
@@ -116,29 +118,26 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       }
     });
   }
-  
+
   /// Betölti az összes jegyzet adatát
   Future<void> _loadNotesData() async {
     if (_noteIds.isEmpty) return;
-    
+
     final notes = await FirebaseFirestore.instance
         .collection('notes')
         .where(FieldPath.documentId, whereIn: _noteIds)
         .get();
-    
-    _notesData = {
-      for (var doc in notes.docs)
-        doc.id: doc.data()
-    };
+
+    _notesData = {for (var doc in notes.docs) doc.id: doc.data()};
   }
-  
+
   /// Betölti az aktuális jegyzet HTML tartalmát
   void _loadCurrentNote() {
     if (_currentIndex >= _noteIds.length) return;
-    
+
     final noteId = _noteIds[_currentIndex];
     final noteData = _notesData[noteId];
-    
+
     String newHtmlContent = '';
     if (noteData != null) {
       final pages = noteData['pages'] as List<dynamic>? ?? [];
@@ -146,14 +145,14 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
         newHtmlContent = pages.first as String? ?? '';
       }
     }
-    
+
     // Csak az állapotot frissítjük, a build majd újraépíti a view-t
     setState(() {
       _currentHtmlContent = newHtmlContent;
       _hasContent = _currentHtmlContent.isNotEmpty;
     });
   }
-  
+
   /// Navigálás az előző jegyzetre
   void _previousNote() {
     if (_currentIndex > 0) {
@@ -163,7 +162,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       _loadCurrentNote();
     }
   }
-  
+
   /// Navigálás a következő jegyzetre
   void _nextNote() {
     if (_currentIndex < _noteIds.length - 1) {
@@ -173,7 +172,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       _loadCurrentNote();
     }
   }
-  
+
   /// Ugrás egy adott jegyzetre
   void _jumpToNote(int index) {
     if (index >= 0 && index < _noteIds.length) {
@@ -183,7 +182,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       _loadCurrentNote();
     }
   }
-  
+
   /// Teljes képernyős mód váltása
   void _toggleFullScreen() {
     // Implementálható teljes képernyős mód
@@ -194,7 +193,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (_bundleSnapshot == null || _isLoadingNotes || _noteIds.isEmpty) {
@@ -209,11 +208,11 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     final currentNoteId = _noteIds[_currentIndex];
     final currentNoteData = _notesData[currentNoteId];
     final currentNoteTitle = currentNoteData?['title'] ?? 'Ismeretlen jegyzet';
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -261,9 +260,9 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
                     ),
                   ),
           ),
-          
+
           // Audio lejátszó ha van
-          if (currentNoteData != null && 
+          if (currentNoteData != null &&
               currentNoteData['audioUrl'] != null &&
               currentNoteData['audioUrl'].toString().isNotEmpty) ...[
             Container(
@@ -277,7 +276,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
               child: AudioPreviewPlayer(audioUrl: currentNoteData['audioUrl']),
             ),
           ],
-          
+
           // Navigációs sáv
           Container(
             padding: const EdgeInsets.all(16),
@@ -306,7 +305,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
                     ),
                   ),
                 ),
-                
+
                 // Pozíció jelző
                 Row(
                   children: [
@@ -327,12 +326,11 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
                       ),
                   ],
                 ),
-                
+
                 // Következő gomb
                 ElevatedButton.icon(
-                  onPressed: _currentIndex < _noteIds.length - 1 
-                      ? _nextNote 
-                      : null,
+                  onPressed:
+                      _currentIndex < _noteIds.length - 1 ? _nextNote : null,
                   icon: const Icon(Icons.arrow_forward),
                   label: const Text('Következő'),
                   style: ElevatedButton.styleFrom(
@@ -349,7 +347,7 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       ),
     );
   }
-  
+
   /// Jegyzetek listájának megjelenítése dialógusban
   void _showNotesList() {
     showDialog(
@@ -366,11 +364,11 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
               final noteData = _notesData[noteId];
               final title = noteData?['title'] ?? 'Ismeretlen jegyzet';
               final isActive = index == _currentIndex;
-              
+
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: isActive 
-                      ? Theme.of(context).primaryColor 
+                  backgroundColor: isActive
+                      ? Theme.of(context).primaryColor
                       : Colors.grey.shade300,
                   foregroundColor: isActive ? Colors.white : Colors.black,
                   child: Text('${index + 1}'),
@@ -399,10 +397,10 @@ class _BundleViewScreenState extends State<BundleViewScreen> {
       ),
     );
   }
-  
+
   @override
   void dispose() {
     _bundleSubscription?.cancel();
     super.dispose();
   }
-} 
+}

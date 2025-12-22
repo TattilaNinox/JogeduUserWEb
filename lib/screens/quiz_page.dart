@@ -58,12 +58,13 @@ class _QuizPageState extends State<QuizPage> {
 
       if (questions.isEmpty) {
         // Fallback to random questions
-        final fallbackQuestions = await QuestionBankService.getPersonalizedQuestions(
+        final fallbackQuestions =
+            await QuestionBankService.getPersonalizedQuestions(
           widget.questionBankId,
           user.uid,
           maxQuestions: 10,
         );
-        
+
         if (fallbackQuestions.isEmpty) {
           setState(() {
             _error = 'Nem sikerült betölteni a kérdéseket';
@@ -71,7 +72,7 @@ class _QuizPageState extends State<QuizPage> {
           });
           return;
         }
-        
+
         setState(() {
           _questions = fallbackQuestions;
           _showFallbackWarning = true;
@@ -148,7 +149,8 @@ class _QuizPageState extends State<QuizPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('A kérdések személyre szabása nem elérhető, véletlenszerű kérdések jelennek meg'),
+            content: Text(
+                'A kérdések személyre szabása nem elérhető, véletlenszerű kérdések jelennek meg'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),

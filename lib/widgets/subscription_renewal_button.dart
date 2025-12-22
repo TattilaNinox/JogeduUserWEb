@@ -287,18 +287,21 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
     }
 
     // WEB esetén: ELŐSZÖR szállítási cím ellenőrzése (még mielőtt bármi mást csinálunk)
-    debugPrint('[SubscriptionRenewalButton] Starting payment - isWeb: ${HybridPaymentService.isWeb}');
-    
+    debugPrint(
+        '[SubscriptionRenewalButton] Starting payment - isWeb: ${HybridPaymentService.isWeb}');
+
     if (HybridPaymentService.isWeb) {
-      debugPrint('[SubscriptionRenewalButton] Web platform detected - checking shipping address');
+      debugPrint(
+          '[SubscriptionRenewalButton] Web platform detected - checking shipping address');
       try {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
-        
+
         if (!userDoc.exists) {
-          debugPrint('[SubscriptionRenewalButton] User document does not exist');
+          debugPrint(
+              '[SubscriptionRenewalButton] User document does not exist');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -309,42 +312,47 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
           return;
         }
 
-        final shippingAddress = userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
-        
-        debugPrint('[SubscriptionRenewalButton] Shipping address check: ${shippingAddress != null ? 'exists' : 'null'}');
-        
+        final shippingAddress =
+            userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
+
+        debugPrint(
+            '[SubscriptionRenewalButton] Shipping address check: ${shippingAddress != null ? 'exists' : 'null'}');
+
         // SZIGORÚ ELLENŐRZÉS: Minden kötelező mező ki kell legyen töltve
         bool isValid = false;
-        
-        if (shippingAddress != null && 
-            shippingAddress.isNotEmpty) {
-          
+
+        if (shippingAddress != null && shippingAddress.isNotEmpty) {
           final name = (shippingAddress['name']?.toString() ?? '').trim();
           final zipCode = (shippingAddress['zipCode']?.toString() ?? '').trim();
           final city = (shippingAddress['city']?.toString() ?? '').trim();
           final address = (shippingAddress['address']?.toString() ?? '').trim();
-          
-          debugPrint('[SubscriptionRenewalButton] Address fields - name: "$name", zipCode: "$zipCode", city: "$city", address: "$address"');
-          
+
+          debugPrint(
+              '[SubscriptionRenewalButton] Address fields - name: "$name", zipCode: "$zipCode", city: "$city", address: "$address"');
+
           // MINDEN kötelező mező NEM ÜRES kell legyen ÉS érvényes formátumú
           final nameValid = name.isNotEmpty && name.length >= 2;
-          final zipCodeValid = zipCode.isNotEmpty && 
-                              zipCode.length == 4 && 
-                              RegExp(r'^\d{4}$').hasMatch(zipCode);
+          final zipCodeValid = zipCode.isNotEmpty &&
+              zipCode.length == 4 &&
+              RegExp(r'^\d{4}$').hasMatch(zipCode);
           final cityValid = city.isNotEmpty && city.length >= 2;
           final addressValid = address.isNotEmpty && address.length >= 5;
-          
+
           isValid = nameValid && zipCodeValid && cityValid && addressValid;
-          
-          debugPrint('[SubscriptionRenewalButton] Validation - name: $nameValid, zipCode: $zipCodeValid, city: $cityValid, address: $addressValid');
-          debugPrint('[SubscriptionRenewalButton] Final validation result: $isValid');
+
+          debugPrint(
+              '[SubscriptionRenewalButton] Validation - name: $nameValid, zipCode: $zipCodeValid, city: $cityValid, address: $addressValid');
+          debugPrint(
+              '[SubscriptionRenewalButton] Final validation result: $isValid');
         } else {
-          debugPrint('[SubscriptionRenewalButton] Shipping address is null, empty, or not a Map');
+          debugPrint(
+              '[SubscriptionRenewalButton] Shipping address is null, empty, or not a Map');
         }
 
         // HA NEM ÉRVÉNYES → BLOKKOLJUK A FIZETÉST
         if (!isValid) {
-          debugPrint('[SubscriptionRenewalButton] ❌ BLOCKING PAYMENT - Shipping address invalid or missing');
+          debugPrint(
+              '[SubscriptionRenewalButton] ❌ BLOCKING PAYMENT - Shipping address invalid or missing');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -368,10 +376,12 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
           // KILÉPÜNK - NEM ENGEDJÜK A FIZETÉST
           return;
         }
-        
-        debugPrint('[SubscriptionRenewalButton] ✅ Shipping address validation PASSED');
+
+        debugPrint(
+            '[SubscriptionRenewalButton] ✅ Shipping address validation PASSED');
       } catch (e) {
-        debugPrint('[SubscriptionRenewalButton] Error checking shipping address: $e');
+        debugPrint(
+            '[SubscriptionRenewalButton] Error checking shipping address: $e');
         // Csak akkor jelenítjük meg a figyelmeztetést, ha nem validation hiba volt
         if (!e.toString().contains('Szállítási cím nem töltve ki')) {
           if (mounted) {
@@ -440,7 +450,8 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
             .collection('users')
             .doc(user.uid)
             .get();
-        final addressData = userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
+        final addressData =
+            userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
         if (addressData != null && addressData.isNotEmpty) {
           shippingAddress = Map<String, String>.from(
             addressData.map((key, value) => MapEntry(key, value.toString())),

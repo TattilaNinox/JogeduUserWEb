@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Egységes irodalom / forrás lista képernyő.
-/// 
+///
 /// A források mostantól a `notes` gyűjteményben találhatók
 /// `type = "source"` mezővel, így mindenhol ugyanúgy kezelhetők,
 /// mint a többi jegyzet.
@@ -38,33 +38,50 @@ class ReferencesScreen extends StatelessWidget {
               final url = data['url'] ?? '';
               final description = data['description'] ?? '';
               final category = data['category'] ?? '';
-              final tagsList = (data['tags'] is List) ? (data['tags'] as List).cast<String>() : <String>[];
+              final tagsList = (data['tags'] is List)
+                  ? (data['tags'] as List).cast<String>()
+                  : <String>[];
               final tagsText = tagsList.join(', ');
 
               List<InlineSpan> spans = [
-                TextSpan(text: '${index + 1}. ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(
+                    text: '${index + 1}. ',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 TextSpan(
                   text: title,
                   style: TextStyle(
                     color: url.isNotEmpty ? Colors.blue : null,
-                    decoration: url.isNotEmpty ? TextDecoration.underline : TextDecoration.none,
+                    decoration: url.isNotEmpty
+                        ? TextDecoration.underline
+                        : TextDecoration.none,
                   ),
                   recognizer: url.isNotEmpty
                       ? (TapGestureRecognizer()
                         ..onTap = () async {
-                          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+                          await launchUrl(Uri.parse(url),
+                              mode: LaunchMode.externalApplication,
+                              webOnlyWindowName: '_blank');
                         })
                       : null,
                 ),
               ];
 
-              if (description.isNotEmpty) spans.add(TextSpan(text: ' – $description'));
-              if (category.isNotEmpty) spans.add(TextSpan(text: '  [Kategória: $category]'));
-              if (tagsText.isNotEmpty) spans.add(TextSpan(text: '  [Címkék: $tagsText]'));
+              if (description.isNotEmpty) {
+                spans.add(TextSpan(text: ' – $description'));
+              }
+              if (category.isNotEmpty) {
+                spans.add(TextSpan(text: '  [Kategória: $category]'));
+              }
+              if (tagsText.isNotEmpty) {
+                spans.add(TextSpan(text: '  [Címkék: $tagsText]'));
+              }
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: RichText(text: TextSpan(style: Theme.of(context).textTheme.bodyMedium, children: spans)),
+                child: RichText(
+                    text: TextSpan(
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        children: spans)),
               );
             },
           );

@@ -21,8 +21,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
   }
 
   void _loadNote() async {
-    final doc = await FirebaseFirestore.instance.collection('notes').doc(widget.noteId).get();
-    
+    final doc = await FirebaseFirestore.instance
+        .collection('notes')
+        .doc(widget.noteId)
+        .get();
+
     if (doc.exists) {
       setState(() {
         _note = doc;
@@ -36,14 +39,15 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     if (_note == null) {
-      return const Scaffold(body: Center(child: Text('A jegyzet nem található.')));
+      return const Scaffold(
+          body: Center(child: Text('A jegyzet nem található.')));
     }
-    
+
     final data = _note!.data() as Map<String, dynamic>;
     final title = data['title'] as String? ?? 'Cím nélkül';
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -53,4 +57,4 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
       ),
     );
   }
-} 
+}

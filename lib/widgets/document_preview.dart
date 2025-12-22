@@ -19,8 +19,10 @@ import 'video_preview_player.dart';
 class DocumentPreview extends StatelessWidget {
   /// A kötelező DOCX fájl URL-je.
   final String docxUrl;
+
   /// Az opcionális hangfájl URL-je.
   final String? audioUrl;
+
   /// Az opcionális videófájl URL-je.
   final String? videoUrl;
 

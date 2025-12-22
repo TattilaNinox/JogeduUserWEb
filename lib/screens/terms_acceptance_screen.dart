@@ -217,4 +217,3 @@ class _TermsAcceptanceScreenState extends State<TermsAcceptanceScreen> {
     );
   }
 }
-

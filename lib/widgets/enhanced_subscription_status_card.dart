@@ -70,7 +70,8 @@ class _EnhancedSubscriptionStatusCardState
       final String subscriptionStatus = data['subscriptionStatus'] ?? 'free';
       // Biztonságos típusellenőrzés - IdentityMap esetén is működik
       final isActiveValue = data['isSubscriptionActive'];
-      final bool isSubscriptionActive = isActiveValue is bool && isActiveValue == true;
+      final bool isSubscriptionActive =
+          isActiveValue is bool && isActiveValue == true;
       final dynamic subscriptionEndDate = data['subscriptionEndDate'];
 
       int? daysUntilExpiry;
@@ -354,10 +355,11 @@ class _EnhancedSubscriptionStatusCardState
       final isAdminEmail = email == 'tattila.ninox@gmail.com';
       isAdmin = isAdminBool || isAdminEmail;
     }
-    
+
     final displayPrice = isAdmin ? 5 : 4350;
-    final formattedPrice = '${displayPrice.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} Ft';
-    
+    final formattedPrice =
+        '${displayPrice.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} Ft';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
@@ -373,8 +375,8 @@ class _EnhancedSubscriptionStatusCardState
             borderRadius: BorderRadius.circular(20),
             child: const Padding(
               padding: EdgeInsets.all(4.0),
-              child: Icon(
-                  Icons.info_outline, color: Color(0xFF2563EB), size: 20),
+              child:
+                  Icon(Icons.info_outline, color: Color(0xFF2563EB), size: 20),
             ),
           ),
           const SizedBox(width: 12),

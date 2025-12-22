@@ -396,46 +396,48 @@ class _WebPaymentPlansState extends State<WebPaymentPlans> {
 
     DocumentSnapshot<Map<String, dynamic>>? userDoc;
     try {
-      userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      
+      userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
       if (!userDoc.exists) {
         debugPrint('[WebPaymentPlans] ❌ User document does not exist');
         _showError('Kérjük, töltsd ki a szállítási adatokat!');
         return;
       }
 
-      final shippingAddress = userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
-      
-      debugPrint('[WebPaymentPlans] Shipping address check: ${shippingAddress != null ? 'exists' : 'null'}');
-      debugPrint('[WebPaymentPlans] Shipping address content: $shippingAddress');
-      
+      final shippingAddress =
+          userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
+
+      debugPrint(
+          '[WebPaymentPlans] Shipping address check: ${shippingAddress != null ? 'exists' : 'null'}');
+      debugPrint(
+          '[WebPaymentPlans] Shipping address content: $shippingAddress');
+
       // SZIGORÚ ELLENŐRZÉS: Minden kötelező mező ki kell legyen töltve
       bool isValid = false;
-      
-      if (shippingAddress != null && 
-          shippingAddress.isNotEmpty) {
+
+      if (shippingAddress != null && shippingAddress.isNotEmpty) {
         final name = (shippingAddress['name']?.toString() ?? '').trim();
         final zipCode = (shippingAddress['zipCode']?.toString() ?? '').trim();
         final city = (shippingAddress['city']?.toString() ?? '').trim();
         final address = (shippingAddress['address']?.toString() ?? '').trim();
-        
-        debugPrint('[WebPaymentPlans] Address fields - name: "$name", zipCode: "$zipCode", city: "$city", address: "$address"');
-        
+
+        debugPrint(
+            '[WebPaymentPlans] Address fields - name: "$name", zipCode: "$zipCode", city: "$city", address: "$address"');
+
         // MINDEN kötelező mező NEM ÜRES kell legyen ÉS érvényes formátumú
         final nameValid = name.isNotEmpty && name.length >= 2;
-        final zipCodeValid = zipCode.isNotEmpty && 
-                            zipCode.length == 4 && 
-                            RegExp(r'^\d{4}$').hasMatch(zipCode);
+        final zipCodeValid = zipCode.isNotEmpty &&
+            zipCode.length == 4 &&
+            RegExp(r'^\d{4}$').hasMatch(zipCode);
         final cityValid = city.isNotEmpty && city.length >= 2;
         final addressValid = address.isNotEmpty && address.length >= 5;
-        
-        debugPrint('[WebPaymentPlans] Validation - name: $nameValid, zipCode: $zipCodeValid, city: $cityValid, address: $addressValid');
-        
+
+        debugPrint(
+            '[WebPaymentPlans] Validation - name: $nameValid, zipCode: $zipCodeValid, city: $cityValid, address: $addressValid');
+
         isValid = nameValid && zipCodeValid && cityValid && addressValid;
-        
+
         debugPrint('[WebPaymentPlans] Final validation result: $isValid');
       } else {
         debugPrint('[WebPaymentPlans] ❌ Shipping address is null or empty');
@@ -443,11 +445,12 @@ class _WebPaymentPlansState extends State<WebPaymentPlans> {
 
       // HA NEM ÉRVÉNYES → BLOKKOLJUK A FIZETÉST
       if (!isValid) {
-        debugPrint('[WebPaymentPlans] ❌❌❌ BLOCKING PAYMENT - Shipping address invalid or missing');
+        debugPrint(
+            '[WebPaymentPlans] ❌❌❌ BLOCKING PAYMENT - Shipping address invalid or missing');
         _showError('Kérjük, töltsd ki a szállítási adatokat!');
         return;
       }
-      
+
       debugPrint('[WebPaymentPlans] ✅ Shipping address validation PASSED');
     } catch (e) {
       debugPrint('[WebPaymentPlans] ❌ Error checking shipping address: $e');
@@ -485,7 +488,8 @@ class _WebPaymentPlansState extends State<WebPaymentPlans> {
 
       // 4. Szállítási cím lekérése (már validálva van)
       // userDoc biztosan nem null és létezik, mert ha nem, akkor már a validáció során return-öltünk volna
-      final addressData = userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
+      final addressData =
+          userDoc.data()?['shippingAddress'] as Map<String, dynamic>?;
       Map<String, String>? shippingAddressMap;
       if (addressData != null && addressData.isNotEmpty) {
         shippingAddressMap = Map<String, String>.from(
