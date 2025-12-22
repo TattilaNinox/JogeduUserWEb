@@ -1752,79 +1752,6 @@ class _MemoriapalotaAllomasViewScreenState
     }
   }
 
-  // Tartalom overlay megjelenítése
-  void _showContentOverlayDialog() {
-    if (_currentHtmlContent.isEmpty || _viewId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nincs megjeleníthető tartalom!')),
-      );
-      return;
-    }
-
-    _beginModalBlock();
-    showDialog(
-      context: context,
-      barrierColor: Colors.black87,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: Container(
-          width: MediaQuery.of(context).size.width,
-          height: MediaQuery.of(context).size.height,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(0),
-          ),
-          child: Column(
-            children: [
-              // Fejléc
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Tananyag tartalma',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              // Tartalom
-              Expanded(
-                child: kIsWeb && _viewId.isNotEmpty
-                    ? HtmlElementView(
-                        key: ValueKey('overlay_$_viewId'),
-                        viewType: _viewId,
-                      )
-                    : const Center(
-                        child: Text('Nem sikerült betölteni a tartalmat'),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ).then((_) => _endModalBlock());
-  }
-
   Future<void> _goToPrevious() async {
     if (_currentIndex > 0) {
       setState(() {
@@ -2191,7 +2118,7 @@ class _MemoriapalotaAllomasViewScreenState
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.add_photo_alternate),
+                : const Icon(Icons.camera_alt),
             onPressed: _isUploadingImage
                 ? null
                 : () {
@@ -2205,13 +2132,6 @@ class _MemoriapalotaAllomasViewScreenState
                   },
             tooltip: 'Kép feltöltése',
           ),
-          // Tartalom megtekintése gomb (csak ha nincs kép, vagy overlay dialog-hoz)
-          if (_currentImageUrl == null)
-            IconButton(
-              icon: const Icon(Icons.menu_book),
-              onPressed: _showContentOverlayDialog,
-              tooltip: 'Tartalom megtekintése',
-            ),
           // Audio beállítások gomb (csak ha van legalább egy állomás audioUrl-jével)
           if (_hasAnyAudio())
             IconButton(
@@ -2493,7 +2413,7 @@ class _MemoriapalotaAllomasViewScreenState
                               const Spacer(),
                               ElevatedButton.icon(
                                 onPressed: _toggleContent,
-                                icon: const Icon(Icons.menu_book),
+                                icon: const Icon(Icons.open_in_full),
                                 label: const Text(
                                   'Tananyag megnyitása',
                                   style: TextStyle(fontSize: 16),
