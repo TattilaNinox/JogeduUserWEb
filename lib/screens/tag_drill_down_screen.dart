@@ -317,7 +317,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               },
             )
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _buildQuery().snapshots(),
+        stream: _buildQuery().snapshots(),
               builder: (context, notesSnapshot) {
                 // Jogesetek stream builder hozzáadása
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -329,18 +329,18 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                         if (notesSnapshot.hasError ||
                             jogesetSnapshot.hasError ||
                             allomasSnapshot.hasError) {
-                          return Center(
+            return Center(
                             child: Text(
                                 'Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error ?? allomasSnapshot.error}'),
-                          );
-                        }
+            );
+          }
 
                         // Normál kategóriák esetén (notes, jogesetek, állomások)
                         if (!notesSnapshot.hasData &&
                             !jogesetSnapshot.hasData &&
                             !allomasSnapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
+            return const Center(child: CircularProgressIndicator());
+          }
 
                     // Összefésüljük a két kollekciót
                     final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
@@ -361,9 +361,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                     final processedJogesetDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                     if (jogesetSnapshot.hasData) {
                       final jogesetDocs = jogesetSnapshot.data!.docs
-                          .where((d) => d.data()['deletedAt'] == null)
-                          .toList();
-                      
+              .where((d) => d.data()['deletedAt'] == null)
+              .toList();
+
                       // Admin ellenőrzés
                       final user = FirebaseAuth.instance.currentUser;
                       bool isAdmin = false;
@@ -375,22 +375,22 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                     }
 
                     if (allDocs.isEmpty && processedJogesetDocs.isEmpty) {
-                      return const Center(child: Text('Nincs találat.'));
-                    }
+            return const Center(child: Text('Nincs találat.'));
+          }
 
-                    // Hierarchikus csoportosítás
+          // Hierarchikus csoportosítás
                     final hierarchy = _buildHierarchy(allDocs, processedJogesetDocs);
 
-                    return ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      children: _buildHierarchyWidgets(hierarchy),
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: _buildHierarchyWidgets(hierarchy),
                     );
                       },
                     );
                   },
-                );
-              },
-            ),
+          );
+        },
+      ),
     );
   }
 

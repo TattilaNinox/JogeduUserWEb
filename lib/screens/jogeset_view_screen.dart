@@ -14,7 +14,8 @@ import '../utils/filter_storage.dart';
 /// Egy dokumentumban (paragrafusban) több jogeset van, ezeket lehet léptetni.
 class JogesetViewScreen extends StatefulWidget {
   final String documentId;
-  final int? jogesetId; // Opcionális: ha meg van adva, ezt a jogesetet nyitja meg
+  final int?
+      jogesetId; // Opcionális: ha meg van adva, ezt a jogesetet nyitja meg
   final String? from;
 
   const JogesetViewScreen({
@@ -34,7 +35,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   bool _isLoading = true;
   bool _isMegoldasVisible = false;
   bool _isAdmin = false;
-  
+
   // PageController a mobilnézetben való lapozáshoz
   PageController? _pageController;
 
@@ -136,7 +137,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         _isLoading = false;
         _isMegoldasVisible = false;
       });
-      
+
       // PageController inicializálása mobilnézetben
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
@@ -174,7 +175,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       _currentIndex++;
       _isMegoldasVisible = false;
     });
-    
+
     // PageController újrainicializálása új jogesethez
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
@@ -194,7 +195,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       _currentIndex--;
       _isMegoldasVisible = false;
     });
-    
+
     // PageController újrainicializálása új jogesethez
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
@@ -203,7 +204,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       _pageController = PageController(initialPage: 0);
     }
   }
-  
 
   /// Megoldás láthatóságának váltása
   void _toggleMegoldas() {
@@ -305,7 +305,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 currentJogeset.title,
                 style: TextStyle(
-                  fontSize: isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
+                  fontSize:
+                      isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -380,7 +381,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                       ElevatedButton.icon(
                         onPressed: _currentIndex > 0 ? _previousJogeset : null,
                         icon: const Icon(Icons.arrow_back),
-                        label: const Text('Előző jogeset'),
+                        label: const Text('Előző'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -390,9 +391,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                       ),
                       // Következő jogeset gomb
                       ElevatedButton.icon(
-                        onPressed: _currentIndex < totalJogesetek - 1 ? _nextJogeset : null,
+                        onPressed: _currentIndex < totalJogesetek - 1
+                            ? _nextJogeset
+                            : null,
                         icon: const Icon(Icons.arrow_forward),
-                        label: const Text('Következő jogeset'),
+                        label: const Text('Következő'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -417,8 +420,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                         ),
                       ),
                       ElevatedButton.icon(
-                        onPressed:
-                            _currentIndex < totalJogesetek - 1 ? _nextJogeset : null,
+                        onPressed: _currentIndex < totalJogesetek - 1
+                            ? _nextJogeset
+                            : null,
                         icon: const Icon(Icons.arrow_forward),
                         label: const Text('Következő'),
                         style: ElevatedButton.styleFrom(
@@ -439,14 +443,14 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   /// Mobilnézeti lapozható tartalom
   Widget _buildMobilePagedContent(Jogeset currentJogeset, bool isMobile) {
     final pages = <Widget>[];
-    
+
     // Oldal 1: Tényállás
     pages.add(_buildMobilePage(
       title: 'Tényállás',
       content: currentJogeset.tenyek,
       isMobile: isMobile,
     ));
-    
+
     // Oldal 2: Jogi kérdés
     pages.add(_buildMobilePageHighlighted(
       title: 'Jogi kérdés',
@@ -455,7 +459,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       borderColor: Colors.blue.shade200,
       isMobile: isMobile,
     ));
-    
+
     // Oldal 3: Megoldás
     pages.add(_buildMobilePageHighlighted(
       title: 'Megoldás',
@@ -464,7 +468,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       borderColor: Colors.green.shade300,
       isMobile: isMobile,
     ));
-    
+
     // Oldal 4: Eredeti jogszabály (ha van)
     if (currentJogeset.eredetiJogszabalySzoveg != null &&
         currentJogeset.eredetiJogszabalySzoveg!.isNotEmpty) {
@@ -475,7 +479,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         isItalic: true,
       ));
     }
-    
+
     return PageView.builder(
       controller: _pageController,
       itemCount: pages.length,
@@ -504,43 +508,43 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  currentJogeset.cim,
-                                  style: const TextStyle(
-                                    fontSize: 16, // További csökkentés: 18-2
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF202122),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentJogeset.cim,
+                              style: const TextStyle(
+                                fontSize: 16, // További csökkentés: 18-2
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF202122),
+                              ),
+                            ),
+                            // Lapozási ikon és szöveg mobilnézetben
+                            if (isMobile && _pageController != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.swipe,
+                                    size: 14,
+                                    color: Colors.grey.shade600,
                                   ),
-                                ),
-                                // Lapozási ikon és szöveg mobilnézetben
-                                if (isMobile && _pageController != null) ...[
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.swipe,
-                                        size: 14,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Lapozz jobbra a következő oldalért',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Lapozz jobbra a következő oldalért',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
                                 ],
-                              ],
-                            ),
-                          ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -598,7 +602,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             Text(
               currentJogeset.cim,
               style: TextStyle(
-                fontSize: isMobile ? 16 : 22, // Mobilnézetben tovább csökkentve: 18-2, asztali: 24-2
+                fontSize: isMobile
+                    ? 16
+                    : 22, // Mobilnézetben tovább csökkentve: 18-2, asztali: 24-2
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF202122),
               ),
@@ -646,8 +652,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                     ? 'Megoldás elrejtése'
                     : 'Megoldás megjelenítése'),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                 ),
@@ -716,7 +722,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         ),
         const SizedBox(height: 8),
         Html(
-          data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
+          data:
+              '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
               fontSize: FontSize(12), // 14-2
@@ -760,7 +767,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           ),
           const SizedBox(height: 8),
           Html(
-            data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
+            data:
+                '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
                 fontSize: FontSize(12), // 14-2
@@ -795,10 +803,12 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         ),
         const SizedBox(height: 8),
         Html(
-          data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
+          data:
+              '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
-              fontSize: FontSize(isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
+              fontSize: FontSize(
+                  isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -831,17 +841,20 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Text(
             title,
             style: TextStyle(
-              fontSize: isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
+              fontSize:
+                  isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
               fontWeight: FontWeight.w600,
               color: const Color(0xFF202122),
             ),
           ),
           const SizedBox(height: 8),
           Html(
-            data: '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
+            data:
+                '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
+                fontSize: FontSize(
+                    isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
@@ -874,10 +887,12 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         const SizedBox(width: 8),
         Expanded(
           child: Html(
-            data: '<div style="text-align: justify;">${_escapeHtml(value)}</div>',
+            data:
+                '<div style="text-align: justify;">${_escapeHtml(value)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
+                fontSize: FontSize(
+                    isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
                 color: const Color(0xFF444444),
                 padding: HtmlPaddings.zero,
                 margin: Margins.zero,
