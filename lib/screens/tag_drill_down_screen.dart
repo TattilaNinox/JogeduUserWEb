@@ -323,22 +323,36 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: _buildJogesetQuery().snapshots(),
                   builder: (context, jogesetSnapshot) {
-                    if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
-                      return Center(
-                        child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
-                      );
-                    }
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: _buildAllomasQuery().snapshots(),
+                      builder: (context, allomasSnapshot) {
+                        if (notesSnapshot.hasError ||
+                            jogesetSnapshot.hasError ||
+                            allomasSnapshot.hasError) {
+                          return Center(
+                            child: Text(
+                                'Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error ?? allomasSnapshot.error}'),
+                          );
+                        }
 
-                    // Normál kategóriák esetén (notes és jogesetek)
-                    if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                        // Normál kategóriák esetén (notes, jogesetek, állomások)
+                        if (!notesSnapshot.hasData &&
+                            !jogesetSnapshot.hasData &&
+                            !allomasSnapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
 
                     // Összefésüljük a két kollekciót
                     final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                     
                     if (notesSnapshot.hasData) {
                       allDocs.addAll(notesSnapshot.data!.docs
+                          .where((d) => d.data()['deletedAt'] == null)
+                          .toList());
+                    }
+                    
+                    if (allomasSnapshot.hasData) {
+                      allDocs.addAll(allomasSnapshot.data!.docs
                           .where((d) => d.data()['deletedAt'] == null)
                           .toList());
                     }
@@ -370,6 +384,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                     return ListView(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       children: _buildHierarchyWidgets(hierarchy),
+                    );
+                      },
                     );
                   },
                 );
@@ -415,6 +431,18 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     return query;
   }
 
+
+  /// Firestore lekérdezés építése memoriapalota_allomasok kollekcióhoz
+  Query<Map<String, dynamic>> _buildAllomasQuery() {
+    final userScience = AccessControl.getUserScience();
+    // Itt is szűrünk kategóriára, mert az állomásoknak van kategóriája
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('memoriapalota_allomasok')
+        .where('science', isEqualTo: userScience)
+        .where('category', isEqualTo: widget.category);
+
+    return query;
+  }
 
   /// Jogeset dokumentumok feldolgozása és kliens oldali szűrése
   /// Dokumentumonként kezeli a jogeseteket, nem külön jogesetenként
@@ -710,9 +738,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   Widget _buildNoteWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     
-    // Ellenőrizzük, hogy jogeset vagy dialogus_fajlok dokumentumról van-e szó
+    // Ellenőrizzük, hogy jogeset, dialogus_fajlok vagy memoriapalota_allomasok dokumentumról van-e szó
     final isJogeset = doc.reference.path.contains('jogesetek');
     final isDialogusFajlok = doc.reference.path.contains('dialogus_fajlok');
+    final isAllomas = doc.reference.path.contains('memoriapalota_allomasok');
     
     // Ha jogeset dokumentum, használjuk a _buildJogesetWidget metódust
     if (isJogeset) {
@@ -725,8 +754,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     }
     
     // Egyébként normál jegyzetként kezeljük
-    final title = data['title'] as String? ?? '';
-    final type = data['type'] as String? ?? 'standard';
+    final title = (data['title'] ?? data['cim'] ?? '').toString();
+    final type = isAllomas 
+        ? 'memoriapalota_allomasok' 
+        : (data['type'] as String? ?? 'standard');
     final isFree = data['isFree'] as bool? ?? false;
     final isLocked = !isFree && !_hasPremiumAccess;
 

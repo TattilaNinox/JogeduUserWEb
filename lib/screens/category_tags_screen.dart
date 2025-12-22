@@ -177,16 +177,24 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: _buildJogesetQuery().snapshots(),
                   builder: (context, jogesetSnapshot) {
-                    if (notesSnapshot.hasError || jogesetSnapshot.hasError) {
-                      return Center(
-                        child: Text('Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error}'),
-                      );
-                    }
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: _buildAllomasQuery().snapshots(),
+                      builder: (context, allomasSnapshot) {
+                        if (notesSnapshot.hasError ||
+                            jogesetSnapshot.hasError ||
+                            allomasSnapshot.hasError) {
+                          return Center(
+                            child: Text(
+                                'Hiba: ${notesSnapshot.error ?? jogesetSnapshot.error ?? allomasSnapshot.error}'),
+                          );
+                        }
 
-                    // Normál kategóriák esetén (notes és jogesetek)
-                    if (!notesSnapshot.hasData && !jogesetSnapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                        // Normál kategóriák esetén (notes, jogesetek, állomások)
+                        if (!notesSnapshot.hasData &&
+                            !jogesetSnapshot.hasData &&
+                            !allomasSnapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
 
                     // Összefésüljük a két kollekciót
                     final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
@@ -263,10 +271,30 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 }
               }
               
-              // Összevonjuk a két tag map-et
+              // Állomások feldolgozása (ha vannak)
+              final allomasTagMap = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+              if (allomasSnapshot.hasData) {
+                final allomasDocs = allomasSnapshot.data!.docs
+                    .where((d) => d.data()['deletedAt'] == null)
+                    .toList();
+                
+                for (var doc in allomasDocs) {
+                  final data = doc.data();
+                  final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
+                  
+                  if (tags.isNotEmpty) {
+                    final firstTag = tags[0];
+                    allomasTagMap.putIfAbsent(firstTag, () => []);
+                    allomasTagMap[firstTag]!.add(doc);
+                  }
+                }
+              }
+              
+              // Összevonjuk a három tag map-et
               final allTags = <String>{};
               allTags.addAll(tagMap.keys);
               allTags.addAll(jogesetTagMap.keys);
+              allTags.addAll(allomasTagMap.keys);
               
               if (allTags.isEmpty && allDocs.isEmpty) {
                 return const Center(child: Text('Nincs találat.'));
@@ -279,10 +307,11 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
                   ...sortedTags.map((tag) {
-                    // Összevonjuk a notes és jogeset dokumentumokat
+                    // Összevonjuk a notes, jogeset és állomás dokumentumokat
                     final notesDocs = tagMap[tag] ?? [];
                     final jogesetDocs = jogesetTagMap[tag] ?? [];
-                    final totalCount = notesDocs.length + jogesetDocs.length;
+                    final allomasDocs = allomasTagMap[tag] ?? [];
+                    final totalCount = notesDocs.length + jogesetDocs.length + allomasDocs.length;
                     
                     // Ellenőrizzük, van-e mélyebb szintű címke
                     final hasDeepTags = notesDocs.any((doc) {
@@ -296,14 +325,20 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                           final firstJogeset = jogesetekList.first as Map<String, dynamic>;
                           final tags = (firstJogeset['tags'] as List<dynamic>? ?? []).cast<String>();
                           return tags.length > 1;
+                        }) ||
+                        allomasDocs.any((doc) {
+                          final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
+                          return tags.length > 1;
                         });
                     
-                    return _buildTagCard(tag, notesDocs, jogesetDocs, totalCount, hasDeepTags);
+                    return _buildTagCard(tag, notesDocs, jogesetDocs, allomasDocs, totalCount, hasDeepTags);
                   }),
                 ],
               );
                   },
                 );
+              },
+            );
               },
             ),
     );
@@ -340,6 +375,18 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
         .collection('jogesetek');
     // Megjegyzés: Ha van index a science mezőre a dokumentum szinten, akkor használhatjuk,
     // de valószínűleg nincs, ezért minden dokumentumot lekérdezünk és kliens oldalon szűrünk
+
+    return query;
+  }
+
+  /// Firestore lekérdezés építése memoriapalota_allomasok kollekcióhoz
+  Query<Map<String, dynamic>> _buildAllomasQuery() {
+    final userScience = AccessControl.getUserScience();
+    // Itt is szűrünk kategóriára, mert az állomásoknak van kategóriája
+    Query<Map<String, dynamic>> query = FirebaseConfig.firestore
+        .collection('memoriapalota_allomasok')
+        .where('science', isEqualTo: userScience)
+        .where('category', isEqualTo: widget.category);
 
     return query;
   }
@@ -391,6 +438,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
       String tag,
       List<QueryDocumentSnapshot<Map<String, dynamic>>> notesDocs,
       List<QueryDocumentSnapshot<Map<String, dynamic>>> jogesetDocs,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> allomasDocs,
       int totalCount,
       bool hasDeepTags) {
 
