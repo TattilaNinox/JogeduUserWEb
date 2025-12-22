@@ -25,13 +25,21 @@ class MiniAudioPlayer extends StatefulWidget {
   /// Automatikus lejátszás: ha igaz, automatikusan elindítja a lejátszást inicializálás után
   final bool autoPlay;
 
+  /// Opcionális vezérlő a külső vezérléshez (pl. mobil web autoplay-hoz user gesture-ből).
+  final MiniAudioPlayerController? controller;
+
+  /// Ha igaz, megjelenik egy "AUTO" badge, jelezve hogy automatikus lejátszás aktív.
+  final bool showAutoBadge;
+
   const MiniAudioPlayer(
       {super.key,
       required this.audioUrl,
       this.deferInit = true,
       this.compact = false,
       this.large = false,
-      this.autoPlay = false});
+      this.autoPlay = false,
+      this.controller,
+      this.showAutoBadge = false});
 
   @override
   State<MiniAudioPlayer> createState() => _MiniAudioPlayerState();
@@ -56,12 +64,46 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
 
   bool get _isPlaying => _playerState == PlayerState.playing;
 
+  String? _guessMimeType(String url) {
+    final lower = url.toLowerCase();
+    // Firebase Storage alt=media URL-eknél is általában benne van a kiterjesztés a path-ban.
+    if (lower.contains('.mp3')) return 'audio/mpeg';
+    if (lower.contains('.m4a') || lower.contains('.mp4')) return 'audio/mp4';
+    if (lower.contains('.aac')) return 'audio/aac';
+    if (lower.contains('.wav')) return 'audio/wav';
+    if (lower.contains('.ogg') || lower.contains('.oga')) return 'audio/ogg';
+    return null; // hagyjuk a böngészőt sniff-elni
+  }
+
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
+    widget.controller?._attach(this);
     if (!widget.deferInit) {
       _initAudioPlayer();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant MiniAudioPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
+
+    if (oldWidget.audioUrl != widget.audioUrl) {
+      // Ha van külső controller (pl. MP autoplay user gesture-ből), akkor NEM nyúlunk
+      // automatikusan a source-hoz itt, mert az a lejátszást azonnal megszakíthatja
+      // egy későbbi setState miatt (start -> stop tünet).
+      //
+      // Controller nélküli esetben viszont frissítjük a source-ot, hogy a UI/play
+      // biztosan az új URL-re álljon.
+      if (widget.controller == null) {
+        _setSource(widget.audioUrl);
+      }
     }
   }
 
@@ -69,10 +111,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
   Future<void> _initAudioPlayer() async {
     try {
       // Beállítja a forrás URL-t. Ez a lejátszás előfeltétele.
-      await _audioPlayer.setSource(UrlSource(
-        widget.audioUrl,
-        mimeType: 'audio/mpeg',
-      ));
+      await _setSource(widget.audioUrl);
       // Ismétlés beállítása a kapcsoló állapotának megfelelően
       await _audioPlayer.setReleaseMode(
         _isLooping ? ReleaseMode.loop : ReleaseMode.stop,
@@ -109,10 +148,12 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
       setState(() => _isInitialized = true);
 
       // Automatikus lejátszás, ha be van kapcsolva
-      if (widget.autoPlay) {
+      // Ha külső controller vezérli (pl. MP mobil autoplay), ne próbáljunk itt automatikusan
+      // elindítani, mert mobil böngészőkben user gesture kell és ez hibára futhat.
+      if (widget.autoPlay && widget.controller == null) {
         await _audioPlayer.play(UrlSource(
           widget.audioUrl,
-          mimeType: 'audio/mpeg',
+          mimeType: _guessMimeType(widget.audioUrl),
         ));
         setState(() => _expanded = true);
       }
@@ -132,7 +173,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
       setState(() => _expanded = true);
       await _audioPlayer.play(UrlSource(
         widget.audioUrl,
-        mimeType: 'audio/mpeg',
+        mimeType: _guessMimeType(widget.audioUrl),
       ));
       return;
     }
@@ -145,7 +186,7 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
     });
     await _audioPlayer.play(UrlSource(
       widget.audioUrl,
-      mimeType: 'audio/mpeg',
+      mimeType: _guessMimeType(widget.audioUrl),
     ));
   }
 
@@ -162,8 +203,76 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
     }
   }
 
+  Future<void> _setSource(String url) async {
+    try {
+      // Ha épp játszik, állítsuk le forrásváltás előtt
+      if (_isPlaying) {
+        await _audioPlayer.stop();
+      }
+      await _audioPlayer.setSource(
+        UrlSource(
+          url,
+          mimeType: _guessMimeType(url),
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          _hasError = false;
+          _duration = Duration.zero;
+          _position = Duration.zero;
+        });
+      }
+    } catch (e) {
+      debugPrint('Hiba a forrás beállításakor: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isInitialized = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _externalSetSourceAndPlay(String url) async {
+    // iOS/WebKit: a lejátszás akkor a legstabilabb user gesture-ből, ha a
+    // source+play egy lépésben történik (külön await-ek nélkül).
+    //
+    // Az audioplayers web implementációja a play(url) hívásnál maga kezeli a source beállítást.
+    if (_hasError) return;
+    if (_isPlaying) {
+      await _audioPlayer.stop();
+    }
+    if (mounted) {
+      setState(() => _expanded = true);
+    }
+    await _audioPlayer.play(
+      UrlSource(url, mimeType: _guessMimeType(url)),
+    );
+  }
+
+  Future<void> _externalSetSource(String url) async {
+    if (!_isInitialized) {
+      await _initAudioPlayer();
+    }
+    if (_hasError) return;
+    await _setSource(url);
+    // Maradjon nyitva a felület, ha már használjuk
+    if (mounted) {
+      setState(() => _expanded = true);
+    }
+  }
+
+  Future<void> _externalPlay() async {
+    if (_hasError) return;
+    if (!_isInitialized) {
+      await _initAudioPlayer();
+    }
+    await _ensureInitAndPlay();
+  }
+
   @override
   void dispose() {
+    widget.controller?._detach(this);
     // Timer törlése
     _activityTimer?.cancel();
     _activityTimer = null;
@@ -308,12 +417,16 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
                     } else if (_playerState == PlayerState.paused) {
                       await _audioPlayer.resume();
                     } else {
-                      // Ha a lejátszás befejeződött vagy le lett állítva,
-                      // a play metódus újra elindítja a forrástól.
-                      await _audioPlayer.play(UrlSource(
-                        widget.audioUrl,
-                        mimeType: 'audio/mpeg',
-                      ));
+                      // If controller is present (MP station view), use the same method as autoplay
+                      // to ensure iOS/WebKit compatibility (single-step source+play)
+                      // Don't await to preserve user gesture context on iOS/WebKit
+                      if (widget.controller != null) {
+                        // ignore: discarded_futures
+                        widget.controller!.setSourceAndPlay(widget.audioUrl);
+                      } else {
+                        // No controller (dialog files): use _ensureInitAndPlay()
+                        await _ensureInitAndPlay();
+                      }
                     }
                   },
                   color: Colors.green,
@@ -379,5 +492,72 @@ class _MiniAudioPlayerState extends State<MiniAudioPlayer> {
             ),
           ),
         ));
+  }
+}
+
+/// Külső vezérlő a `MiniAudioPlayer`-hez (pl. mobil weben user gesture-ből indított autoplay).
+class MiniAudioPlayerController {
+  _MiniAudioPlayerState? _state;
+  String? _pendingUrlToPlay;
+  String? _pendingUrlToSet;
+  bool _pendingPlay = false;
+
+  void _attach(_MiniAudioPlayerState state) {
+    _state = state;
+    // Függőben lévő parancsok lejátszása attach után
+    if (_pendingUrlToPlay != null) {
+      final url = _pendingUrlToPlay!;
+      _pendingUrlToPlay = null;
+      _pendingPlay = false;
+      // ignore: discarded_futures
+      state._externalSetSourceAndPlay(url);
+      return;
+    }
+    if (_pendingUrlToSet != null) {
+      final url = _pendingUrlToSet!;
+      _pendingUrlToSet = null;
+      // ignore: discarded_futures
+      state._externalSetSource(url);
+      // ne return-öljünk, mert lehet még pendingPlay is
+    }
+    if (_pendingPlay) {
+      _pendingPlay = false;
+      // ignore: discarded_futures
+      state._externalPlay();
+    }
+  }
+
+  void _detach(_MiniAudioPlayerState state) {
+    if (_state == state) {
+      _state = null;
+    }
+  }
+
+  Future<void> setSourceAndPlay(String url) async {
+    final s = _state;
+    if (s == null) {
+      _pendingUrlToPlay = url;
+      _pendingPlay = true;
+      return;
+    }
+    await s._externalSetSourceAndPlay(url);
+  }
+
+  Future<void> setSource(String url) async {
+    final s = _state;
+    if (s == null) {
+      _pendingUrlToSet = url;
+      return;
+    }
+    await s._externalSetSource(url);
+  }
+
+  Future<void> play() async {
+    final s = _state;
+    if (s == null) {
+      _pendingPlay = true;
+      return;
+    }
+    await s._externalPlay();
   }
 }

@@ -12,11 +12,13 @@ import 'package:image/image.dart' as img;
 import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:async';
+import 'dart:js_interop';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/firebase_config.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
 import '../widgets/mini_audio_player.dart';
+import '../services/version_check_service.dart';
 
 // Top-level függvény a compute-hoz - gyorsított, egyszerűsített verzió
 Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
@@ -166,6 +168,7 @@ class _MemoriapalotaAllomasViewScreenState
   String _viewId = '';
   web.HTMLIFrameElement? _iframeElement;
   bool _isModalOpen = false;
+  JSFunction? _mpMessageListener;
 
   // Képfeltöltés state változók
   String? _currentImageUrl;
@@ -187,8 +190,8 @@ class _MemoriapalotaAllomasViewScreenState
   // Audio lejátszás state változók
   String? _currentAudioUrl;
   bool _autoPlayAudio = false;
-  int _audioPlayerKeyCounter =
-      0; // Kulcs számláló az audio player újraépítéséhez
+  final MiniAudioPlayerController _mpAudioController =
+      MiniAudioPlayerController();
 
   void _setIframePointerEventsEnabled(bool enabled) {
     if (!kIsWeb) return;
@@ -221,6 +224,34 @@ class _MemoriapalotaAllomasViewScreenState
     _loadNoteData();
     _loadAudioSettings();
     _loadAllomasok();
+
+    // Flutter Web + iframe: az iframe-ben történő scroll/touch nem mindig ér el a window-ig,
+    // ezért külön "activity" üzenetet fogadunk (postMessage) és azt aktivitásnak számítjuk.
+    _setupIframeActivityBridge();
+  }
+
+  void _setupIframeActivityBridge() {
+    if (!kIsWeb) return;
+    if (_mpMessageListener != null) return;
+
+    _mpMessageListener = ((web.Event event) {
+      final me = event as web.MessageEvent;
+      final msg = me.data?.toString();
+      if (msg == 'mp_activity') {
+        VersionCheckService().recordScrollActivity();
+      }
+    }).toJS;
+
+    web.window.addEventListener('message', _mpMessageListener!);
+  }
+
+  @override
+  void dispose() {
+    if (kIsWeb && _mpMessageListener != null) {
+      web.window.removeEventListener('message', _mpMessageListener!);
+      _mpMessageListener = null;
+    }
+    super.dispose();
   }
 
   /// Betölti az audio beállításokat SharedPreferences-ből
@@ -603,6 +634,23 @@ class _MemoriapalotaAllomasViewScreenState
 </head>
 <body>
   <script>
+    // Jelzünk a Flutter oldalnak, hogy a felhasználó aktív az iframe-ben.
+    // (scroll/touch/key events nem mindig kerülnek ki window-ig Flutter Web-en)
+    (function () {
+      var last = 0;
+      function ping() {
+        var now = Date.now();
+        if (now - last < 500) return; // throttle
+        last = now;
+        try { window.parent.postMessage('mp_activity', '*'); } catch (e) {}
+      }
+      ['scroll', 'touchstart', 'mousemove', 'keydown'].forEach(function (evt) {
+        window.addEventListener(evt, ping, { passive: true });
+      });
+      ping();
+    })();
+  </script>
+  <script>
     (function () {
       function isEditableTarget(target) {
         if (!target) return false;
@@ -801,8 +849,8 @@ class _MemoriapalotaAllomasViewScreenState
     final audioUrl = data['audioUrl'] as String?;
 
     // Audio URL frissítése
-    final previousAudioUrl = _currentAudioUrl;
     final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
+    final nextAudioUrl = hasAudio ? audioUrl.trim() : null;
 
     // Új iframe-et hozunk létre az új tartalommal (teljes HTML dokumentummal)
     _setupIframe(cim, kulcsszo, tartalom, sorszam: sorszam);
@@ -815,12 +863,20 @@ class _MemoriapalotaAllomasViewScreenState
       setState(() {
         _currentHtmlContent =
             tartalom.isNotEmpty ? tartalom : '<p>Nincs tartalom.</p>';
-        _currentAudioUrl = hasAudio ? audioUrl : null;
-        // Új kulcs generálása az audio player újraépítéséhez (ha változott az URL)
-        if (previousAudioUrl != _currentAudioUrl) {
-          _audioPlayerKeyCounter++;
-        }
+        _currentAudioUrl = nextAudioUrl;
+        // A lejátszó már nem key alapján épül újra, hanem controller-rel frissítjük.
       });
+    }
+
+    // IMPORTANT: controller-rel állítjuk át a forrást állomásváltáskor.
+    // - autoPlay: user gesture esetén _goToNext/_goToPrevious indítja a play-t
+    // - egyébként: csak source váltás, hogy a Play már a megfelelő hangot indítsa
+    // Ha autoPlay be van kapcsolva, a lejátszást és source váltást a léptetés gomb (user gesture)
+    // indítja. Itt ne állítsuk át a source-ot, mert az iOS/Android weben megszakíthatja
+    // az épp induló lejátszást.
+    if (!_autoPlayAudio && nextAudioUrl != null && nextAudioUrl.isNotEmpty) {
+      // ignore: discarded_futures
+      _mpAudioController.setSource(nextAudioUrl);
     }
   }
 
@@ -1754,11 +1810,19 @@ class _MemoriapalotaAllomasViewScreenState
 
   Future<void> _goToPrevious() async {
     if (_currentIndex > 0) {
+      // Mobil web autoplay: indítsuk el közvetlenül user gesture-ből
+      if (_autoPlayAudio) {
+        final prevData =
+            _allomasok[_currentIndex - 1].data() as Map<String, dynamic>;
+        final prevUrl = (prevData['audioUrl'] as String?)?.trim();
+        if (prevUrl != null && prevUrl.isNotEmpty) {
+          // ignore: discarded_futures
+          _mpAudioController.setSourceAndPlay(prevUrl);
+        }
+      }
       setState(() {
         _currentIndex--;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
-        // Új kulcs generálása az audio player újraépítéséhez
-        _audioPlayerKeyCounter++;
       });
       await _displayCurrentAllomas();
     }
@@ -1766,11 +1830,19 @@ class _MemoriapalotaAllomasViewScreenState
 
   Future<void> _goToNext() async {
     if (_currentIndex < _allomasok.length - 1) {
+      // Mobil web autoplay: indítsuk el közvetlenül user gesture-ből
+      if (_autoPlayAudio) {
+        final nextData =
+            _allomasok[_currentIndex + 1].data() as Map<String, dynamic>;
+        final nextUrl = (nextData['audioUrl'] as String?)?.trim();
+        if (nextUrl != null && nextUrl.isNotEmpty) {
+          // ignore: discarded_futures
+          _mpAudioController.setSourceAndPlay(nextUrl);
+        }
+      }
       setState(() {
         _currentIndex++;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
-        // Új kulcs generálása az audio player újraépítéséhez
-        _audioPlayerKeyCounter++;
       });
       await _displayCurrentAllomas();
     }
@@ -1868,12 +1940,15 @@ class _MemoriapalotaAllomasViewScreenState
       children: [
         if (hasAudio) ...[
           MiniAudioPlayer(
-            key: ValueKey('audio_player_$_audioPlayerKeyCounter'),
+            controller: _mpAudioController,
             audioUrl: _currentAudioUrl!,
             compact: false,
             large: true,
-            deferInit: false,
-            autoPlay: _autoPlayAudio,
+            // iOS WebKit: a legstabilabb, ha az init+play user gesture-ből történik
+            deferInit: kIsWeb,
+            // Autoplay-t mobilon user gesture-ből indítjuk (léptetés gomb),
+            // ezért itt ne próbáljon init-ből automatikusan indulni.
+            autoPlay: false,
           ),
         ] else ...[
           const Text(
@@ -2134,10 +2209,46 @@ class _MemoriapalotaAllomasViewScreenState
           ),
           // Audio beállítások gomb (csak ha van legalább egy állomás audioUrl-jével)
           if (_hasAnyAudio())
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: _showAudioSettingsDialog,
-              tooltip: 'Audio beállítások',
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    Icons.settings,
+                    color: _autoPlayAudio ? Colors.green : null,
+                  ),
+                  onPressed: _showAudioSettingsDialog,
+                  tooltip: _autoPlayAudio
+                      ? 'Audio beállítások (Automatikus lejátszás: BE)'
+                      : 'Audio beállítások',
+                ),
+                if (_autoPlayAudio)
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 12,
+                      ),
+                      child: const Text(
+                        'AUTO',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
         ],
       ),
@@ -2171,10 +2282,10 @@ class _MemoriapalotaAllomasViewScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: MiniAudioPlayer(
-                      key: ValueKey('audio_player_$_audioPlayerKeyCounter'),
+                      controller: _mpAudioController,
                       audioUrl: _currentAudioUrl!,
-                      deferInit: false,
-                      autoPlay: _autoPlayAudio,
+                      deferInit: kIsWeb,
+                      autoPlay: false,
                     ),
                   ),
                 ],

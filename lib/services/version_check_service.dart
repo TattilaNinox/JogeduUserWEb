@@ -144,9 +144,12 @@ class VersionCheckService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final serverVersion = data['version'] as String?;
+        final serverVersionRaw = data['version'] as String?;
+        final serverVersion = serverVersionRaw?.trim();
 
-        if (serverVersion != null && serverVersion != _currentVersion) {
+        if (serverVersion != null &&
+            serverVersion.isNotEmpty &&
+            !_isSameVersion(serverVersion, _currentVersion)) {
           debugPrint(
               '[VersionCheck] New version available: $serverVersion (current: $_currentVersion)');
           _attemptReload();
@@ -197,6 +200,9 @@ class VersionCheckService {
       '/note/', // Jegyzet olvasás
       '/read/note/', // Jegyzet olvasás (alternatív route)
       '/interactive-note/', // Interaktív jegyzet
+      '/memoriapalota-allomas/', // Memóriapalota állomások (iframe-es olvasás)
+      '/memoriapalota-fajl/', // Memóriapalota fájlok
+      '/jogeset/', // Jogeset megtekintés
     ];
 
     for (final route in criticalRoutes) {
@@ -238,5 +244,25 @@ class VersionCheckService {
   /// Aktivitás rögzítése (külső komponensek számára, pl. audio player)
   void recordActivity() {
     _lastActivityTime = DateTime.now();
+  }
+
+  /// Scroll/olvasási aktivitás rögzítése (pl. iframe-ben történő görgetés)
+  /// - frissíti az aktivitást és a scroll timestamp-et is
+  void recordScrollActivity() {
+    final now = DateTime.now();
+    _lastActivityTime = now;
+    _lastScrollTime = now;
+  }
+
+  bool _isSameVersion(String serverVersion, String currentVersion) {
+    // Ha a szerver nem ad build suffix-et (+...), akkor csak a semver részt hasonlítjuk.
+    final serverHasBuild = serverVersion.contains('+');
+    final currentSemver = currentVersion.split('+').first.trim();
+
+    if (!serverHasBuild) {
+      return serverVersion.trim() == currentSemver;
+    }
+
+    return serverVersion.trim() == currentVersion.trim();
   }
 }
