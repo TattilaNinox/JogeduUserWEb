@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -210,7 +211,7 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
           ),
 
           // SimplePay logó csak webes platformon
-          if (HybridPaymentService.isWeb) ...[
+          if (kIsWeb) ...[
             const SizedBox(height: 16),
             const SimplePayLogoCompact(
               width: 120,
@@ -287,10 +288,9 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
     }
 
     // WEB esetén: ELŐSZÖR szállítási cím ellenőrzése (még mielőtt bármi mást csinálunk)
-    debugPrint(
-        '[SubscriptionRenewalButton] Starting payment - isWeb: ${HybridPaymentService.isWeb}');
+    debugPrint('[SubscriptionRenewalButton] Starting payment - isWeb: $kIsWeb');
 
-    if (HybridPaymentService.isWeb) {
+    if (kIsWeb) {
       debugPrint(
           '[SubscriptionRenewalButton] Web platform detected - checking shipping address');
       try {
@@ -417,7 +417,7 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
 
     try {
       // WEB esetén: KÖTELEZŐ adattovábbítási nyilatkozat elfogadása
-      if (HybridPaymentService.isWeb) {
+      if (kIsWeb) {
         if (!mounted) return;
         final consentAccepted = await DataTransferConsentDialog.show(context);
         if (!consentAccepted) {
@@ -445,7 +445,7 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
 
       // Szállítási cím lekérése (ha web és van)
       Map<String, String>? shippingAddress;
-      if (HybridPaymentService.isWeb) {
+      if (kIsWeb) {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -472,7 +472,7 @@ class _SubscriptionRenewalButtonState extends State<SubscriptionRenewalButton> {
         _showSuccess('Fizetés sikeresen indítva!');
 
         // Web esetén ugyanabban a fülben nyissuk meg (ne új ablakban)
-        if (HybridPaymentService.isWeb) {
+        if (kIsWeb) {
           final uri = Uri.parse(result.paymentUrl!);
           final launched = await launchUrl(
             uri,

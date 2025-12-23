@@ -1,50 +1,35 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'web_payment_service.dart';
 
-/// Hibrid fizetési service - kezeli a webes és mobil fizetéseket
+/// Webes fizetési service wrapper - SimplePay integrációhoz
 ///
-/// Ez a service automatikusan detektálja a platformot és a megfelelő
-/// fizetési módszert használja (Web: SimplePay, Mobile: Google Play Billing).
+/// Ez a service a WebPaymentService-t használja SimplePay fizetésekhez.
 class HybridPaymentService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Platform detection
-  static bool get isWeb => kIsWeb;
-  static bool get isMobile => !kIsWeb;
-
-  /// Elérhető fizetési csomagok lekérése platform alapján
+  /// Elérhető fizetési csomagok lekérése
   static List<PaymentPlan> getAvailablePlans() {
-    if (isWeb) {
-      return WebPaymentService.availablePlans;
-    } else {
-      // Mobil esetén Google Play Billing csomagok
-      return _getMobilePlans();
-    }
+    return WebPaymentService.availablePlans;
   }
 
-  /// Fizetés indítása platform-specifikus módszerrel
+  /// Fizetés indítása SimplePay-jel
   static Future<PaymentInitiationResult> initiatePayment({
     required String planId,
     required String userId,
     Map<String, String>? shippingAddress,
   }) async {
-    if (isWeb) {
-      return await _initiateWebPayment(planId, userId, shippingAddress);
-    } else {
-      return await _initiateMobilePayment(planId, userId);
-    }
+    return await WebPaymentService.initiatePaymentViaCloudFunction(
+      planId: planId,
+      userId: userId,
+      shippingAddress: shippingAddress,
+    );
   }
 
   /// Fizetési előzmények lekérése
   static Future<List<PaymentHistoryItem>> getPaymentHistory(
       String userId) async {
-    if (isWeb) {
-      return await WebPaymentService.getPaymentHistory(userId);
-    } else {
-      return await _getMobilePaymentHistory(userId);
-    }
+    return await WebPaymentService.getPaymentHistory(userId);
   }
 
   /// Előfizetési státusz lekérése
@@ -152,106 +137,11 @@ class HybridPaymentService {
     }
   }
 
-  /// Webes fizetés indítása
-  static Future<PaymentInitiationResult> _initiateWebPayment(String planId,
-      String userId, Map<String, String>? shippingAddress) async {
-    if (!isWeb) {
-      return const PaymentInitiationResult(
-        success: false,
-        error: 'Webes fizetés csak webes platformon érhető el',
-      );
-    }
-
-    return await WebPaymentService.initiatePaymentViaCloudFunction(
-      planId: planId,
-      userId: userId,
-      shippingAddress: shippingAddress,
-    );
-  }
-
-  /// Mobil fizetés indítása (Google Play Billing)
-  static Future<PaymentInitiationResult> _initiateMobilePayment(
-      String planId, String userId) async {
-    if (!isMobile) {
-      return const PaymentInitiationResult(
-        success: false,
-        error: 'Mobil fizetés csak mobil platformon érhető el',
-      );
-    }
-
-    // Google Play Billing integráció (mobil alkalmazásban)
-    // Ez a meglévő subscription service része lesz
-    return const PaymentInitiationResult(
-      success: false,
-      error: 'Mobil fizetés még nincs implementálva',
-    );
-  }
-
-  /// Mobil fizetési előzmények lekérése
-  static Future<List<PaymentHistoryItem>> _getMobilePaymentHistory(
-      String userId) async {
-    // Google Play Billing előzmények (mobil alkalmazásban)
-    return [];
-  }
-
-  /// Mobil csomagok definíciója
-  static List<PaymentPlan> _getMobilePlans() {
-    return [
-      const PaymentPlan(
-        id: 'monthly_premium_prepaid',
-        name: '30 napos előfizetés',
-        price: 2990,
-        period: '30 nap',
-        description: 'Teljes hozzáférés minden funkcióhoz',
-        features: [
-          'Korlátlan jegyzet hozzáférés',
-          'Interaktív kvízek',
-          'Flashcard csomagok',
-          'Audio tartalmak',
-          'Offline letöltés',
-          'Elsődleges támogatás'
-        ],
-        subscriptionDays: 30,
-      ),
-      const PaymentPlan(
-        id: 'yearly_premium_prepaid',
-        name: 'Éves előfizetés',
-        price: 29900,
-        period: 'év',
-        description: '2 hónap ingyen a havi árhoz képest',
-        features: [
-          'Korlátlan jegyzet hozzáférés',
-          'Interaktív kvízek',
-          'Flashcard csomagok',
-          'Audio tartalmak',
-          'Offline letöltés',
-          'Elsődleges támogatás',
-          'Korai hozzáférés új funkciókhoz',
-          'Exkluzív tartalmak'
-        ],
-        subscriptionDays: 365,
-        popular: true,
-      ),
-    ];
-  }
-
   /// Konfiguráció ellenőrzése
-  static bool get isConfigured {
-    if (isWeb) {
-      return WebPaymentService.isConfigured;
-    } else {
-      // Google Play Billing konfiguráció (mobil alkalmazásban)
-      return true;
-    }
-  }
+  static bool get isConfigured => WebPaymentService.isConfigured;
 
-  static String get configurationStatus {
-    if (isWeb) {
-      return WebPaymentService.configurationStatus;
-    } else {
-      return 'Google Play Billing konfigurálva';
-    }
-  }
+  static String get configurationStatus =>
+      WebPaymentService.configurationStatus;
 }
 
 /// Előfizetési státusz enum
