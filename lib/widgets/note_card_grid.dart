@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../core/firebase_config.dart';
 import '../screens/category_tags_screen.dart';
+import '../screens/tag_drill_down_screen.dart';
 
 class NoteCardGrid extends StatefulWidget {
   final String searchText;
@@ -587,7 +588,16 @@ class _CategorySectionState extends State<_CategorySection> {
 
   /// Platform-natív navigáció a CategoryTagsScreen-re
   void _navigateToCategoryTags(BuildContext context) {
-    final screen = CategoryTagsScreen(category: widget.category);
+    // Ha a főoldalon van aktív "Címke" szűrő, akkor a kategóriába belépéskor
+    // közvetlenül a címke drill-down nézetet nyissuk meg, különben úgy tűnik,
+    // mintha a szűrő nem működne (mert a CategoryTagsScreen minden tags[0]-t listáz).
+    final selectedTag = widget.selectedTag;
+    final Widget screen = (selectedTag != null && selectedTag.isNotEmpty)
+        ? TagDrillDownScreen(
+            category: widget.category,
+            tagPath: [selectedTag],
+          )
+        : CategoryTagsScreen(category: widget.category);
 
     // Platform-natív navigáció
     if (!kIsWeb && Platform.isIOS) {
