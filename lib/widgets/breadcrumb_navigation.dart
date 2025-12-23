@@ -158,39 +158,45 @@ class BreadcrumbNavigation extends StatelessWidget {
                           ),
                         ),
                       ],
-                      GestureDetector(
-                        onTap: item.onTap,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 6 : 8,
-                            vertical: isMobile ? 2 : 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: item.isActive
-                                ? Theme.of(context)
-                                    .primaryColor
-                                    .withValues(alpha: 0.1)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            item.label,
-                            style: TextStyle(
-                              fontSize: isMobile ? 12 : 14,
-                              fontWeight: item.isActive
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                              color: item.onTap != null
-                                  ? (item.isActive
-                                      ? Theme.of(context).primaryColor
-                                      : Colors.grey.shade700)
-                                  : Colors.grey.shade600,
-                              decoration: item.onTap != null
-                                  ? null
-                                  : TextDecoration.none,
+                      MouseRegion(
+                        cursor: item.onTap != null
+                            ? SystemMouseCursors.click
+                            : SystemMouseCursors.basic,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: item.onTap,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 6 : 8,
+                              vertical: isMobile ? 2 : 4,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            decoration: BoxDecoration(
+                              color: item.isActive
+                                  ? Theme.of(context)
+                                      .primaryColor
+                                      .withValues(alpha: 0.1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              item.label,
+                              style: TextStyle(
+                                fontSize: isMobile ? 12 : 14,
+                                fontWeight: item.isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: item.onTap != null
+                                    ? (item.isActive
+                                        ? Theme.of(context).primaryColor
+                                        : Colors.grey.shade700)
+                                    : Colors.grey.shade600,
+                                decoration: item.onTap != null
+                                    ? null
+                                    : TextDecoration.none,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ),
