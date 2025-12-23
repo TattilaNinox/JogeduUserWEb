@@ -13,7 +13,7 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:js_interop';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../core/firebase_config.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
@@ -189,9 +189,6 @@ class _MemoriapalotaAllomasViewScreenState
 
   // Audio lejátszás state változók
   String? _currentAudioUrl;
-  bool _autoPlayAudio = false;
-  final MiniAudioPlayerController _mpAudioController =
-      MiniAudioPlayerController();
 
   void _setIframePointerEventsEnabled(bool enabled) {
     if (!kIsWeb) return;
@@ -222,7 +219,7 @@ class _MemoriapalotaAllomasViewScreenState
     // FONTOS: Betöltjük a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
     _loadFiltersFromUrl();
     _loadNoteData();
-    _loadAudioSettings();
+
     _loadAllomasok();
 
     // Flutter Web + iframe: az iframe-ben történő scroll/touch nem mindig ér el a window-ig,
@@ -252,36 +249,6 @@ class _MemoriapalotaAllomasViewScreenState
       _mpMessageListener = null;
     }
     super.dispose();
-  }
-
-  /// Betölti az audio beállításokat SharedPreferences-ből
-  Future<void> _loadAudioSettings() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (mounted) {
-        setState(() {
-          _autoPlayAudio =
-              prefs.getBool('memoriapalota_auto_play_audio') ?? false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Hiba az audio beállítások betöltésekor: $e');
-    }
-  }
-
-  /// Elmenti az audio beállításokat SharedPreferences-be
-  Future<void> _saveAudioSettings(bool autoPlay) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('memoriapalota_auto_play_audio', autoPlay);
-      if (mounted) {
-        setState(() {
-          _autoPlayAudio = autoPlay;
-        });
-      }
-    } catch (e) {
-      debugPrint('Hiba az audio beállítások mentésekor: $e');
-    }
   }
 
   /// Betölti a FilterStorage értékeit az előző oldal URL-jéből (from paraméter)
@@ -866,17 +833,6 @@ class _MemoriapalotaAllomasViewScreenState
         _currentAudioUrl = nextAudioUrl;
         // A lejátszó már nem key alapján épül újra, hanem controller-rel frissítjük.
       });
-    }
-
-    // IMPORTANT: controller-rel állítjuk át a forrást állomásváltáskor.
-    // - autoPlay: user gesture esetén _goToNext/_goToPrevious indítja a play-t
-    // - egyébként: csak source váltás, hogy a Play már a megfelelő hangot indítsa
-    // Ha autoPlay be van kapcsolva, a lejátszást és source váltást a léptetés gomb (user gesture)
-    // indítja. Itt ne állítsuk át a source-ot, mert az iOS/Android weben megszakíthatja
-    // az épp induló lejátszást.
-    if (!_autoPlayAudio && nextAudioUrl != null && nextAudioUrl.isNotEmpty) {
-      // ignore: discarded_futures
-      _mpAudioController.setSource(nextAudioUrl);
     }
   }
 
@@ -1810,16 +1766,6 @@ class _MemoriapalotaAllomasViewScreenState
 
   Future<void> _goToPrevious() async {
     if (_currentIndex > 0) {
-      // Mobil web autoplay: indítsuk el közvetlenül user gesture-ből
-      if (_autoPlayAudio) {
-        final prevData =
-            _allomasok[_currentIndex - 1].data() as Map<String, dynamic>;
-        final prevUrl = (prevData['audioUrl'] as String?)?.trim();
-        if (prevUrl != null && prevUrl.isNotEmpty) {
-          // ignore: discarded_futures
-          _mpAudioController.setSourceAndPlay(prevUrl);
-        }
-      }
       setState(() {
         _currentIndex--;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
@@ -1830,16 +1776,6 @@ class _MemoriapalotaAllomasViewScreenState
 
   Future<void> _goToNext() async {
     if (_currentIndex < _allomasok.length - 1) {
-      // Mobil web autoplay: indítsuk el közvetlenül user gesture-ből
-      if (_autoPlayAudio) {
-        final nextData =
-            _allomasok[_currentIndex + 1].data() as Map<String, dynamic>;
-        final nextUrl = (nextData['audioUrl'] as String?)?.trim();
-        if (nextUrl != null && nextUrl.isNotEmpty) {
-          // ignore: discarded_futures
-          _mpAudioController.setSourceAndPlay(nextUrl);
-        }
-      }
       setState(() {
         _currentIndex++;
         _isContentOpen = false; // Bezárjuk a tananyagot továbblépéskor
@@ -1848,89 +1784,9 @@ class _MemoriapalotaAllomasViewScreenState
     }
   }
 
-  /// Ellenőrzi, hogy van-e legalább egy állomás audioUrl-jével
-  bool _hasAnyAudio() {
-    for (var allomas in _allomasok) {
-      final data = allomas.data() as Map<String, dynamic>;
-      final audioUrl = data['audioUrl'] as String?;
-      if (audioUrl != null && audioUrl.isNotEmpty) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /// Audio beállítások dialógus megjelenítése
-  Future<void> _showAudioSettingsDialog() async {
-    bool tempAutoPlay = _autoPlayAudio;
 
-    if (!mounted) return;
-
-    _beginModalBlock();
-    try {
-      await showDialog(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Audio beállítások'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Automatikus audio lejátszás állomások közötti léptetéskor',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    Switch(
-                      value: tempAutoPlay,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          tempAutoPlay = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  tempAutoPlay
-                      ? 'Az állomások közötti léptetéskor automatikusan elindul az audio lejátszása.'
-                      : 'Az állomások közötti léptetéskor nem indul el automatikusan az audio lejátszása.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Mégse'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  await _saveAudioSettings(tempAutoPlay);
-                  if (mounted && dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop();
-                  }
-                },
-                child: const Text('Mentés'),
-              ),
-            ],
-          ),
-        ),
-      );
-    } finally {
-      _endModalBlock();
-    }
-  }
-
+  /// Mobilnézet alsó sáv: audio player vagy "Nincs hanganyag" üzenet
   /// Mobilnézet alsó sáv: audio player vagy "Nincs hanganyag" üzenet
   Widget _buildMobileBottomBar() {
     final hasAudio = _currentAudioUrl != null && _currentAudioUrl!.isNotEmpty;
@@ -1940,15 +1796,11 @@ class _MemoriapalotaAllomasViewScreenState
       children: [
         if (hasAudio) ...[
           MiniAudioPlayer(
-            controller: _mpAudioController,
+            // ValueKey forces widget recreation on URL change = fresh state like first load
+            key: ValueKey(_currentAudioUrl),
             audioUrl: _currentAudioUrl!,
             compact: false,
             large: true,
-            // iOS WebKit: a legstabilabb, ha az init+play user gesture-ből történik
-            deferInit: kIsWeb,
-            // Autoplay-t mobilon user gesture-ből indítjuk (léptetés gomb),
-            // ezért itt ne próbáljon init-ből automatikusan indulni.
-            autoPlay: false,
           ),
         ] else ...[
           const Text(
@@ -2207,49 +2059,6 @@ class _MemoriapalotaAllomasViewScreenState
                   },
             tooltip: 'Kép feltöltése',
           ),
-          // Audio beállítások gomb (csak ha van legalább egy állomás audioUrl-jével)
-          if (_hasAnyAudio())
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.settings,
-                    color: _autoPlayAudio ? Colors.green : null,
-                  ),
-                  onPressed: _showAudioSettingsDialog,
-                  tooltip: _autoPlayAudio
-                      ? 'Audio beállítások (Automatikus lejátszás: BE)'
-                      : 'Audio beállítások',
-                ),
-                if (_autoPlayAudio)
-                  Positioned(
-                    right: 4,
-                    bottom: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 12,
-                      ),
-                      child: const Text(
-                        'AUTO',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
         ],
       ),
       body: Column(
@@ -2282,10 +2091,9 @@ class _MemoriapalotaAllomasViewScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: MiniAudioPlayer(
-                      controller: _mpAudioController,
+                      // ValueKey forces widget recreation on URL change = fresh state like first load
+                      key: ValueKey(_currentAudioUrl),
                       audioUrl: _currentAudioUrl!,
-                      deferInit: kIsWeb,
-                      autoPlay: false,
                     ),
                   ),
                 ],
