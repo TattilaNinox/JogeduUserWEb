@@ -16,6 +16,11 @@ class WebPaymentHistory extends StatelessWidget {
     this.onRefresh,
   });
 
+  double _fs(BuildContext context, double base) {
+    final isMobile = MediaQuery.of(context).size.width <= 768;
+    return isMobile ? (base - 2) : base;
+  }
+
   // Import hozzáadása szükséges
   // import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -69,21 +74,21 @@ class WebPaymentHistory extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              const Row(
+              Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.history,
                     size: 24,
                     color: Color(0xFF1E3A8A),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Fizetési előzmények',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: _fs(context, 20),
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E3A8A),
+                        color: const Color(0xFF1E3A8A),
                       ),
                     ),
                   ),
@@ -94,13 +99,16 @@ class WebPaymentHistory extends StatelessWidget {
 
               // Content
               if (snapshot.connectionState == ConnectionState.waiting)
-                _buildLoadingState()
+                _buildLoadingState(context)
               else if (snapshot.hasError)
-                _buildErrorState(snapshot.error.toString())
+                _buildErrorState(context, snapshot.error.toString())
               else if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-                _buildEmptyState()
+                _buildEmptyState(context)
               else
-                _buildPaymentsList(_convertToPaymentItems(snapshot.data!.docs)),
+                _buildPaymentsList(
+                  context,
+                  _convertToPaymentItems(snapshot.data!.docs),
+                ),
             ],
           ),
         );
@@ -126,19 +134,22 @@ class WebPaymentHistory extends StatelessWidget {
     }).toList();
   }
 
-  Widget _buildLoadingState() {
-    return const Center(
+  Widget _buildLoadingState(BuildContext context) {
+    return Center(
       child: Column(
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Fizetési előzmények betöltése...'),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            'Fizetési előzmények betöltése...',
+            style: TextStyle(fontSize: _fs(context, 14)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState(String error) {
+  Widget _buildErrorState(BuildContext context, String error) {
     return Center(
       child: Column(
         children: [
@@ -151,7 +162,7 @@ class WebPaymentHistory extends StatelessWidget {
           Text(
             'Hiba történt az adatok betöltése során',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: _fs(context, 16),
               color: Colors.grey[600],
             ),
           ),
@@ -159,7 +170,7 @@ class WebPaymentHistory extends StatelessWidget {
           Text(
             error,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: _fs(context, 14),
               color: Colors.red[600],
             ),
             textAlign: TextAlign.center,
@@ -169,7 +180,7 @@ class WebPaymentHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         children: [
@@ -182,7 +193,7 @@ class WebPaymentHistory extends StatelessWidget {
           Text(
             'Még nincsenek fizetési előzmények',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: _fs(context, 16),
               color: Colors.grey[600],
             ),
           ),
@@ -190,7 +201,7 @@ class WebPaymentHistory extends StatelessWidget {
           Text(
             'Az első vásárlás után itt jelennek meg a részletek',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: _fs(context, 14),
               color: Colors.grey[500],
             ),
             textAlign: TextAlign.center,
@@ -200,16 +211,17 @@ class WebPaymentHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentsList(List<PaymentHistoryItem> payments) {
+  Widget _buildPaymentsList(
+      BuildContext context, List<PaymentHistoryItem> payments) {
     return Column(
       children: [
         // Desktop table view
         LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth > 768) {
-              return _buildDesktopTable(payments);
+              return _buildDesktopTable(context, payments);
             } else {
-              return _buildMobileList(payments);
+              return _buildMobileList(context, payments);
             }
           },
         ),
@@ -228,7 +240,7 @@ class WebPaymentHistory extends StatelessWidget {
             '${payments.length} db megrendelés található',
             style: TextStyle(
               color: Colors.grey[600],
-              fontSize: 14,
+              fontSize: _fs(context, 14),
             ),
           ),
         ),
@@ -236,7 +248,8 @@ class WebPaymentHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildDesktopTable(List<PaymentHistoryItem> payments) {
+  Widget _buildDesktopTable(
+      BuildContext context, List<PaymentHistoryItem> payments) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[200]!),
@@ -254,7 +267,7 @@ class WebPaymentHistory extends StatelessWidget {
                 topRight: Radius.circular(8),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
                   flex: 2,
@@ -262,7 +275,7 @@ class WebPaymentHistory extends StatelessWidget {
                     'Dátum',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: _fs(context, 14),
                     ),
                   ),
                 ),
@@ -272,7 +285,7 @@ class WebPaymentHistory extends StatelessWidget {
                     'Leírás',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: _fs(context, 14),
                     ),
                   ),
                 ),
@@ -282,7 +295,7 @@ class WebPaymentHistory extends StatelessWidget {
                     'Összeg',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: _fs(context, 14),
                     ),
                   ),
                 ),
@@ -292,7 +305,7 @@ class WebPaymentHistory extends StatelessWidget {
                     'SimplePay ID',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: _fs(context, 14),
                     ),
                   ),
                 ),
@@ -302,7 +315,7 @@ class WebPaymentHistory extends StatelessWidget {
                     'Státusz',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: _fs(context, 14),
                     ),
                   ),
                 ),
@@ -311,13 +324,13 @@ class WebPaymentHistory extends StatelessWidget {
           ),
 
           // Rows
-          ...payments.map((payment) => _buildTableRow(payment)),
+          ...payments.map((payment) => _buildTableRow(context, payment)),
         ],
       ),
     );
   }
 
-  Widget _buildTableRow(PaymentHistoryItem payment) {
+  Widget _buildTableRow(BuildContext context, PaymentHistoryItem payment) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -331,22 +344,22 @@ class WebPaymentHistory extends StatelessWidget {
             flex: 2,
             child: Text(
               _formatDate(payment.createdAt),
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: _fs(context, 14)),
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
               _getPlanName(payment.planId),
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: _fs(context, 14)),
             ),
           ),
           Expanded(
             flex: 1,
             child: Text(
               payment.formattedAmount,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: _fs(context, 14),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -356,7 +369,7 @@ class WebPaymentHistory extends StatelessWidget {
             child: Text(
               payment.simplePayTransactionId ?? '-',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: _fs(context, 14),
                 color: payment.simplePayTransactionId != null
                     ? Colors.grey[800]
                     : Colors.grey[400],
@@ -366,20 +379,23 @@ class WebPaymentHistory extends StatelessWidget {
           ),
           Expanded(
             flex: 1,
-            child: _buildStatusChip(payment.status),
+            child: _buildStatusChip(context, payment.status),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMobileList(List<PaymentHistoryItem> payments) {
+  Widget _buildMobileList(
+      BuildContext context, List<PaymentHistoryItem> payments) {
     return Column(
-      children: payments.map((payment) => _buildMobileCard(payment)).toList(),
+      children: payments
+          .map((payment) => _buildMobileCard(context, payment))
+          .toList(),
     );
   }
 
-  Widget _buildMobileCard(PaymentHistoryItem payment) {
+  Widget _buildMobileCard(BuildContext context, PaymentHistoryItem payment) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -395,12 +411,12 @@ class WebPaymentHistory extends StatelessWidget {
             children: [
               Text(
                 _getPlanName(payment.planId),
-                style: const TextStyle(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontSize: _fs(context, 16),
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              _buildStatusChip(payment.status),
+              _buildStatusChip(context, payment.status),
             ],
           ),
           const SizedBox(height: 8),
@@ -410,14 +426,14 @@ class WebPaymentHistory extends StatelessWidget {
               Text(
                 _formatDate(payment.createdAt),
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: _fs(context, 14),
                   color: Colors.grey[600],
                 ),
               ),
               Text(
                 payment.formattedAmount,
-                style: const TextStyle(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontSize: _fs(context, 16),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -436,7 +452,7 @@ class WebPaymentHistory extends StatelessWidget {
                   Text(
                     'SimplePay ID: ',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: _fs(context, 12),
                       color: Colors.grey[600],
                       fontWeight: FontWeight.w500,
                     ),
@@ -444,7 +460,7 @@ class WebPaymentHistory extends StatelessWidget {
                   Text(
                     payment.simplePayTransactionId!,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: _fs(context, 12),
                       color: Colors.grey[800],
                       fontFamily: 'monospace',
                     ),
@@ -458,7 +474,7 @@ class WebPaymentHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(BuildContext context, String status) {
     Color backgroundColor;
     Color textColor;
     String text;
@@ -500,7 +516,7 @@ class WebPaymentHistory extends StatelessWidget {
         text,
         style: TextStyle(
           color: textColor,
-          fontSize: 12,
+          fontSize: _fs(context, 12),
           fontWeight: FontWeight.w600,
         ),
       ),

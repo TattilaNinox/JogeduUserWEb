@@ -556,6 +556,9 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
   Widget build(BuildContext context) {
     final canEdit = widget.canEdit || _isAdmin;
     final isFormEditable = canEdit && _isEditing;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    // Mobil nézetben a mezők "placeholder jellegű" (világosszürke) label szövege legyen kisebb.
+    final double mobileLabelFontSize = isMobile ? 12 : 14;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
@@ -645,6 +648,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   labelText: _isCompany ? 'Cégnév *' : 'Név *',
+                  labelStyle: TextStyle(fontSize: mobileLabelFontSize),
                   prefixIcon: const Icon(Icons.person, size: 20),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -676,6 +680,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         labelText: 'Irányítószám *',
+                        labelStyle: TextStyle(fontSize: mobileLabelFontSize),
                         prefixIcon:
                             const Icon(Icons.markunread_mailbox, size: 20),
                         suffixIcon: _isLoadingPostalCodes
@@ -726,6 +731,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         labelText: 'Település *',
+                        labelStyle: TextStyle(fontSize: mobileLabelFontSize),
                         prefixIcon: const Icon(Icons.location_city, size: 20),
                         suffixIcon: _availableCities != null
                             ? IconButton(
@@ -813,6 +819,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   labelText: 'Utca, házszám *',
+                  labelStyle: TextStyle(fontSize: mobileLabelFontSize),
                   prefixIcon: const Icon(Icons.home, size: 20),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -840,6 +847,7 @@ class _ShippingAddressFormState extends State<ShippingAddressForm> {
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
                     labelText: _isCompany ? 'Adószám *' : 'Adószám',
+                    labelStyle: TextStyle(fontSize: mobileLabelFontSize),
                     prefixIcon: const Icon(Icons.badge, size: 20),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),

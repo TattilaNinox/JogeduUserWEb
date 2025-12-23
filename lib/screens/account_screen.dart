@@ -493,245 +493,529 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 420;
+                        final buttonTextStyle = TextStyle(
+                          fontSize: isNarrow ? 12 : 14,
+                          fontWeight: FontWeight.w600,
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.admin_panel_settings,
-                                color: Color(0xFFD97706), size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Admin eszközök - Előfizetés lejárat vezérlő',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w400,
-                                fontSize: 15,
-                                color: Color(0xFF202122),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  if (!mounted) return;
-
-                                  // ScaffoldMessenger mentése az async művelet előtt
-                                  final scaffoldMessenger =
-                                      ScaffoldMessenger.maybeOf(context);
-                                  if (scaffoldMessenger == null) return;
-
-                                  final confirmed = await showDialog<bool>(
-                                        context: context,
-                                        barrierDismissible: false,
-                                        builder: (ctx) {
-                                          return AlertDialog(
-                                            title: const Text(
-                                                'Lejárat előtti email teszt'),
-                                            content: const Text(
-                                                'Ez beállítja az előfizetést 3 napos lejáratra, hogy tesztelhessük a lejárat előtti email értesítéseket.'),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () {
-                                                  Navigator.of(ctx).pop(false);
-                                                },
-                                                child: const Text('Mégse'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () {
-                                                  Navigator.of(ctx).pop(true);
-                                                },
-                                                child: const Text('Beállítás'),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ) ??
-                                      false;
-                                  if (!mounted || !confirmed) return;
-
-                                  final now = DateTime.now();
-                                  final expiry =
-                                      now.add(const Duration(days: 3));
-                                  try {
-                                    await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(user.uid)
-                                        .set(
-                                      {
-                                        'isSubscriptionActive': true,
-                                        'subscriptionStatus': 'premium',
-                                        'subscriptionEndDate':
-                                            Timestamp.fromDate(expiry),
-                                        'subscription': {
-                                          'status': 'ACTIVE',
-                                          'productId': 'test_web_monthly',
-                                          'purchaseToken': 'test_expiry_3_days',
-                                          'endTime': expiry.toIso8601String(),
-                                          'lastUpdateTime':
-                                              now.toIso8601String(),
-                                          'source': 'test_simulation',
-                                        },
-                                        'lastPaymentDate':
-                                            FieldValue.serverTimestamp(),
-                                        'updatedAt':
-                                            FieldValue.serverTimestamp(),
-                                        // NE töröljük a lastReminder mezőt teszteléskor!
-                                        // Csak új előfizetés esetén töröljük
-                                      },
-                                      SetOptions(merge: true),
-                                    );
-
-                                    if (!mounted) return;
-
-                                    // Azonnal mutatjuk a sikeres üzenetet
-                                    scaffoldMessenger.showSnackBar(const SnackBar(
-                                        content: Text(
-                                            'Előfizetés beállítva 3 napos lejáratra!')));
-
-                                    // Email küldése (nem blokkoljuk, ha dispose-olódik)
-                                    EmailNotificationService.sendTestEmail(
-                                      testType: 'expiry_warning',
-                                      daysLeft: 3,
-                                    ).then((emailSent) {
-                                      if (!mounted) return;
-                                      scaffoldMessenger.showSnackBar(SnackBar(
-                                          content: Text(emailSent
-                                              ? 'Email elküldve!'
-                                              : 'Email küldése sikertelen!')));
-                                    }).catchError((e) {
-                                      debugPrint('Email küldés hiba: $e');
-                                    });
-                                  } catch (e) {
-                                    if (!mounted) return;
-                                    scaffoldMessenger.showSnackBar(
-                                        SnackBar(content: Text('Hiba: $e')));
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD97706),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.admin_panel_settings,
+                                  color: Color(0xFFD97706),
+                                  size: 20,
                                 ),
-                                child: const Text('3 napos lejárat'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  if (!mounted) return;
-
-                                  // ScaffoldMessenger mentése az async művelet előtt
-                                  final scaffoldMessenger =
-                                      ScaffoldMessenger.maybeOf(context);
-                                  if (scaffoldMessenger == null) return;
-
-                                  final confirmed = await showDialog<bool>(
-                                        context: context,
-                                        barrierDismissible: false,
-                                        builder: (ctx) {
-                                          return AlertDialog(
-                                            title: const Text(
-                                                'Lejárat utáni email teszt'),
-                                            content: const Text(
-                                                'Ez beállítja az előfizetést lejárt állapotra, hogy tesztelhessük a lejárat utáni email értesítéseket.'),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () {
-                                                  Navigator.of(ctx,
-                                                          rootNavigator: true)
-                                                      .pop(false);
-                                                },
-                                                child: const Text('Mégse'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () {
-                                                  Navigator.of(ctx,
-                                                          rootNavigator: true)
-                                                      .pop(true);
-                                                },
-                                                child: const Text('Beállítás'),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ) ??
-                                      false;
-                                  if (!mounted || !confirmed) return;
-
-                                  final now = DateTime.now();
-                                  final expiredDate =
-                                      now.subtract(const Duration(days: 1));
-                                  try {
-                                    await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(user.uid)
-                                        .set(
-                                      {
-                                        'isSubscriptionActive': false,
-                                        'subscriptionStatus': 'expired',
-                                        'subscriptionEndDate':
-                                            Timestamp.fromDate(expiredDate),
-                                        'subscription': {
-                                          'status': 'EXPIRED',
-                                          'productId': 'test_web_monthly',
-                                          'purchaseToken': 'test_expired',
-                                          'endTime':
-                                              expiredDate.toIso8601String(),
-                                          'lastUpdateTime':
-                                              now.toIso8601String(),
-                                          'source': 'test_simulation',
-                                        },
-                                        'lastPaymentDate':
-                                            FieldValue.serverTimestamp(),
-                                        'updatedAt':
-                                            FieldValue.serverTimestamp(),
-                                        // NE töröljük a lastReminder mezőt teszteléskor!
-                                        // Csak új előfizetés esetén töröljük
-                                      },
-                                      SetOptions(merge: true),
-                                    );
-
-                                    if (!mounted) return;
-
-                                    // Azonnal mutatjuk a sikeres üzenetet
-                                    scaffoldMessenger.showSnackBar(const SnackBar(
-                                        content: Text(
-                                            'Előfizetés beállítva lejárt állapotra!')));
-
-                                    // Email küldése (nem blokkoljuk, ha dispose-olódik)
-                                    EmailNotificationService.sendTestEmail(
-                                      testType: 'expired',
-                                    ).then((emailSent) {
-                                      if (!mounted) return;
-                                      scaffoldMessenger.showSnackBar(SnackBar(
-                                          content: Text(emailSent
-                                              ? 'Email elküldve!'
-                                              : 'Email küldése sikertelen!')));
-                                    }).catchError((e) {
-                                      debugPrint('Email küldés hiba: $e');
-                                    });
-                                  } catch (e) {
-                                    if (!mounted) return;
-                                    scaffoldMessenger.showSnackBar(
-                                        SnackBar(content: Text('Hiba: $e')));
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFDC2626),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Admin eszközök - Előfizetés lejárat vezérlő',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: 15,
+                                      color: Color(0xFF202122),
+                                    ),
+                                  ),
                                 ),
-                                child: const Text('Lejárt állapot'),
-                              ),
+                              ],
                             ),
+                            const SizedBox(height: 12),
+                            if (isNarrow) ...[
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    if (!mounted) return;
+
+                                    // ScaffoldMessenger mentése az async művelet előtt
+                                    final scaffoldMessenger =
+                                        ScaffoldMessenger.maybeOf(context);
+                                    if (scaffoldMessenger == null) return;
+
+                                    final confirmed = await showDialog<bool>(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder: (ctx) {
+                                            return AlertDialog(
+                                              title: const Text(
+                                                  'Lejárat előtti email teszt'),
+                                              content: const Text(
+                                                  'Ez beállítja az előfizetést 3 napos lejáratra, hogy tesztelhessük a lejárat előtti email értesítéseket.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.of(ctx)
+                                                        .pop(false);
+                                                  },
+                                                  child: const Text('Mégse'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: () {
+                                                    Navigator.of(ctx).pop(true);
+                                                  },
+                                                  child:
+                                                      const Text('Beállítás'),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ) ??
+                                        false;
+                                    if (!mounted || !confirmed) return;
+
+                                    final now = DateTime.now();
+                                    final expiry =
+                                        now.add(const Duration(days: 3));
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(user.uid)
+                                          .set(
+                                        {
+                                          'isSubscriptionActive': true,
+                                          'subscriptionStatus': 'premium',
+                                          'subscriptionEndDate':
+                                              Timestamp.fromDate(expiry),
+                                          'subscription': {
+                                            'status': 'ACTIVE',
+                                            'productId': 'test_web_monthly',
+                                            'purchaseToken':
+                                                'test_expiry_3_days',
+                                            'endTime': expiry.toIso8601String(),
+                                            'lastUpdateTime':
+                                                now.toIso8601String(),
+                                            'source': 'test_simulation',
+                                          },
+                                          'lastPaymentDate':
+                                              FieldValue.serverTimestamp(),
+                                          'updatedAt':
+                                              FieldValue.serverTimestamp(),
+                                          // NE töröljük a lastReminder mezőt teszteléskor!
+                                          // Csak új előfizetés esetén töröljük
+                                        },
+                                        SetOptions(merge: true),
+                                      );
+
+                                      if (!mounted) return;
+
+                                      // Azonnal mutatjuk a sikeres üzenetet
+                                      scaffoldMessenger.showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'Előfizetés beállítva 3 napos lejáratra!')));
+
+                                      // Email küldése (nem blokkoljuk, ha dispose-olódik)
+                                      EmailNotificationService.sendTestEmail(
+                                        testType: 'expiry_warning',
+                                        daysLeft: 3,
+                                      ).then((emailSent) {
+                                        if (!mounted) return;
+                                        scaffoldMessenger.showSnackBar(SnackBar(
+                                            content: Text(emailSent
+                                                ? 'Email elküldve!'
+                                                : 'Email küldése sikertelen!')));
+                                      }).catchError((e) {
+                                        debugPrint('Email küldés hiba: $e');
+                                      });
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      scaffoldMessenger.showSnackBar(
+                                          SnackBar(content: Text('Hiba: $e')));
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD97706),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    '3 napos lejárat',
+                                    textAlign: TextAlign.center,
+                                    style: buttonTextStyle,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    if (!mounted) return;
+
+                                    // ScaffoldMessenger mentése az async művelet előtt
+                                    final scaffoldMessenger =
+                                        ScaffoldMessenger.maybeOf(context);
+                                    if (scaffoldMessenger == null) return;
+
+                                    final confirmed = await showDialog<bool>(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder: (ctx) {
+                                            return AlertDialog(
+                                              title: const Text(
+                                                  'Lejárat utáni email teszt'),
+                                              content: const Text(
+                                                  'Ez beállítja az előfizetést lejárt állapotra, hogy tesztelhessük a lejárat utáni email értesítéseket.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.of(ctx,
+                                                            rootNavigator: true)
+                                                        .pop(false);
+                                                  },
+                                                  child: const Text('Mégse'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: () {
+                                                    Navigator.of(ctx,
+                                                            rootNavigator: true)
+                                                        .pop(true);
+                                                  },
+                                                  child:
+                                                      const Text('Beállítás'),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ) ??
+                                        false;
+                                    if (!mounted || !confirmed) return;
+
+                                    final now = DateTime.now();
+                                    final expiredDate =
+                                        now.subtract(const Duration(days: 1));
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(user.uid)
+                                          .set(
+                                        {
+                                          'isSubscriptionActive': false,
+                                          'subscriptionStatus': 'expired',
+                                          'subscriptionEndDate':
+                                              Timestamp.fromDate(expiredDate),
+                                          'subscription': {
+                                            'status': 'EXPIRED',
+                                            'productId': 'test_web_monthly',
+                                            'purchaseToken': 'test_expired',
+                                            'endTime':
+                                                expiredDate.toIso8601String(),
+                                            'lastUpdateTime':
+                                                now.toIso8601String(),
+                                            'source': 'test_simulation',
+                                          },
+                                          'lastPaymentDate':
+                                              FieldValue.serverTimestamp(),
+                                          'updatedAt':
+                                              FieldValue.serverTimestamp(),
+                                          // NE töröljük a lastReminder mezőt teszteléskor!
+                                          // Csak új előfizetés esetén töröljük
+                                        },
+                                        SetOptions(merge: true),
+                                      );
+
+                                      if (!mounted) return;
+
+                                      // Azonnal mutatjuk a sikeres üzenetet
+                                      scaffoldMessenger.showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'Előfizetés beállítva lejárt állapotra!')));
+
+                                      // Email küldése (nem blokkoljuk, ha dispose-olódik)
+                                      EmailNotificationService.sendTestEmail(
+                                        testType: 'expired',
+                                      ).then((emailSent) {
+                                        if (!mounted) return;
+                                        scaffoldMessenger.showSnackBar(SnackBar(
+                                            content: Text(emailSent
+                                                ? 'Email elküldve!'
+                                                : 'Email küldése sikertelen!')));
+                                      }).catchError((e) {
+                                        debugPrint('Email küldés hiba: $e');
+                                      });
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      scaffoldMessenger.showSnackBar(
+                                          SnackBar(content: Text('Hiba: $e')));
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFDC2626),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    'Lejárt állapot',
+                                    textAlign: TextAlign.center,
+                                    style: buttonTextStyle,
+                                  ),
+                                ),
+                              ),
+                            ] else ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        if (!mounted) return;
+                                        // ScaffoldMessenger mentése az async művelet előtt
+                                        final scaffoldMessenger =
+                                            ScaffoldMessenger.maybeOf(context);
+                                        if (scaffoldMessenger == null) return;
+
+                                        final confirmed =
+                                            await showDialog<bool>(
+                                                  context: context,
+                                                  barrierDismissible: false,
+                                                  builder: (ctx) {
+                                                    return AlertDialog(
+                                                      title: const Text(
+                                                          'Lejárat előtti email teszt'),
+                                                      content: const Text(
+                                                          'Ez beállítja az előfizetést 3 napos lejáratra, hogy tesztelhessük a lejárat előtti email értesítéseket.'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () {
+                                                            Navigator.of(ctx)
+                                                                .pop(false);
+                                                          },
+                                                          child: const Text(
+                                                              'Mégse'),
+                                                        ),
+                                                        ElevatedButton(
+                                                          onPressed: () {
+                                                            Navigator.of(ctx)
+                                                                .pop(true);
+                                                          },
+                                                          child: const Text(
+                                                              'Beállítás'),
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                ) ??
+                                                false;
+                                        if (!mounted || !confirmed) return;
+
+                                        final now = DateTime.now();
+                                        final expiry =
+                                            now.add(const Duration(days: 3));
+                                        try {
+                                          await FirebaseFirestore.instance
+                                              .collection('users')
+                                              .doc(user.uid)
+                                              .set(
+                                            {
+                                              'isSubscriptionActive': true,
+                                              'subscriptionStatus': 'premium',
+                                              'subscriptionEndDate':
+                                                  Timestamp.fromDate(expiry),
+                                              'subscription': {
+                                                'status': 'ACTIVE',
+                                                'productId': 'test_web_monthly',
+                                                'purchaseToken':
+                                                    'test_expiry_3_days',
+                                                'endTime':
+                                                    expiry.toIso8601String(),
+                                                'lastUpdateTime':
+                                                    now.toIso8601String(),
+                                                'source': 'test_simulation',
+                                              },
+                                              'lastPaymentDate':
+                                                  FieldValue.serverTimestamp(),
+                                              'updatedAt':
+                                                  FieldValue.serverTimestamp(),
+                                              // NE töröljük a lastReminder mezőt teszteléskor!
+                                              // Csak új előfizetés esetén töröljük
+                                            },
+                                            SetOptions(merge: true),
+                                          );
+
+                                          if (!mounted) return;
+
+                                          scaffoldMessenger.showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Előfizetés beállítva 3 napos lejáratra!'),
+                                            ),
+                                          );
+
+                                          EmailNotificationService
+                                              .sendTestEmail(
+                                            testType: 'expiry_warning',
+                                            daysLeft: 3,
+                                          ).then((emailSent) {
+                                            if (!mounted) return;
+                                            scaffoldMessenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  emailSent
+                                                      ? 'Email elküldve!'
+                                                      : 'Email küldése sikertelen!',
+                                                ),
+                                              ),
+                                            );
+                                          }).catchError((e) {
+                                            debugPrint('Email küldés hiba: $e');
+                                          });
+                                        } catch (e) {
+                                          if (!mounted) return;
+                                          scaffoldMessenger.showSnackBar(
+                                            SnackBar(content: Text('Hiba: $e')),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFFD97706),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        '3 napos lejárat',
+                                        style: buttonTextStyle,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        if (!mounted) return;
+                                        // ScaffoldMessenger mentése az async művelet előtt
+                                        final scaffoldMessenger =
+                                            ScaffoldMessenger.maybeOf(context);
+                                        if (scaffoldMessenger == null) return;
+
+                                        final confirmed =
+                                            await showDialog<bool>(
+                                                  context: context,
+                                                  barrierDismissible: false,
+                                                  builder: (ctx) {
+                                                    return AlertDialog(
+                                                      title: const Text(
+                                                          'Lejárat utáni email teszt'),
+                                                      content: const Text(
+                                                          'Ez beállítja az előfizetést lejárt állapotra, hogy tesztelhessük a lejárat utáni email értesítéseket.'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () {
+                                                            Navigator.of(ctx,
+                                                                    rootNavigator:
+                                                                        true)
+                                                                .pop(false);
+                                                          },
+                                                          child: const Text(
+                                                              'Mégse'),
+                                                        ),
+                                                        ElevatedButton(
+                                                          onPressed: () {
+                                                            Navigator.of(ctx,
+                                                                    rootNavigator:
+                                                                        true)
+                                                                .pop(true);
+                                                          },
+                                                          child: const Text(
+                                                              'Beállítás'),
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                ) ??
+                                                false;
+                                        if (!mounted || !confirmed) return;
+
+                                        final now = DateTime.now();
+                                        final expiredDate = now
+                                            .subtract(const Duration(days: 1));
+                                        try {
+                                          await FirebaseFirestore.instance
+                                              .collection('users')
+                                              .doc(user.uid)
+                                              .set(
+                                            {
+                                              'isSubscriptionActive': false,
+                                              'subscriptionStatus': 'expired',
+                                              'subscriptionEndDate':
+                                                  Timestamp.fromDate(
+                                                      expiredDate),
+                                              'subscription': {
+                                                'status': 'EXPIRED',
+                                                'productId': 'test_web_monthly',
+                                                'purchaseToken': 'test_expired',
+                                                'endTime': expiredDate
+                                                    .toIso8601String(),
+                                                'lastUpdateTime':
+                                                    now.toIso8601String(),
+                                                'source': 'test_simulation',
+                                              },
+                                              'lastPaymentDate':
+                                                  FieldValue.serverTimestamp(),
+                                              'updatedAt':
+                                                  FieldValue.serverTimestamp(),
+                                              // NE töröljük a lastReminder mezőt teszteléskor!
+                                              // Csak új előfizetés esetén töröljük
+                                            },
+                                            SetOptions(merge: true),
+                                          );
+
+                                          if (!mounted) return;
+
+                                          scaffoldMessenger.showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Előfizetés beállítva lejárt állapotra!'),
+                                            ),
+                                          );
+
+                                          EmailNotificationService
+                                              .sendTestEmail(
+                                            testType: 'expired',
+                                          ).then((emailSent) {
+                                            if (!mounted) return;
+                                            scaffoldMessenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  emailSent
+                                                      ? 'Email elküldve!'
+                                                      : 'Email küldése sikertelen!',
+                                                ),
+                                              ),
+                                            );
+                                          }).catchError((e) {
+                                            debugPrint('Email küldés hiba: $e');
+                                          });
+                                        } catch (e) {
+                                          if (!mounted) return;
+                                          scaffoldMessenger.showSnackBar(
+                                            SnackBar(content: Text('Hiba: $e')),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFFDC2626),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        'Lejárt állapot',
+                                        style: buttonTextStyle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ),
