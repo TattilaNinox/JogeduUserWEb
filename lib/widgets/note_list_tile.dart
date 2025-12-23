@@ -58,7 +58,8 @@ class NoteListTile extends StatelessWidget {
       case 'memoriapalota_allomasok':
         return Icons.train;
       case 'memoriapalota_fajlok':
-        return Icons.audiotrack;
+        // Régi tartalomtípus (kollekció már nincs használatban) – maradjon látható, de jelezzük.
+        return Icons.block;
       case 'jogeset':
         return Icons.gavel; // Kalapács ikon jogesetekhez
       case 'dialogus_fajlok':
@@ -155,11 +156,14 @@ class NoteListTile extends StatelessWidget {
         context.go('/memoriapalota-allomas/$id$fromQuery');
       }
     } else if (type == 'memoriapalota_fajlok') {
-      if (usePush) {
-        context.push('/memoriapalota-fajl/$id$fromQuery');
-      } else {
-        context.go('/memoriapalota-fajl/$id$fromQuery');
-      }
+      // A memoriapalota_fajlok kollekció már nincs használatban, ezért ne navigáljunk hibás oldalra.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ez a tartalomtípus már nem elérhető.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
     } else if (type == 'jogeset') {
       // Jogesetek esetén a dokumentum megnyitása (nem a dialog)
       // A dialog csak a List ikonra kattintva nyílik meg

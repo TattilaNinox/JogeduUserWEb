@@ -30,6 +30,19 @@ class NoteCardGrid extends StatefulWidget {
 }
 
 class _NoteCardGridState extends State<NoteCardGrid> {
+  // Flutter StreamBuilder: ha build közben minden alkalommal új `query.snapshots()` stream-et adunk,
+  // akkor minden parent rebuild újrafeliratkozást + "loading" villanást okozhat (rángatózás).
+  // Ezért a streameket kulcs alapján cache-eljük.
+  final Map<String, Stream<QuerySnapshot<Map<String, dynamic>>>> _streamCache =
+      <String, Stream<QuerySnapshot<Map<String, dynamic>>>>{};
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _cachedSnapshotsStream(
+    String cacheKey,
+    Query<Map<String, dynamic>> query,
+  ) {
+    return _streamCache.putIfAbsent(cacheKey, () => query.snapshots());
+  }
+
   bool _checkPremiumAccess(Map<String, dynamic> userData) {
     // Próbaidő ellenőrzése
     final trialEndDate = userData['freeTrialEndDate'] as Timestamp?;
@@ -204,16 +217,34 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           }
         }
 
+        final notesStreamKey =
+            'notes|admin=$isAdmin|science=$userScience|status=${widget.selectedStatus ?? ""}|cat=${widget.selectedCategory ?? ""}|tag=${widget.selectedTag ?? ""}|type=${widget.selectedType ?? ""}';
+        final notesStream = _cachedSnapshotsStream(notesStreamKey, query);
+
+        final allomasStreamKey = allomasQuery == null
+            ? null
+            : 'mpAllomas|admin=$isAdmin|science=$userScience|status=${widget.selectedStatus ?? ""}|cat=${widget.selectedCategory ?? ""}|tag=${widget.selectedTag ?? ""}';
+        final allomasStream = allomasQuery == null
+            ? null
+            : _cachedSnapshotsStream(allomasStreamKey!, allomasQuery);
+
+        final dialogusStreamKey = dialogusQuery == null
+            ? null
+            : 'dialogus|admin=$isAdmin|science=$userScience|status=${widget.selectedStatus ?? ""}|tag=${widget.selectedTag ?? ""}';
+        final dialogusStream = dialogusQuery == null
+            ? null
+            : _cachedSnapshotsStream(dialogusStreamKey!, dialogusQuery);
+
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: query.snapshots(),
+          stream: notesStream,
           builder: (context, snapshot) {
             // Állomások stream builder
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: allomasQuery?.snapshots(),
+              stream: allomasStream,
               builder: (context, allomasSnapshot) {
                 // Dialogus fájlok stream builder
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: dialogusQuery?.snapshots(),
+                  stream: dialogusStream,
                   builder: (context, dialogusSnapshot) {
                     // Debug: találatok száma
                     if (snapshot.hasData) {

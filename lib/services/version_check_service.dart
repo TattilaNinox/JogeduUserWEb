@@ -201,7 +201,6 @@ class VersionCheckService {
       '/read/note/', // Jegyzet olvasás (alternatív route)
       '/interactive-note/', // Interaktív jegyzet
       '/memoriapalota-allomas/', // Memóriapalota állomások (iframe-es olvasás)
-      '/memoriapalota-fajl/', // Memóriapalota fájlok
       '/jogeset/', // Jogeset megtekintés
     ];
 

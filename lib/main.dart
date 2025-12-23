@@ -23,7 +23,6 @@ import 'screens/flashcard_study_screen.dart';
 import 'screens/interactive_note_view_screen.dart';
 import 'screens/dynamic_quiz_view_screen.dart';
 import 'screens/memoriapalota_allomas_view_screen.dart';
-import 'screens/memoriapalota_fajl_view_screen.dart';
 import 'screens/jogeset_view_screen.dart';
 import 'core/session_guard.dart';
 import 'screens/guard_splash_screen.dart';
@@ -289,14 +288,6 @@ final _router = GoRouter(
       },
     ),
     // Memóriapalota fájlok megtekintése
-    GoRoute(
-      path: '/memoriapalota-fajl/:noteId',
-      builder: (context, state) {
-        final noteId = state.pathParameters['noteId']!;
-        final from = state.uri.queryParameters['from'];
-        return MemoriapalotaFajlViewScreen(noteId: noteId, from: from);
-      },
-    ),
     // Jogeset megtekintése
     // Az ID formátum lehet: "6_519" vagy "6_519#2" (dokumentum ID + jogeset ID)
     GoRoute(

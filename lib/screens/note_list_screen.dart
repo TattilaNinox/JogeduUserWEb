@@ -52,6 +52,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
   // TextEditingController a keresőmező vezérléséhez
   final _searchController = TextEditingController();
 
+  // Cache-elt NoteCardGrid: így a kategória/címke betöltés miatti setState nem fogja
+  // újraépíteni a fő listát, csak amikor a szűrők ténylegesen változnak.
+  Widget? _cachedGrid;
+  String? _cachedGridKey;
+
   // Listák a Firestore-ból betöltött kategóriák, tudományok és címkék tárolására.
   List<String> _categories = [];
   List<String> _sciences = [];
@@ -73,15 +78,25 @@ class _NoteListScreenState extends State<NoteListScreen> {
     _loadSavedFilters();
     _loadCategories();
     _loadTags();
+
+    // inicializáljuk a grid-et a kezdeti szűrőkkel
+    _rebuildGridIfNeeded(force: true);
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Minden alkalommal, amikor a widget újraépül, ellenőrizzük a mentett szűrőket
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadSavedFilters();
-    });
+  void _rebuildGridIfNeeded({bool force = false}) {
+    final key =
+        '$_searchText|${_selectedStatus ?? ''}|${_selectedCategory ?? ''}|${_selectedScience ?? ''}|${_selectedTag ?? ''}|${_selectedType ?? ''}';
+    if (!force && key == _cachedGridKey && _cachedGrid != null) return;
+    _cachedGridKey = key;
+    _cachedGrid = NoteCardGrid(
+      key: ValueKey('noteGrid_$key'),
+      searchText: _searchText,
+      selectedStatus: _selectedStatus,
+      selectedCategory: _selectedCategory,
+      selectedScience: _selectedScience,
+      selectedTag: _selectedTag,
+      selectedType: _selectedType,
+    );
   }
 
   /// Betölti a mentett szűrőket vagy az URL paraméterekből származó kezdeti szűrőket.
@@ -122,6 +137,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
         _selectedTag = widget.initialTag;
         _selectedType = normalizedType;
       });
+
+      // szűrők változtak → grid újraépítése
+      _rebuildGridIfNeeded(force: true);
 
       // FONTOS: Beállítjuk a FilterStorage értékeit is, hogy a breadcrumb és visszalépés működjön!
       FilterStorage.searchText = widget.initialSearch;
@@ -398,51 +416,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             '🔴 Hiba a memoriapalota_allomasok kollekció címkéinek betöltésekor: $e');
       }
 
-      // 3. Betöltjük a címkéket a memoriapalota_fajlok kollekcióból
-      try {
-        Query<Map<String, dynamic>> mpFajlQuery = FirebaseConfig.firestore
-            .collection('memoriapalota_fajlok')
-            .where('science', isEqualTo: userScience);
-
-        // Status szűrés hozzáadása a Firestore query-hez (szükséges a security rules miatt)
-        if (isAdmin) {
-          mpFajlQuery =
-              mpFajlQuery.where('status', whereIn: ['Published', 'Draft']);
-        } else {
-          mpFajlQuery = mpFajlQuery.where('status', isEqualTo: 'Published');
-        }
-
-        final mpFajlSnapshot = await mpFajlQuery.get();
-
-        for (final doc in mpFajlSnapshot.docs) {
-          final data = doc.data();
-          if (data['deletedAt'] != null) continue;
-
-          // Kliens oldali status szűrés
-          final status = data['status'] as String?;
-          if (isAdmin) {
-            if (status != 'Published' &&
-                status != 'Draft' &&
-                status != 'Public') {
-              continue;
-            }
-          } else {
-            if (status != 'Published' && status != 'Public') continue;
-          }
-
-          if (data.containsKey('tags') && data['tags'] is List) {
-            final tags = List<String>.from(data['tags']);
-            allTags.addAll(tags);
-          }
-        }
-        debugPrint(
-            '🔵 Memoriapalota_fajlok címkék betöltve: ${mpFajlSnapshot.docs.length} dokumentum');
-      } catch (e) {
-        debugPrint(
-            '🔴 Hiba a memoriapalota_fajlok kollekció címkéinek betöltésekor: $e');
-      }
-
-      // 4. Betöltjük a címkéket a jogesetek kollekcióból
+      // 3. Betöltjük a címkéket a jogesetek kollekcióból
       try {
         final jogesetekQuery = FirebaseConfig.firestore
             .collection('jogesetek')
@@ -510,6 +484,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() {
       _searchText = value;
     });
+    _rebuildGridIfNeeded();
     // Ha a controller értéke eltér, frissítjük
     if (_searchController.text != value) {
       _searchController.text = value;
@@ -532,6 +507,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() {
       _selectedStatus = value;
     });
+    _rebuildGridIfNeeded();
     // Menti a státusz szűrőt a FilterStorage-ba
     FilterStorage.status = value;
     _pushFiltersToUrl();
@@ -542,6 +518,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() {
       _selectedCategory = value;
     });
+    _rebuildGridIfNeeded();
     // Menti a kategória szűrőt a FilterStorage-ba
     FilterStorage.category = value;
     // Menti a CategoryState-be is
@@ -560,6 +537,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() {
       _selectedScience = value;
     });
+    _rebuildGridIfNeeded();
     // Menti a tudomány szűrőt a FilterStorage-ba
     FilterStorage.science = value;
     // Menti a CategoryState-be is
@@ -576,6 +554,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   /// Frissíti a kiválasztott címkét a `Filters` widgetből.
   void _onTagChanged(String? value) {
     setState(() => _selectedTag = value);
+    _rebuildGridIfNeeded();
     // Menti a címke szűrőt a FilterStorage-ba
     FilterStorage.tag = value;
     // Menti a CategoryState-be is
@@ -594,6 +573,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
     final normalizedValue = value == 'MP' ? 'memoriapalota_allomasok' : value;
     setState(() => _selectedType = normalizedValue);
+    _rebuildGridIfNeeded();
     // Menti a típus szűrőt a FilterStorage-ba (normalizált értékkel)
     FilterStorage.type = normalizedValue;
     // Menti a CategoryState-be is (normalizált értékkel)
@@ -620,6 +600,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       _selectedTag = null;
       _selectedType = null;
     });
+    _rebuildGridIfNeeded(force: true);
     // Törli a szűrőket a FilterStorage-ból is
     FilterStorage.clearFilters();
     // Törli a CategoryState-et is, de a science megmarad
@@ -792,14 +773,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   ),
                 ),
               Expanded(
-                child: NoteCardGrid(
-                  searchText: _searchText,
-                  selectedStatus: _selectedStatus,
-                  selectedCategory: _selectedCategory,
-                  selectedScience: _selectedScience,
-                  selectedTag: _selectedTag,
-                  selectedType: _selectedType,
-                ),
+                child: _cachedGrid ??
+                    NoteCardGrid(
+                      searchText: _searchText,
+                      selectedStatus: _selectedStatus,
+                      selectedCategory: _selectedCategory,
+                      selectedScience: _selectedScience,
+                      selectedTag: _selectedTag,
+                      selectedType: _selectedType,
+                    ),
               ),
             ],
           ),
