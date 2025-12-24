@@ -69,8 +69,8 @@
   },
   "functions": [
     {
-      "source": "functions",
-      "codebase": "default",
+      "source": "functions_lexgo",
+      "codebase": "lexgo",
       "ignore": [
         "node_modules",
         ".git",

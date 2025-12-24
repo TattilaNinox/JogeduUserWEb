@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../core/payment_plans.dart';
 
 enum SubscriptionStatusColor {
   free,
@@ -385,7 +386,7 @@ class _EnhancedSubscriptionStatusCardState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '30 napos előfizetés',
+                  kPlanNameLexgo30DayOpen,
                   style: TextStyle(
                     fontWeight: FontWeight.w400,
                     color: Color(0xFF202122),
@@ -439,8 +440,8 @@ class _EnhancedSubscriptionStatusCardState
               children: [
                 _buildInfoStep(
                   '1',
-                  '30 napos előfizetés',
-                  'Egy csomag érhető el: 30 napos teljes hozzáférés minden prémium funkcióhoz 4,350 Ft-ért.',
+                  kPlanNameLexgo30DayOpen,
+                  'Egy csomag érhető el: $kPlanNameLexgo30DayOpen – 30 napos teljes hozzáférés minden prémium funkcióhoz 4,350 Ft-ért.',
                   isMobile,
                 ),
                 const SizedBox(height: 16),

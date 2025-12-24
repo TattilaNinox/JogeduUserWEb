@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import '../core/payment_plans.dart';
 
 /// Flutter Web payment service OTP SimplePay v2 API integrációval
 ///
@@ -19,9 +20,9 @@ class WebPaymentService {
   /// Fizetési csomagok definíciója
   static const Map<String, PaymentPlan> _plans = {
     // Kanonikus azonosító
-    'monthly_premium_prepaid': PaymentPlan(
-      id: 'monthly_premium_prepaid',
-      name: '30 napos előfizetés',
+    kPlanIdMonthlyPremiumPrepaid: PaymentPlan(
+      id: kPlanIdMonthlyPremiumPrepaid,
+      name: kPlanNameLexgo30DayOpen,
       price: 4350,
       period: '30 nap',
       description: 'Teljes hozzáférés minden funkcióhoz',
@@ -37,9 +38,9 @@ class WebPaymentService {
       popular: true,
     ),
     // Visszafelé kompatibilitás
-    'monthly_web': PaymentPlan(
-      id: 'monthly_web',
-      name: '30 napos előfizetés',
+    kPlanIdMonthlyWeb: PaymentPlan(
+      id: kPlanIdMonthlyWeb,
+      name: kPlanNameLexgo30DayOpen,
       price: 4350,
       period: '30 nap',
       description: 'Teljes hozzáférés minden funkcióhoz',
@@ -71,10 +72,8 @@ class WebPaymentService {
     // Irányítás a Cloud Function-re. A plusz paramétereket (email, név) most
     // nem továbbítjuk; a Functon a Firestore-ból olvassa a felhasználó adatait.
     // Alapértelmezett kanonikus planId használata, ha a hívó nem a kanonikusat adja
-    final canonicalPlanId =
-        planId == 'monthly_web' ? 'monthly_premium_prepaid' : planId;
-    return initiatePaymentViaCloudFunction(
-        planId: canonicalPlanId, userId: userId);
+    final canonicalId = canonicalPlanId(planId);
+    return initiatePaymentViaCloudFunction(planId: canonicalId, userId: userId);
   }
 
   /// Cloud Function hívás a fizetés indításához (alternatív megközelítés)
@@ -85,7 +84,7 @@ class WebPaymentService {
   }) async {
     try {
       final functions = FirebaseFunctions.instanceFor(region: 'europe-west1');
-      final callable = functions.httpsCallable('initiateWebPayment');
+      final callable = functions.httpsCallable('initiateWebPaymentLexgo');
 
       final callData = <String, dynamic>{
         'planId': planId,

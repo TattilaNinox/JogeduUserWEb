@@ -91,7 +91,7 @@ ELVÁRT EREDMÉNY:
      - Új sor jelenik meg automatikusan
      - Státusz: "Sikeres" (zöld chip)
      - Összeg: 4,350 Ft
-     - Leírás: "30 napos előfizetés"
+     - Leírás: "LexGO 30 day open"
 
 
 3.2 TESZT: Sikertelen Fizetés (9.6.2)
@@ -275,7 +275,7 @@ MŰKÖDÉS:
 
 TÁBLÁZAT OSZLOPOK:
   - Dátum: Fizetés időpontja
-  - Leírás: "30 napos előfizetés"
+  - Leírás: "LexGO 30 day open"
   - Összeg: 4,350 Ft
   - Státusz: Színes chip (Sikeres/Sikertelen/stb.)
 

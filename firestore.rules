@@ -86,6 +86,31 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ────────── Study Boards (private Kanban boards) ──────────
+    function isStudyBoardOwner(boardId) {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/study_boards/$(boardId)).data.ownerUid == request.auth.uid;
+    }
+
+    match /study_boards/{boardId} {
+      allow list: if request.auth != null;
+
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+
+      allow get, update, delete: if isAdmin() || isStudyBoardOwner(boardId);
+
+      match /cards/{cardId} {
+        allow read: if isAdmin() || isStudyBoardOwner(boardId);
+        allow write: if isAdmin() || isStudyBoardOwner(boardId);
+
+        match /items/{itemId} {
+          allow read: if isAdmin() || isStudyBoardOwner(boardId);
+          allow write: if isAdmin() || isStudyBoardOwner(boardId);
+        }
+      }
+    }
+
     // ────────── Kategóriák ──────────
     match /categories/{categoryId} {
       allow read: if request.auth != null;

@@ -164,7 +164,7 @@ XML struktúra:
   
   <tetelek>
     <tetel>
-      <megnevezes>30 napos előfizetés</megnevezes>
+      <megnevezes>LexGO 30 day open</megnevezes>
       <mennyiseg>1.0</mennyiseg>
       <mennyisegiEgyseg>db</mennyisegiEgyseg>
       <nettoEgysegar>3425.20</nettoEgysegar>
@@ -313,7 +313,7 @@ package.json:
 {
   monthly_premium_prepaid: {
     id: 'monthly_premium_prepaid',
-    name: '30 napos előfizetés - Prémium hozzáférés',
+    name: 'LexGO 30 day open',
     price: 4350,
     subscriptionDays: 30,
     description: 'Teljes hozzáférés minden tartalomhoz'

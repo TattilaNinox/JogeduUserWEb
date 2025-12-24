@@ -156,7 +156,7 @@ String _getButtonText() {
 ## 🧪 **TESZTELÉS**
 
 ### **Debug Módban**
-- **Teszt fizetés gomb** - 30 napos előfizetés aktiválás
+- **Teszt fizetés gomb** - LexGO 30 day open aktiválás
 - **Fejlesztői eszközök** szekció
 - **Valós idejű** státusz frissítés
 

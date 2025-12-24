@@ -23,6 +23,8 @@ import 'screens/flashcard_study_screen.dart';
 import 'screens/interactive_note_view_screen.dart';
 import 'screens/dynamic_quiz_view_screen.dart';
 import 'screens/memoriapalota_allomas_view_screen.dart';
+import 'screens/study_board_list_screen.dart';
+import 'screens/study_board_screen.dart';
 import 'screens/jogeset_view_screen.dart';
 import 'core/session_guard.dart';
 import 'screens/guard_splash_screen.dart';
@@ -218,6 +220,17 @@ final _router = GoRouter(
           initialTag: qp['tag'],
           initialType: normalizedType,
         );
+      },
+    ),
+    GoRoute(
+      path: '/study-boards',
+      builder: (context, state) => const StudyBoardListScreen(),
+    ),
+    GoRoute(
+      path: '/study-boards/:boardId',
+      builder: (context, state) {
+        final boardId = state.pathParameters['boardId']!;
+        return StudyBoardScreen(boardId: boardId);
       },
     ),
     // Létrehozó/szerkesztő útvonalak eltávolítva

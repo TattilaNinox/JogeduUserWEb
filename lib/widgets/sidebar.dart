@@ -138,6 +138,8 @@ class Sidebar extends StatelessWidget {
             ),
             _buildMenuItem(
                 context, 'notes', 'Tags Főoldal', selectedMenu == 'notes'),
+            _buildMenuItem(context, 'study_boards', 'Kötegek',
+                selectedMenu == 'study_boards'),
             if (extraPanel != null) ...[
               const SizedBox(height: 8),
               Padding(
@@ -182,6 +184,9 @@ class Sidebar extends StatelessWidget {
         break;
       case 'bundles':
         iconData = Icons.collections_bookmark;
+        break;
+      case 'study_boards':
+        iconData = Icons.view_kanban;
         break;
       case 'question_banks':
         iconData = Icons.quiz;
@@ -230,6 +235,8 @@ class Sidebar extends StatelessWidget {
       onTap: () {
         if (routeName == 'notes') {
           _navigate(context, '/notes');
+        } else if (routeName == 'study_boards') {
+          _navigate(context, '/study-boards');
         } else if (routeName == 'note_create') {
           _navigate(context, '/notes/create');
         } else if (routeName == 'interactive_note_create') {

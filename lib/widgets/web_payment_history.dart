@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/web_payment_service.dart';
+import '../core/payment_plans.dart';
 
 /// Webes fizetési előzmények widget
 ///
@@ -528,15 +529,10 @@ class WebPaymentHistory extends StatelessWidget {
   }
 
   String _getPlanName(String planId) {
-    switch (planId) {
-      case 'monthly_premium_prepaid':
-        return '30 napos előfizetés';
-      case 'monthly_web':
-        return '30 napos előfizetés';
-      case 'yearly_web':
-        return 'Éves előfizetés';
-      default:
-        return planId;
+    if (planId == 'yearly_web') {
+      return 'Éves előfizetés';
     }
+
+    return displayPlanName(planId);
   }
 }
