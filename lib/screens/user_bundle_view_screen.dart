@@ -21,9 +21,6 @@ class UserBundleViewScreen extends StatefulWidget {
 class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
   Map<String, dynamic>? _bundleData;
   bool _isLoading = true;
-  bool _notesExpanded = true;
-  bool _allomasExpanded = true;
-  bool _dialogusExpanded = true;
 
   @override
   void initState() {
@@ -100,82 +97,83 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           // Leírás
           if (description.isNotEmpty) ...[
             Card(
+              elevation: 0,
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
                   description,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey.shade700,
+                      ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
           ],
 
-          // Jegyzetek szekció
-          if (noteIds.isNotEmpty)
-            _buildExpandableSection(
-              title: 'Jegyzetek',
-              icon: Icons.description,
-              count: noteIds.length,
-              isExpanded: _notesExpanded,
-              onToggle: () => setState(() => _notesExpanded = !_notesExpanded),
-              ids: noteIds,
-              collection: 'notes',
+          // Egyetlen közös lista az összes elemnek
+          if (noteIds.isNotEmpty ||
+              allomasIds.isNotEmpty ||
+              dialogusIds.isNotEmpty)
+            Card(
+              elevation: 0,
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  ...noteIds.map((id) => _buildDocumentTile(
+                        id: id,
+                        collection: 'notes',
+                        icon: Icons.description,
+                        iconColor: Colors.blue.shade700,
+                      )),
+                  ...allomasIds.map((id) => _buildDocumentTile(
+                        id: id,
+                        collection: 'memoriapalota_allomasok',
+                        icon: Icons.directions_bus,
+                        iconColor: Colors.orange.shade700,
+                      )),
+                  ...dialogusIds.map((id) => _buildDocumentTile(
+                        id: id,
+                        collection: 'dialogus_fajlok',
+                        icon: Icons.chat_bubble_outline,
+                        iconColor: Colors.green.shade700,
+                      )),
+                ],
+              ),
             ),
-
-          // Állomások szekció
-          if (allomasIds.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _buildExpandableSection(
-              title: 'Memóriapalota állomások',
-              icon: Icons.train,
-              count: allomasIds.length,
-              isExpanded: _allomasExpanded,
-              onToggle: () =>
-                  setState(() => _allomasExpanded = !_allomasExpanded),
-              ids: allomasIds,
-              collection: 'memoriapalota_allomasok',
-            ),
-          ],
-
-          // Dialógusok szekció
-          if (dialogusIds.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _buildExpandableSection(
-              title: 'Dialógus fájlok',
-              icon: Icons.chat_bubble_outline,
-              count: dialogusIds.length,
-              isExpanded: _dialogusExpanded,
-              onToggle: () =>
-                  setState(() => _dialogusExpanded = !_dialogusExpanded),
-              ids: dialogusIds,
-              collection: 'dialogus_fajlok',
-            ),
-          ],
 
           // Ha nincs egyetlen dokumentum sem
           if (noteIds.isEmpty && allomasIds.isEmpty && dialogusIds.isEmpty)
-            Card(
+            Center(
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.folder_open,
-                        size: 48,
-                        color: Colors.grey.shade400,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.folder_open,
+                      size: 64,
+                      color: Colors.grey.shade300,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Ez a köteg még üres',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Ez a köteg még üres',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -184,59 +182,54 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     );
   }
 
-  Widget _buildExpandableSection({
-    required String title,
-    required IconData icon,
-    required int count,
-    required bool isExpanded,
-    required VoidCallback onToggle,
-    required List<String> ids,
+  Widget _buildDocumentTile({
+    required String id,
     required String collection,
+    required IconData icon,
+    required Color iconColor,
   }) {
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(icon, color: Theme.of(context).primaryColor),
-            title: Text(
-              '$title ($count)',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+    return Column(
+      children: [
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-            trailing: Icon(
-              isExpanded ? Icons.expand_less : Icons.expand_more,
-            ),
-            onTap: onToggle,
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          if (isExpanded)
-            ...ids.map((id) => ListTile(
-                  dense: true,
-                  leading: const SizedBox(width: 40),
-                  title: FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseConfig.firestore
-                        .collection(collection)
-                        .doc(id)
-                        .get(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Text('Betöltés...');
-                      }
-                      if (!snapshot.data!.exists) {
-                        return Text('Dokumentum nem található ($id)');
-                      }
-                      final data =
-                          snapshot.data!.data() as Map<String, dynamic>;
-                      final title = data['title'] ?? data['name'] ?? 'Névtelen';
-                      return Text(title);
-                    },
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // Navigálás a dokumentumhoz
-                    _navigateToDocument(id, collection);
-                  },
-                )),
-        ],
-      ),
+          title: FutureBuilder<DocumentSnapshot>(
+            future:
+                FirebaseConfig.firestore.collection(collection).doc(id).get(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Text('Betöltés...',
+                    style:
+                        TextStyle(color: Colors.grey.shade400, fontSize: 14));
+              }
+              if (!snapshot.hasData || !snapshot.data!.exists) {
+                return Text('Dokumentum nem található',
+                    style: TextStyle(color: Colors.red.shade300, fontSize: 14));
+              }
+              final data = snapshot.data!.data() as Map<String, dynamic>;
+              final title = data['title'] ?? data['name'] ?? 'Névtelen';
+              return Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF2C3E50),
+                ),
+              );
+            },
+          ),
+          trailing:
+              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 18),
+          onTap: () => _navigateToDocument(id, collection),
+        ),
+        Divider(height: 1, indent: 70, color: Colors.grey.shade100),
+      ],
     );
   }
 
