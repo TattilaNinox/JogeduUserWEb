@@ -31,7 +31,7 @@ class BundleCardGrid extends StatelessWidget {
           .collection('users')
           .doc(user.uid)
           .collection('bundles')
-          .orderBy('createdAt', descending: true)
+          .orderBy('updatedAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {

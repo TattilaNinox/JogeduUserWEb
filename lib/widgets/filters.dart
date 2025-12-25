@@ -199,7 +199,13 @@ class _FiltersState extends State<Filters> {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: children)
-          : Row(children: children),
+          : Row(
+              children: children.map((w) {
+                if (w is SizedBox) return w;
+                if (w is TextButton) return w;
+                return Expanded(child: w);
+              }).toList(),
+            ),
     );
   }
 

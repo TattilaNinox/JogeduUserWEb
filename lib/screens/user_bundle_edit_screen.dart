@@ -102,12 +102,13 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
         'noteIds': _noteIds,
         'allomasIds': _allomasIds,
         'dialogusIds': _dialogusIds,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'modified': FieldValue.serverTimestamp(),
       };
 
       if (widget.bundleId == null) {
         // Új köteg létrehozása
-        bundleData['createdAt'] = FieldValue.serverTimestamp();
+        bundleData['created'] =
+            FieldValue.serverTimestamp(); // Megtartjuk a létrehozás idejét is
         await FirebaseConfig.firestore
             .collection('users')
             .doc(user.uid)
