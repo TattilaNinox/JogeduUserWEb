@@ -270,10 +270,11 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                   ),
                 ),
                 trailing: isDialogue && (audioUrl?.isNotEmpty ?? false)
-                    ? SizedBox(
-                        width: 150,
-                        child:
-                            MiniAudioPlayer(audioUrl: audioUrl!, compact: true))
+                    ? MiniAudioPlayer(
+                        audioUrl: audioUrl!,
+                        compact: false,
+                        large: true,
+                      )
                     : Icon(Icons.chevron_right,
                         color: Colors.grey.shade400, size: 18),
                 onTap: !isDialogue
