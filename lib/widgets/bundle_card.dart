@@ -32,6 +32,8 @@ class BundleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalCount = noteCount + allomasCount + dialogusCount;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
@@ -44,7 +46,10 @@ class BundleCard extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 12 : 16,
+          vertical: isMobile ? 2 : 4,
+        ),
         child: Row(
           children: [
             // Kattintható rész a megtekintéshez
@@ -56,12 +61,12 @@ class BundleCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.folder_special,
-                        color: Color(0xFF1976D2),
-                        size: 24,
+                        color: const Color(0xFF1976D2),
+                        size: isMobile ? 22 : 24,
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,19 +74,21 @@ class BundleCard extends StatelessWidget {
                           children: [
                             Text(
                               name,
-                              style: const TextStyle(
-                                fontSize: 15,
+                              style: TextStyle(
+                                fontSize: isMobile ? 14 : 15,
                                 fontWeight: FontWeight.w400,
-                                color: Color(0xFF202122),
+                                color: const Color(0xFF202122),
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             if (description != null &&
                                 description!.isNotEmpty) ...[
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 1),
                               Text(
                                 description!,
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: isMobile ? 12 : 13,
                                   color: Colors.grey.shade600,
                                 ),
                                 maxLines: 1,
@@ -95,7 +102,7 @@ class BundleCard extends StatelessWidget {
                       Text(
                         totalCount.toString(),
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: isMobile ? 13 : 14,
                           color: Colors.grey.shade600,
                           fontWeight: FontWeight.w400,
                         ),
@@ -106,24 +113,66 @@ class BundleCard extends StatelessWidget {
               ),
             ),
 
-            // Akció ikonok
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              onPressed: () => context.go('/my-bundles/edit/$id'),
-              tooltip: 'Szerkesztés',
-              color: Colors.grey.shade700,
-            ),
-            IconButton(
-              icon:
-                  const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-              onPressed: () => _confirmDelete(context),
-              tooltip: 'Törlés',
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey.shade400,
-              size: 20,
-            ),
+            if (isMobile)
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert,
+                    size: 20, color: Colors.grey.shade600),
+                padding: EdgeInsets.zero,
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    context.go('/my-bundles/edit/$id');
+                  } else if (value == 'delete') {
+                    _confirmDelete(context);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined,
+                            size: 18, color: Colors.grey.shade700),
+                        const SizedBox(width: 12),
+                        const Text('Szerkesztés'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline,
+                            size: 18, color: Colors.red),
+                        const SizedBox(width: 12),
+                        const Text('Törlés',
+                            style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            else ...[
+              // Desktop akció ikonok
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                onPressed: () => context.go('/my-bundles/edit/$id'),
+                tooltip: 'Szerkesztés',
+                color: Colors.grey.shade700,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: Colors.red),
+                onPressed: () => _confirmDelete(context),
+                tooltip: 'Törlés',
+              ),
+            ],
+
+            if (!isMobile)
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey.shade400,
+                size: 20,
+              ),
           ],
         ),
       ),
