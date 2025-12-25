@@ -139,7 +139,6 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     final filteredNoteIds = allNoteIds.where((id) {
       if (_selectedType == 'all') return true;
       final docType = _docTypes[id];
-      // Kezeljük a 'text' és 'standard' típusokat azonosan a szűrésnél
       if (_selectedType == 'standard' || _selectedType == 'text') {
         return docType == 'standard' || docType == 'text';
       }
@@ -160,24 +159,30 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         filteredAllomasIds.isEmpty &&
         filteredDialogusIds.isEmpty;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: Text(
           name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: isMobile ? 18 : 20,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          icon: Icon(Icons.arrow_back_ios, size: isMobile ? 18 : 20),
           onPressed: () => context.go('/my-bundles'),
         ),
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 8),
             child: IconButton(
-              icon: const Icon(Icons.edit_outlined),
+              icon: Icon(Icons.edit_outlined, size: isMobile ? 22 : 24),
               onPressed: () =>
                   context.go('/my-bundles/edit/${widget.bundleId}'),
               tooltip: 'Szerkesztés',
@@ -190,60 +195,64 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 12.0 : 20.0,
+          vertical: isMobile ? 16.0 : 24.0,
+        ),
         children: [
           // Leírás
           if (description.isNotEmpty) ...[
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withOpacity(0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(20.0),
+              padding: EdgeInsets.all(isMobile ? 12.0 : 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Icon(Icons.info_outline,
-                          size: 18, color: Colors.blue.shade700),
+                          size: isMobile ? 16 : 18,
+                          color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Text(
                         'Leírás',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: isMobile ? 13 : 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade700,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isMobile ? 8 : 12),
                   Text(
                     description,
                     style: TextStyle(
-                      fontSize: 15,
-                      height: 1.5,
+                      fontSize: isMobile ? 14 : 15,
+                      height: 1.4,
                       color: Colors.grey.shade800,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: isMobile ? 16 : 24),
           ],
 
           // Típusszűrő - Prémium UI
           if (_availableTypes.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 24.0),
+              padding: EdgeInsets.only(bottom: isMobile ? 16.0 : 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -252,7 +261,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                     child: Text(
                       'Tartalom szűrése',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: isMobile ? 12 : 13,
                         fontWeight: FontWeight.w600,
                         color: Colors.grey.shade500,
                         letterSpacing: 0.5,
@@ -260,7 +269,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                     ),
                   ),
                   Container(
-                    height: 54,
+                    height: isMobile ? 48 : 54,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -268,7 +277,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                       border: Border.all(color: Colors.grey.shade200),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
+                          color: Colors.black.withOpacity(0.02),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -295,9 +304,12 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                             child: Row(
                               children: [
                                 Icon(Icons.grid_view_rounded,
-                                    size: 18, color: Colors.blue.shade700),
+                                    size: isMobile ? 16 : 18,
+                                    color: Colors.blue.shade700),
                                 const SizedBox(width: 12),
-                                const Text('Összes típus'),
+                                Text('Összes típus',
+                                    style: TextStyle(
+                                        fontSize: isMobile ? 13 : 14)),
                               ],
                             ),
                           ),
@@ -309,9 +321,12 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                               child: Row(
                                 children: [
                                   Icon(config['icon'] as IconData,
-                                      size: 18, color: Colors.blue.shade700),
+                                      size: isMobile ? 16 : 18,
+                                      color: Colors.blue.shade700),
                                   const SizedBox(width: 12),
-                                  Text(config['label'] as String),
+                                  Text(config['label'] as String,
+                                      style: TextStyle(
+                                          fontSize: isMobile ? 13 : 14)),
                                 ],
                               ),
                             );
@@ -331,17 +346,17 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                 padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
                 child: Text(
                   '${typeConfig[_selectedType]?['label'] ?? _selectedType} (${filteredNoteIds.length + filteredAllomasIds.length + filteredDialogusIds.length})',
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: TextStyle(
+                    fontSize: isMobile ? 14 : 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
+                    color: const Color(0xFF2C3E50),
                   ),
                 ),
               ),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.03),
@@ -357,16 +372,19 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                         id: id,
                         collection: 'notes',
                         defaultColor: Colors.blue.shade700,
+                        isMobile: isMobile,
                       )),
                   ...filteredAllomasIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'memoriapalota_allomasok',
                         defaultColor: Colors.orange.shade700,
+                        isMobile: isMobile,
                       )),
                   ...filteredDialogusIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'dialogus_fajlok',
                         defaultColor: Colors.green.shade700,
+                        isMobile: isMobile,
                       )),
                 ],
               ),
@@ -412,22 +430,26 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     required String id,
     required String collection,
     required Color defaultColor,
+    required bool isMobile,
   }) {
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: isMobile ? 10 : 16,
+            ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 40,
-                  height: 40,
+                  width: isMobile ? 32 : 40,
+                  height: isMobile ? 32 : 40,
                   child: Center(
                     child: SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.grey.shade300,
@@ -437,11 +459,11 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                 ),
                 const SizedBox(width: 16),
                 Container(
-                  width: 140,
-                  height: 12,
+                  width: isMobile ? 100 : 140,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(5),
                   ),
                 ),
               ],
@@ -491,30 +513,33 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 16 : 20,
+                    vertical: isMobile ? 10 : 16,
+                  ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: EdgeInsets.all(isMobile ? 8 : 10),
                         decoration: BoxDecoration(
-                          color: defaultColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12),
+                          color: defaultColor.withOpacity(0.08),
+                          borderRadius:
+                              BorderRadius.circular(isMobile ? 10 : 12),
                         ),
                         child: Icon(
                           icon,
                           color: defaultColor,
-                          size: 20,
+                          size: isMobile ? 18 : 20,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(
-                            fontSize: 15,
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 15,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF2C3E50),
+                            color: const Color(0xFF2C3E50),
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -524,17 +549,20 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                           padding: const EdgeInsets.only(left: 12),
                           child: MiniAudioPlayer(
                             audioUrl: audioUrl!,
-                            compact: false,
-                            large: true,
+                            compact: isMobile,
+                            large: !isMobile,
                           ),
                         )
                       else if (!isDialogue)
                         Icon(Icons.arrow_forward_ios,
-                            color: Colors.grey.shade300, size: 14),
+                            color: Colors.grey.shade300, size: 12),
                     ],
                   ),
                 ),
-                Divider(height: 1, indent: 68, color: Colors.grey.shade50),
+                Divider(
+                    height: 1,
+                    indent: isMobile ? 56 : 68,
+                    color: Colors.grey.shade50),
               ],
             ),
           );
