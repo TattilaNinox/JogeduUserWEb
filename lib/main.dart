@@ -34,6 +34,10 @@ import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/terms_acceptance_screen.dart';
+import 'screens/user_bundle_list_screen.dart';
+import 'screens/user_bundle_edit_screen.dart';
+import 'screens/user_bundle_view_screen.dart';
+import 'screens/document_selection_screen.dart';
 import 'services/version_check_service.dart';
 
 /// Az alkalmazás fő belépési pontja.
@@ -338,6 +342,60 @@ final _router = GoRouter(
     GoRoute(
       path: '/terms-acceptance',
       builder: (context, state) => const TermsAcceptanceScreen(),
+    ),
+    // Felhasználói kötegek útvonalak
+    GoRoute(
+      path: '/my-bundles',
+      builder: (context, state) => const UserBundleListScreen(),
+    ),
+    GoRoute(
+      path: '/my-bundles/create',
+      builder: (context, state) => const UserBundleEditScreen(),
+    ),
+    GoRoute(
+      path: '/my-bundles/edit/:bundleId',
+      builder: (context, state) {
+        final bundleId = state.pathParameters['bundleId']!;
+        return UserBundleEditScreen(bundleId: bundleId);
+      },
+    ),
+    GoRoute(
+      path: '/my-bundles/view/:bundleId',
+      builder: (context, state) {
+        final bundleId = state.pathParameters['bundleId']!;
+        return UserBundleViewScreen(bundleId: bundleId);
+      },
+    ),
+    // Dokumentum kiválasztás útvonalak (mobil)
+    GoRoute(
+      path: '/my-bundles/edit/:bundleId/add-notes',
+      builder: (context, state) {
+        final bundleId = state.pathParameters['bundleId']!;
+        return DocumentSelectionScreen(
+          bundleId: bundleId,
+          documentType: 'notes',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/my-bundles/edit/:bundleId/add-allomasok',
+      builder: (context, state) {
+        final bundleId = state.pathParameters['bundleId']!;
+        return DocumentSelectionScreen(
+          bundleId: bundleId,
+          documentType: 'allomasok',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/my-bundles/edit/:bundleId/add-dialogus',
+      builder: (context, state) {
+        final bundleId = state.pathParameters['bundleId']!;
+        return DocumentSelectionScreen(
+          bundleId: bundleId,
+          documentType: 'dialogus',
+        );
+      },
     ),
   ],
 );

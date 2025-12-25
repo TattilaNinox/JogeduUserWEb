@@ -138,8 +138,8 @@ class Sidebar extends StatelessWidget {
             ),
             _buildMenuItem(
                 context, 'notes', 'Tags Főoldal', selectedMenu == 'notes'),
-            _buildMenuItem(context, 'study_boards', 'Kötegek',
-                selectedMenu == 'study_boards'),
+            _buildMenuItem(context, 'my-bundles', 'Saját kötegek',
+                selectedMenu == 'my-bundles'),
             if (extraPanel != null) ...[
               const SizedBox(height: 8),
               Padding(
@@ -182,8 +182,8 @@ class Sidebar extends StatelessWidget {
       case 'dynamic_quiz_dual_create':
         iconData = Icons.quiz_outlined;
         break;
-      case 'bundles':
-        iconData = Icons.collections_bookmark;
+      case 'my-bundles':
+        iconData = Icons.folder_special;
         break;
       case 'study_boards':
         iconData = Icons.view_kanban;
@@ -245,8 +245,8 @@ class Sidebar extends StatelessWidget {
           _navigate(context, '/dynamic-quiz/create');
         } else if (routeName == 'dynamic_quiz_dual_create') {
           _navigate(context, '/dynamic-quiz-dual/create');
-        } else if (routeName == 'bundles') {
-          _navigate(context, '/bundles');
+        } else if (routeName == 'my-bundles') {
+          _navigate(context, '/my-bundles');
         } else if (routeName == 'question_banks') {
           _navigate(context, '/question-banks');
         } else if (routeName == 'categories') {
