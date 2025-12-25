@@ -42,6 +42,50 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
   final Map<String, Stream<QuerySnapshot<Map<String, dynamic>>>> _streamCache =
       {};
 
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingSelections();
+  }
+
+  Future<void> _loadExistingSelections() async {
+    if (widget.bundleId == 'create') {
+      return;
+    }
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return;
+      }
+
+      final doc = await FirebaseConfig.firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('bundles')
+          .doc(widget.bundleId)
+          .get();
+
+      if (doc.exists && mounted) {
+        final data = doc.data()!;
+        List<String> ids = [];
+        if (widget.documentType == 'notes') {
+          ids = List<String>.from(data['noteIds'] ?? []);
+        } else if (widget.documentType == 'allomasok') {
+          ids = List<String>.from(data['allomasIds'] ?? []);
+        } else if (widget.documentType == 'dialogus') {
+          ids = List<String>.from(data['dialogusIds'] ?? []);
+        }
+
+        setState(() {
+          _selectedIds.addAll(ids);
+        });
+      }
+    } catch (e) {
+      debugPrint('Hiba a meglévő elemek betöltésekor: $e');
+    }
+  }
+
   Stream<QuerySnapshot<Map<String, dynamic>>> _cachedSnapshotsStream(
     String cacheKey,
     Query<Map<String, dynamic>> query,
@@ -75,7 +119,7 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
   }
 
   Future<void> _addSelectedDocuments() async {
-    if (_selectedIds.isEmpty) return;
+    // Engedjük az üres listát is, hogy lehessen mindent eltávolítani
 
     try {
       final user = FirebaseAuth.instance.currentUser;
