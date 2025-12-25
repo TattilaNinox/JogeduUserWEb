@@ -351,15 +351,21 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       ),
       body: Column(
         children: [
-          // Breadcrumb navigáció
-          BreadcrumbNavigation(
-            category: _noteCategory,
-            tag: _noteTag,
-            noteTitle: _noteTitle,
-            noteId: widget.documentId,
-            fromBundleId:
-                GoRouterState.of(context).uri.queryParameters['bundleId'],
-          ),
+          // Breadcrumb navigáció - elrejtve, ha kötegből jöttünk
+          if (GoRouterState.of(context).uri.queryParameters['bundleId'] ==
+                  null ||
+              GoRouterState.of(context)
+                  .uri
+                  .queryParameters['bundleId']!
+                  .isEmpty)
+            BreadcrumbNavigation(
+              category: _noteCategory,
+              tag: _noteTag,
+              noteTitle: _noteTitle,
+              noteId: widget.documentId,
+              fromBundleId:
+                  GoRouterState.of(context).uri.queryParameters['bundleId'],
+            ),
 
           // Tartalom
           Expanded(

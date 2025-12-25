@@ -743,16 +743,15 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
       ),
       body: Column(
         children: [
-          // Breadcrumb navigáció
-          // Prioritás: 1. FilterStorage-ban tárolt előző oldal szűrői, 2. Jegyzet aktuális értékei
-          // A breadcrumb a jegyzet aktuális kategóriáját és címkéjét mutatja
-          BreadcrumbNavigation(
-            category: category,
-            tag: tag,
-            noteTitle: title,
-            noteId: widget.noteId,
-            fromBundleId: bundleId,
-          ),
+          // Breadcrumb navigáció - elrejtve, ha kötegből jöttünk
+          if (bundleId == null || bundleId.isEmpty)
+            BreadcrumbNavigation(
+              category: category,
+              tag: tag,
+              noteTitle: title,
+              noteId: widget.noteId,
+              fromBundleId: bundleId,
+            ),
           // Tartalom
           Expanded(
             child: Container(

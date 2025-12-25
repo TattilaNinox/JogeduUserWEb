@@ -2072,17 +2072,21 @@ class _MemoriapalotaAllomasViewScreenState
       ),
       body: Column(
         children: [
-          // Breadcrumb navigáció
-          // Prioritás: 1. FilterStorage-ban tárolt előző oldal szűrői, 2. Jegyzet aktuális értékei
-          // A breadcrumb a jegyzet aktuális kategóriáját és címkéjét mutatja
-          BreadcrumbNavigation(
-            category: _noteCategory,
-            tag: _noteTag,
-            noteTitle: _noteTitle,
-            noteId: widget.noteId,
-            fromBundleId:
-                GoRouterState.of(context).uri.queryParameters['bundleId'],
-          ),
+          // Breadcrumb navigáció - elrejtve, ha kötegből jöttünk
+          if (GoRouterState.of(context).uri.queryParameters['bundleId'] ==
+                  null ||
+              GoRouterState.of(context)
+                  .uri
+                  .queryParameters['bundleId']!
+                  .isEmpty)
+            BreadcrumbNavigation(
+              category: _noteCategory,
+              tag: _noteTag,
+              noteTitle: _noteTitle,
+              noteId: widget.noteId,
+              fromBundleId:
+                  GoRouterState.of(context).uri.queryParameters['bundleId'],
+            ),
           if (isMobile) _buildMobilePagerTopBar(),
           // Audio player desktopnézetben (ha van audio)
           if (!isMobile &&
