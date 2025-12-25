@@ -31,7 +31,6 @@ class BundleCardGrid extends StatelessWidget {
           .collection('users')
           .doc(user.uid)
           .collection('bundles')
-          .orderBy('modified', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -44,7 +43,24 @@ class BundleCardGrid extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        var bundles = snapshot.data!.docs;
+        var bundles = snapshot.data!.docs.toList();
+
+        // Rendezés kliens oldalon (hogy kötelező orderBy nélkül is lássuk a régi dokumentumokat)
+        bundles.sort((a, b) {
+          final dataA = a.data() as Map<String, dynamic>;
+          final dataB = b.data() as Map<String, dynamic>;
+
+          final tsA = dataA['modified'] as Timestamp? ??
+              dataA['updatedAt'] as Timestamp? ??
+              dataA['createdAt'] as Timestamp?;
+          final tsB = dataB['modified'] as Timestamp? ??
+              dataB['updatedAt'] as Timestamp? ??
+              dataB['createdAt'] as Timestamp?;
+
+          if (tsA == null) return 1;
+          if (tsB == null) return -1;
+          return tsB.compareTo(tsA);
+        });
 
         // Szűrés keresőszöveg alapján
         if (searchText.isNotEmpty) {
@@ -106,7 +122,8 @@ class BundleCardGrid extends StatelessWidget {
             final noteIds = (data['noteIds'] as List<dynamic>?) ?? [];
             final allomasIds = (data['allomasIds'] as List<dynamic>?) ?? [];
             final dialogusIds = (data['dialogusIds'] as List<dynamic>?) ?? [];
-            final createdAt = data['createdAt'] as Timestamp?;
+            final createdAt =
+                (data['createdAt'] ?? data['created']) as Timestamp?;
 
             return BundleCard(
               id: bundle.id,
