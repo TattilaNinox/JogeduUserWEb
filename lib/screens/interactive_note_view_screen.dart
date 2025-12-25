@@ -278,6 +278,9 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
+    final state = GoRouterState.of(context);
+    final bundleId = state.uri.queryParameters['bundleId'];
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -297,6 +300,12 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
             size: isMobile ? 20 : 22,
           ),
           onPressed: () {
+            // Ha kötegből jöttünk, oda megyünk vissza
+            if (bundleId != null && bundleId.isNotEmpty) {
+              context.go('/my-bundles/view/$bundleId');
+              return;
+            }
+
             // Egy szinttel visszalépés, ha van előző oldal a veremben
             if (context.canPop()) {
               context.pop();

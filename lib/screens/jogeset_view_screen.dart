@@ -214,6 +214,15 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
   /// Vissza navigáció
   void _navigateBack() {
+    final state = GoRouterState.of(context);
+    final bundleId = state.uri.queryParameters['bundleId'];
+
+    // Ha kötegből jöttünk, oda megyünk vissza
+    if (bundleId != null && bundleId.isNotEmpty) {
+      context.go('/my-bundles/view/$bundleId');
+      return;
+    }
+
     final effectiveTag = FilterStorage.tag;
     final effectiveCategory = FilterStorage.category;
 
@@ -348,6 +357,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             tag: _noteTag,
             noteTitle: _noteTitle,
             noteId: widget.documentId,
+            fromBundleId:
+                GoRouterState.of(context).uri.queryParameters['bundleId'],
           ),
 
           // Tartalom

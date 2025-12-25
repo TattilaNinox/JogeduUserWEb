@@ -299,19 +299,21 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           // Kvíz esetén követjük a NoteListTile logikáját
           // Itt egyszerűség kedvéért a mobil útvonalat használjuk mindenhol a kötegben,
           // vagy ha nagyon precízek akarunk lenni, átvesszük a NoteListTile elágazását.
-          context.go('/quiz/$id?from=bundle');
+          context.go('/quiz/$id?from=bundle&bundleId=${widget.bundleId}');
         } else if (type == 'deck') {
           // Tanulókártya: kötelezően a VIEW (előoldal), nem a STUDY
-          context.go('/deck/$id/view?from=bundle');
+          context.go('/deck/$id/view?from=bundle&bundleId=${widget.bundleId}');
         } else if (type == 'interactive') {
-          context.go('/interactive-note/$id?from=bundle');
+          context.go(
+              '/interactive-note/$id?from=bundle&bundleId=${widget.bundleId}');
         } else if (type == 'jogeset') {
-          context.go('/jogeset/$id?from=bundle');
+          context.go('/jogeset/$id?from=bundle&bundleId=${widget.bundleId}');
         } else {
-          context.go('/note/$id?from=bundle');
+          context.go('/note/$id?from=bundle&bundleId=${widget.bundleId}');
         }
       } else if (collection == 'memoriapalota_allomasok') {
-        context.go('/memoriapalota-allomas/$id?from=bundle');
+        context.go(
+            '/memoriapalota-allomas/$id?from=bundle&bundleId=${widget.bundleId}');
       } else if (collection == 'dialogus_fajlok') {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

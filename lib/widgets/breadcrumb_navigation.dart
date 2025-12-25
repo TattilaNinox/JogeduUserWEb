@@ -12,6 +12,7 @@ class BreadcrumbNavigation extends StatelessWidget {
   final String? tag; // Jegyzet aktuális címkéje
   final String? noteTitle;
   final String? noteId;
+  final String? fromBundleId; // Ha kötegből érkezünk
 
   const BreadcrumbNavigation({
     super.key,
@@ -19,6 +20,7 @@ class BreadcrumbNavigation extends StatelessWidget {
     this.tag,
     this.noteTitle,
     this.noteId,
+    this.fromBundleId,
   });
 
   /// Navigál az adott szintre (kategória vagy címke alapján)
@@ -68,8 +70,17 @@ class BreadcrumbNavigation extends StatelessWidget {
     items.add(BreadcrumbItem(
       label: 'Főoldal',
       onTap: () => _navigateToLevel(context),
-      isActive: noteTitle == null,
+      isActive: noteTitle == null && fromBundleId == null,
     ));
+
+    // Köteg (ha kötegből érkeztünk)
+    if (fromBundleId != null && fromBundleId!.isNotEmpty) {
+      items.add(BreadcrumbItem(
+        label: 'Köteg',
+        onTap: () => context.go('/my-bundles/view/$fromBundleId'),
+        isActive: noteTitle == null,
+      ));
+    }
 
     // Kategória és címke változók előre deklarálása
     final effectiveCategory = category;

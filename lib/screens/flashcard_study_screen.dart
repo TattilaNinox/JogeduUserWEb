@@ -242,7 +242,13 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              context.go('/notes');
+              final state = GoRouterState.of(context);
+              final bundleId = state.uri.queryParameters['bundleId'];
+              if (bundleId != null && bundleId.isNotEmpty) {
+                context.go('/my-bundles/view/$bundleId');
+              } else {
+                context.go('/notes');
+              }
             },
             child: const Text('Vissza'),
           ),
@@ -290,7 +296,10 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        context.go('/deck/${widget.deckId}/view');
+        final state = GoRouterState.of(context);
+        final bundleId = state.uri.queryParameters['bundleId'];
+        context.go(
+            '/deck/${widget.deckId}/view${bundleId != null ? "?bundleId=$bundleId" : ""}');
       }
     } catch (e) {
       if (mounted) {
@@ -410,6 +419,9 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
+    final state = GoRouterState.of(context);
+    final bundleId = state.uri.queryParameters['bundleId'];
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -430,7 +442,8 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            context.go('/deck/${widget.deckId}/view');
+            context.go(
+                '/deck/${widget.deckId}/view${bundleId != null ? '?bundleId=$bundleId' : ''}');
           },
         ),
         actions: [

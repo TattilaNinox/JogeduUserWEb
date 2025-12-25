@@ -222,6 +222,9 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
 
+      final state = GoRouterState.of(context);
+      final bundleId = state.uri.queryParameters['bundleId'];
+
       final content = flashcards.isEmpty
           ? const Center(child: Text('Ez a pakli üres.'))
           : GridView.builder(
@@ -290,6 +293,12 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
                 size: isMobile ? 20 : 22,
               ),
               onPressed: () {
+                // Ha kötegből jöttünk, oda megyünk vissza
+                if (bundleId != null && bundleId.isNotEmpty) {
+                  context.go('/my-bundles/view/$bundleId');
+                  return;
+                }
+
                 // URL paraméterekkel vissza navigálás a szűrők megőrzéséhez
                 final uri = Uri(
                   path: '/notes',
@@ -319,7 +328,8 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
                   ),
                   tooltip: 'Tanulás',
                   onPressed: () {
-                    context.go('/deck/${widget.deckId}/study');
+                    context.go(
+                        '/deck/${widget.deckId}/study${bundleId != null ? '?bundleId=$bundleId' : ''}');
                   },
                 ),
             ],
@@ -356,6 +366,12 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
               size: isMobile ? 20 : 22,
             ),
             onPressed: () {
+              // Ha kötegből jöttünk, oda megyünk vissza
+              if (bundleId != null && bundleId.isNotEmpty) {
+                context.go('/my-bundles/view/$bundleId');
+                return;
+              }
+
               // Egy szinttel visszalépés, ha van előző oldal a veremben
               if (context.canPop()) {
                 context.pop();
@@ -390,7 +406,8 @@ class _FlashcardDeckViewScreenState extends State<FlashcardDeckViewScreen> {
                 ),
                 tooltip: 'Tanulás',
                 onPressed: () {
-                  context.go('/deck/${widget.deckId}/study');
+                  context.go(
+                      '/deck/${widget.deckId}/study${bundleId != null ? '?bundleId=$bundleId' : ''}');
                 },
               ),
           ],

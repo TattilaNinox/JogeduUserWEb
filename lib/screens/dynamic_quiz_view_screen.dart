@@ -59,8 +59,15 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Close quiz screen
+              final state = GoRouterState.of(context);
+              final bundleId = state.uri.queryParameters['bundleId'];
+              Navigator.of(context).pop(); // Dialog bezárása
+
+              if (bundleId != null && bundleId.isNotEmpty) {
+                context.go('/my-bundles/view/$bundleId');
+              } else {
+                context.go('/notes');
+              }
             },
             child: const Text('Bezárás'),
           ),
@@ -157,6 +164,9 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
+    final state = GoRouterState.of(context);
+    final bundleId = state.uri.queryParameters['bundleId'];
+
     final appBar = AppBar(
       title: Text(
         _noteSnapshot == null
@@ -179,6 +189,12 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
           size: isMobile ? 20 : 22,
         ),
         onPressed: () {
+          // Ha kötegből jöttünk, oda megyünk vissza
+          if (bundleId != null && bundleId.isNotEmpty) {
+            context.go('/my-bundles/view/$bundleId');
+            return;
+          }
+
           final uri = Uri(
             path: '/notes',
             queryParameters: {

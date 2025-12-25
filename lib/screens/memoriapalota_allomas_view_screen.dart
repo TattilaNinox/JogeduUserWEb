@@ -1935,6 +1935,9 @@ class _MemoriapalotaAllomasViewScreenState
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
 
+    final state = GoRouterState.of(context);
+    final bundleId = state.uri.queryParameters['bundleId'];
+
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: isMobile ? 80 : (isTablet ? 70 : 56),
@@ -1966,6 +1969,12 @@ class _MemoriapalotaAllomasViewScreenState
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
+            // Ha kötegből jöttünk, oda megyünk vissza
+            if (bundleId != null && bundleId.isNotEmpty) {
+              context.go('/my-bundles/view/$bundleId');
+              return;
+            }
+
             // Breadcrumb navigációval visszalépünk
             // CSAK FilterStorage-ban tárolt előző oldal szűrőit használjuk, SOHA ne a jegyzet aktuális értékeit!
             final effectiveTag = FilterStorage.tag;
@@ -2071,6 +2080,8 @@ class _MemoriapalotaAllomasViewScreenState
             tag: _noteTag,
             noteTitle: _noteTitle,
             noteId: widget.noteId,
+            fromBundleId:
+                GoRouterState.of(context).uri.queryParameters['bundleId'],
           ),
           if (isMobile) _buildMobilePagerTopBar(),
           // Audio player desktopnézetben (ha van audio)
