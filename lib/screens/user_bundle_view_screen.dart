@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../core/firebase_config.dart';
 import '../utils/filter_storage.dart';
+import '../widgets/mini_audio_player.dart';
 
 /// Köteg megtekintő képernyő.
 ///
@@ -187,21 +188,40 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
       builder: (context, snapshot) {
-        IconData icon = Icons.description;
         String title = 'Betöltés...';
-        bool isLoading = snapshot.connectionState == ConnectionState.waiting;
-        bool exists = snapshot.hasData && snapshot.data!.exists;
+        IconData icon = Icons.description;
+        final bool isLoading =
+            snapshot.connectionState == ConnectionState.waiting;
+        final bool exists = snapshot.hasData && snapshot.data!.exists;
 
-        if (!isLoading && exists) {
+        if (isLoading) {
+          return ListTile(
+            leading: const SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            title: Text(title),
+          );
+        }
+
+        if (exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           title = data['title'] ?? data['name'] ?? 'Névtelen';
           final type = data['type'] as String? ?? 'standard';
+          String? audioUrl;
 
-          // Ikon meghatározása típus alapján (NoteListTile logika szerint)
-          if (collection == 'memoriapalota_allomasok') {
+          if (collection == 'dialogus_fajlok') {
+            audioUrl = data['audioUrl'] as String?;
+            icon = Icons.mic; // Mikrofon ikon dialógusokhoz
+          } else if (collection == 'memoriapalota_allomasok') {
             icon = Icons.directions_bus;
-          } else if (collection == 'dialogus_fajlok') {
-            icon = Icons.chat_bubble_outline;
           } else {
             switch (type) {
               case 'deck':
@@ -223,42 +243,53 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                 icon = Icons.description;
             }
           }
-        } else if (!isLoading && !exists) {
-          title = 'Dokumentum nem található';
-          icon = Icons.error_outline;
-        }
 
-        return Column(
-          children: [
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (exists ? defaultColor : Colors.grey)
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+          final bool isDialogue = collection == 'dialogus_fajlok';
+
+          return Column(
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: defaultColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: defaultColor,
+                    size: 20,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: exists ? defaultColor : Colors.grey,
-                  size: 20,
+                title: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF2C3E50),
+                  ),
                 ),
+                trailing: isDialogue && (audioUrl?.isNotEmpty ?? false)
+                    ? SizedBox(
+                        width: 150,
+                        child:
+                            MiniAudioPlayer(audioUrl: audioUrl!, compact: true))
+                    : Icon(Icons.chevron_right,
+                        color: Colors.grey.shade400, size: 18),
+                onTap: !isDialogue
+                    ? () => _navigateToDocument(id, collection)
+                    : null,
               ),
-              title: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: exists ? const Color(0xFF2C3E50) : Colors.red.shade300,
-                ),
-              ),
-              trailing: Icon(Icons.chevron_right,
-                  color: Colors.grey.shade400, size: 18),
-              onTap: exists ? () => _navigateToDocument(id, collection) : null,
-            ),
-            Divider(height: 1, indent: 70, color: Colors.grey.shade100),
-          ],
-        );
+              Divider(height: 1, indent: 70, color: Colors.grey.shade100),
+            ],
+          );
+        } else {
+          return const ListTile(
+            leading: Icon(Icons.error_outline, color: Colors.red),
+            title: Text('Dokumentum nem található',
+                style: TextStyle(color: Colors.red)),
+          );
+        }
       },
     );
   }
@@ -315,10 +346,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         context.go(
             '/memoriapalota-allomas/$id?from=bundle&bundleId=${widget.bundleId}');
       } else if (collection == 'dialogus_fajlok') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Dialógus fájl megnyitása még nem implementált')),
-        );
+        // Dialógus fájlok esetén nincs navigáció, helyben lejátszhatóak
+        return;
       }
     } catch (e) {
       if (mounted) {
