@@ -23,6 +23,11 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
   Map<String, dynamic>? _bundleData;
   bool _isLoading = true;
 
+  // Szűréshez szükséges állapot
+  Map<String, String> _docTypes = {}; // id -> type
+  Set<String> _availableTypes = {};
+  String _selectedType = 'all';
+
   @override
   void initState() {
     super.initState();
@@ -41,10 +46,46 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         .get();
 
     if (doc.exists) {
-      setState(() {
-        _bundleData = doc.data();
-        _isLoading = false;
-      });
+      final data = doc.data()!;
+      final noteIds = List<String>.from(data['noteIds'] ?? []);
+      final allomasIds = List<String>.from(data['allomasIds'] ?? []);
+      final dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
+
+      Map<String, String> docTypes = {};
+      Set<String> availableTypes = {};
+
+      // Előtöltjük a típusokat a szűréshez
+      // Jegyzetek, kvízek, kártyák
+      for (String id in noteIds) {
+        final d =
+            await FirebaseConfig.firestore.collection('notes').doc(id).get();
+        if (d.exists) {
+          final type = d.data()?['type'] as String? ?? 'standard';
+          docTypes[id] = type;
+          availableTypes.add(type);
+        }
+      }
+
+      // Memóriapalota állomások
+      for (String id in allomasIds) {
+        docTypes[id] = 'mp';
+        availableTypes.add('mp');
+      }
+
+      // Dialógusok
+      for (String id in dialogusIds) {
+        docTypes[id] = 'dialogue';
+        availableTypes.add('dialogue');
+      }
+
+      if (mounted) {
+        setState(() {
+          _bundleData = data;
+          _docTypes = docTypes;
+          _availableTypes = availableTypes;
+          _isLoading = false;
+        });
+      }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -71,11 +112,47 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       );
     }
 
-    final name = _bundleData!['name'] ?? 'Névtelen köteg';
-    final description = _bundleData!['description'] ?? '';
-    final noteIds = List<String>.from(_bundleData!['noteIds'] ?? []);
-    final allomasIds = List<String>.from(_bundleData!['allomasIds'] ?? []);
-    final dialogusIds = List<String>.from(_bundleData!['dialogusIds'] ?? []);
+    final String name = _bundleData!['name'] ?? 'Névtelen köteg';
+    final String description = _bundleData!['description'] ?? '';
+    final List<String> allNoteIds =
+        List<String>.from(_bundleData!['noteIds'] ?? []);
+    final List<String> allAllomasIds =
+        List<String>.from(_bundleData!['allomasIds'] ?? []);
+    final List<String> allDialogusIds =
+        List<String>.from(_bundleData!['dialogusIds'] ?? []);
+
+    // Típusok leképezése magyar névre
+    final Map<String, String> typeLabels = {
+      'all': 'Összes típus',
+      'standard': 'Jegyzet',
+      'deck': 'Tanulókártya',
+      'dynamic_quiz': 'Kvíz',
+      'dynamic_quiz_dual': 'Páros kvíz',
+      'interactive': 'Interaktív',
+      'jogeset': 'Jogeset',
+      'mp': 'Memóriapalota',
+      'dialogue': 'Dialógus',
+    };
+
+    // Lista szűrése
+    final filteredNoteIds = allNoteIds.where((id) {
+      if (_selectedType == 'all') return true;
+      return _docTypes[id] == _selectedType;
+    }).toList();
+
+    final filteredAllomasIds = allAllomasIds.where((id) {
+      if (_selectedType == 'all') return true;
+      return _docTypes[id] == _selectedType;
+    }).toList();
+
+    final filteredDialogusIds = allDialogusIds.where((id) {
+      if (_selectedType == 'all') return true;
+      return _docTypes[id] == _selectedType;
+    }).toList();
+
+    final bool isEmpty = filteredNoteIds.isEmpty &&
+        filteredAllomasIds.isEmpty &&
+        filteredDialogusIds.isEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -117,10 +194,70 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
             const SizedBox(height: 16),
           ],
 
+          // Típusszűrő
+          if (_availableTypes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.filter_list, size: 20, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Szűrés:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedType,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF2C3E50),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          onChanged: (String? newValue) {
+                            if (newValue != null) {
+                              setState(() {
+                                _selectedType = newValue;
+                              });
+                            }
+                          },
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: 'all',
+                              child: Text('Összes típus'),
+                            ),
+                            ..._availableTypes.map((type) {
+                              return DropdownMenuItem<String>(
+                                value: type,
+                                child: Text(typeLabels[type] ?? type),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Egyetlen közös lista az összes elemnek
-          if (noteIds.isNotEmpty ||
-              allomasIds.isNotEmpty ||
-              dialogusIds.isNotEmpty)
+          if (!isEmpty)
             Card(
               elevation: 0,
               color: Colors.white,
@@ -130,17 +267,17 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               ),
               child: Column(
                 children: [
-                  ...noteIds.map((id) => _buildDocumentTile(
+                  ...filteredNoteIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'notes',
                         defaultColor: Colors.blue.shade700,
                       )),
-                  ...allomasIds.map((id) => _buildDocumentTile(
+                  ...filteredAllomasIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'memoriapalota_allomasok',
                         defaultColor: Colors.orange.shade700,
                       )),
-                  ...dialogusIds.map((id) => _buildDocumentTile(
+                  ...filteredDialogusIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'dialogus_fajlok',
                         defaultColor: Colors.green.shade700,
@@ -149,8 +286,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               ),
             ),
 
-          // Ha nincs egyetlen dokumentum sem
-          if (noteIds.isEmpty && allomasIds.isEmpty && dialogusIds.isEmpty)
+          // Ha nincs egyetlen dokumentum sem (vagy a szűrés után üres)
+          if (isEmpty)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -158,15 +295,19 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.folder_open,
+                      _selectedType == 'all'
+                          ? Icons.folder_open
+                          : Icons.filter_list_off,
                       size: 64,
                       color: Colors.grey.shade300,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Ez a köteg még üres',
+                      _selectedType == 'all'
+                          ? 'Ez a köteg még üres'
+                          : 'Nincs ilyen típusú elem a kötegben',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         color: Colors.grey.shade500,
                         fontWeight: FontWeight.w500,
                       ),
