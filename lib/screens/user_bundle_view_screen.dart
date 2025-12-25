@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../core/firebase_config.dart';
+import '../utils/filter_storage.dart';
 
 /// Köteg megtekintő képernyő.
 ///
@@ -239,18 +240,50 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     );
   }
 
-  void _navigateToDocument(String id, String collection) {
-    // TODO: Implementálni a megfelelő navigációt a dokumentum típusa alapján
-    if (collection == 'notes') {
-      context.go('/note/$id');
-    } else if (collection == 'memoriapalota_allomasok') {
-      context.go('/memoriapalota-allomas/$id');
-    } else if (collection == 'dialogus_fajlok') {
-      // Dialógus fájlok navigációja (ha van ilyen route)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Dialógus fájl megnyitása még nem implementált')),
-      );
+  Future<void> _navigateToDocument(String id, String collection) async {
+    try {
+      // Megnyitás előtt lekérjük a dokumentum metaadatait a helyes navigációhoz
+      final doc =
+          await FirebaseConfig.firestore.collection(collection).doc(id).get();
+
+      if (!doc.exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Dokumentum nem található')),
+          );
+        }
+        return;
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+      final science = data['science'] as String?;
+      final category = data['category'] as String?;
+      final tags = data['tags'] as List<dynamic>?;
+      final tag =
+          tags != null && tags.isNotEmpty ? tags.first.toString() : null;
+
+      // FilterStorage inicializálása, hogy a Jegyzethallgató/Olvasó tudja, hova kell visszalépni
+      // és milyen környezetben kell betöltenie a tartalmat
+      FilterStorage.science = science;
+      FilterStorage.category = category;
+      FilterStorage.tag = tag;
+
+      if (collection == 'notes') {
+        context.go('/note/$id?from=bundle');
+      } else if (collection == 'memoriapalota_allomasok') {
+        context.go('/memoriapalota-allomas/$id?from=bundle');
+      } else if (collection == 'dialogus_fajlok') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Dialógus fájl megnyitása még nem implementált')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hiba a megnyitás során: $e')),
+        );
+      }
     }
   }
 }
