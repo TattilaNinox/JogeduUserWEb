@@ -291,14 +291,18 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       FilterStorage.category = category;
       FilterStorage.tag = tag;
 
+      if (!mounted) return;
       if (collection == 'notes') {
-        if (!mounted) return;
         final type = data['type'] as String? ?? 'standard';
 
         if (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual') {
+          // Kvíz esetén követjük a NoteListTile logikáját
+          // Itt egyszerűség kedvéért a mobil útvonalat használjuk mindenhol a kötegben,
+          // vagy ha nagyon precízek akarunk lenni, átvesszük a NoteListTile elágazását.
           context.go('/quiz/$id?from=bundle');
         } else if (type == 'deck') {
-          context.go('/deck/$id/study?from=bundle');
+          // Tanulókártya: kötelezően a VIEW (előoldal), nem a STUDY
+          context.go('/deck/$id/view?from=bundle');
         } else if (type == 'interactive') {
           context.go('/interactive-note/$id?from=bundle');
         } else if (type == 'jogeset') {
@@ -307,10 +311,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           context.go('/note/$id?from=bundle');
         }
       } else if (collection == 'memoriapalota_allomasok') {
-        if (!mounted) return;
         context.go('/memoriapalota-allomas/$id?from=bundle');
       } else if (collection == 'dialogus_fajlok') {
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Dialógus fájl megnyitása még nem implementált')),
