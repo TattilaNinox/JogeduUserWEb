@@ -124,8 +124,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     // Típusok leképezése magyar névre és ikonra
     final Map<String, Map<String, dynamic>> typeConfig = {
       'all': {'label': 'Összes típus', 'icon': Icons.filter_list},
-      'standard': {'label': 'Szöveges jegyzet', 'icon': Icons.description},
-      'text': {'label': 'Szöveges jegyzet', 'icon': Icons.description},
+      'standard': {'label': 'Szöveg Tags', 'icon': Icons.description},
+      'text': {'label': 'Szöveg Tags', 'icon': Icons.description},
       'deck': {'label': 'Tanulókártya', 'icon': Icons.style},
       'dynamic_quiz': {'label': 'Kvíz', 'icon': Icons.quiz},
       'dynamic_quiz_dual': {'label': 'Páros kvíz', 'icon': Icons.quiz_outlined},
