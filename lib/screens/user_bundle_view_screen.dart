@@ -517,47 +517,83 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                     horizontal: isMobile ? 16 : 20,
                     vertical: isMobile ? 10 : 16,
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(isMobile ? 8 : 10),
-                        decoration: BoxDecoration(
-                          color: defaultColor.withOpacity(0.08),
-                          borderRadius:
-                              BorderRadius.circular(isMobile ? 10 : 12),
-                        ),
-                        child: Icon(
-                          icon,
-                          color: defaultColor,
-                          size: isMobile ? 18 : 20,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: isMobile ? 14 : 15,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF2C3E50),
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                      ),
-                      if (isDialogue && (audioUrl?.isNotEmpty ?? false))
-                        Padding(
-                          padding: const EdgeInsets.only(left: 12),
-                          child: MiniAudioPlayer(
-                            audioUrl: audioUrl!,
-                            compact: isMobile,
-                            large: !isMobile,
-                          ),
+                  child: isDialogue
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(isMobile ? 8 : 10),
+                                  decoration: BoxDecoration(
+                                    color: defaultColor.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(
+                                        isMobile ? 10 : 12),
+                                  ),
+                                  child: Icon(
+                                    icon,
+                                    color: defaultColor,
+                                    size: isMobile ? 18 : 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 14 : 15,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF2C3E50),
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (audioUrl?.isNotEmpty ?? false) ...[
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: MiniAudioPlayer(
+                                  audioUrl: audioUrl!,
+                                  compact: false,
+                                  large: true,
+                                ),
+                              ),
+                            ],
+                          ],
                         )
-                      else if (!isDialogue)
-                        Icon(Icons.arrow_forward_ios,
-                            color: Colors.grey.shade300, size: 12),
-                    ],
-                  ),
+                      : Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(isMobile ? 8 : 10),
+                              decoration: BoxDecoration(
+                                color: defaultColor.withOpacity(0.08),
+                                borderRadius:
+                                    BorderRadius.circular(isMobile ? 10 : 12),
+                              ),
+                              child: Icon(
+                                icon,
+                                color: defaultColor,
+                                size: isMobile ? 18 : 20,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 14 : 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF2C3E50),
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios,
+                                color: Colors.grey.shade300, size: 12),
+                          ],
+                        ),
                 ),
                 Divider(
                     height: 1,
