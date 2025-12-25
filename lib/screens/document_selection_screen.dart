@@ -101,7 +101,7 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
           'dialogusIds':
               widget.documentType == 'dialogus' ? _selectedIds.toList() : [],
           'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
+          'modified': FieldValue.serverTimestamp(),
         });
         bundleId = newBundleRef.id;
       } else {
@@ -119,21 +119,24 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
         final allomasIds = List<String>.from(data['allomasIds'] ?? []);
         final dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
 
-        for (final id in _selectedIds) {
-          if (widget.documentType == 'notes') {
-            if (!noteIds.contains(id)) noteIds.add(id);
-          } else if (widget.documentType == 'allomasok') {
-            if (!allomasIds.contains(id)) allomasIds.add(id);
-          } else if (widget.documentType == 'dialogus') {
-            if (!dialogusIds.contains(id)) dialogusIds.add(id);
-          }
+        // Itt nem hozzáadunk, hanem felülírjuk az adott típust a kijelöltekkel,
+        // így az eltávolítás is működni fog a választó képernyőn.
+        if (widget.documentType == 'notes') {
+          noteIds.clear();
+          noteIds.addAll(_selectedIds);
+        } else if (widget.documentType == 'allomasok') {
+          allomasIds.clear();
+          allomasIds.addAll(_selectedIds);
+        } else if (widget.documentType == 'dialogus') {
+          dialogusIds.clear();
+          dialogusIds.addAll(_selectedIds);
         }
 
         batch.update(bundleRef, {
           'noteIds': noteIds,
           'allomasIds': allomasIds,
           'dialogusIds': dialogusIds,
-          'updatedAt': FieldValue.serverTimestamp(),
+          'modified': FieldValue.serverTimestamp(),
         });
       }
 

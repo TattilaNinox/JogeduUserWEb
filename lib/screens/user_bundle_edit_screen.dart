@@ -216,7 +216,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     context.go('/my-bundles/edit/$bundleId/add-$type');
   }
 
-  void _removeDocument(String id, String type) {
+  Future<void> _removeDocument(String id, String type) async {
     setState(() {
       if (type == 'notes') {
         _noteIds.remove(id);
@@ -226,6 +226,30 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
         _dialogusIds.remove(id);
       }
     });
+
+    // Ha szerkesztés módban vagyunk, azonnal mentsük a törlést a Firestore-ba is,
+    // különben a DocumentSelectionScreen-ről visszatérve (ami az adatbázisból tölt)
+    // újra megjelennének a törölt elemek.
+    if (widget.bundleId != null) {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        await FirebaseConfig.firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('bundles')
+            .doc(widget.bundleId)
+            .update({
+          'noteIds': _noteIds,
+          'allomasIds': _allomasIds,
+          'dialogusIds': _dialogusIds,
+          'modified': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('Hiba az elem törlésekor: $e');
+      }
+    }
   }
 
   @override
