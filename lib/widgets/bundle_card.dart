@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../core/firebase_config.dart';
 
 /// Köteg kártya widget a grid nézethez.
 ///
@@ -167,11 +169,29 @@ class BundleCard extends StatelessWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      // A törlést a lista képernyő fogja kezelni
-      // Itt csak jelezzük a szándékot
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Köteg törölve')),
-      );
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        await FirebaseConfig.firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('bundles')
+            .doc(id)
+            .delete();
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Köteg sikeresen törölve')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Hiba a törlés során: $e')),
+          );
+        }
+      }
     }
   }
 }

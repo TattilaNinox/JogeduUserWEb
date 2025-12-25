@@ -151,6 +151,65 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     }
   }
 
+  Future<void> _deleteBundle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Köteg törlése'),
+        content: const Text(
+            'Biztosan törölni szeretnéd ezt a köteget? Ez a művelet nem vonható vissza.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Mégse'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Törlés'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() {
+        _isSaving = true;
+      });
+
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        await FirebaseConfig.firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('bundles')
+            .doc(widget.bundleId)
+            .delete();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Köteg sikeresen törölve')),
+          );
+          context.go('/my-bundles');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Hiba a törlés során: $e')),
+          );
+          setState(() {
+            _isSaving = false;
+          });
+        }
+      }
+    }
+  }
+
   void _addDocuments(String type) {
     // Teljes képernyős navigáció minden platformon (mobil + desktop)
     final bundleId = widget.bundleId ?? 'create';
@@ -186,6 +245,14 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/my-bundles'),
         ),
+        actions: [
+          if (widget.bundleId != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: _isSaving ? null : _deleteBundle,
+              tooltip: 'Köteg törlése',
+            ),
+        ],
       ),
       body: Form(
         key: _formKey,
