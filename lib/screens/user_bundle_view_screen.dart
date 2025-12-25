@@ -234,7 +234,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (exists ? defaultColor : Colors.grey).withOpacity(0.1),
+                  color: (exists ? defaultColor : Colors.grey)
+                      .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -292,7 +293,19 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
 
       if (collection == 'notes') {
         if (!mounted) return;
-        context.go('/note/$id?from=bundle');
+        final type = data['type'] as String? ?? 'standard';
+
+        if (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual') {
+          context.go('/quiz/$id?from=bundle');
+        } else if (type == 'deck') {
+          context.go('/deck/$id/study?from=bundle');
+        } else if (type == 'interactive') {
+          context.go('/interactive-note/$id?from=bundle');
+        } else if (type == 'jogeset') {
+          context.go('/jogeset/$id?from=bundle');
+        } else {
+          context.go('/note/$id?from=bundle');
+        }
       } else if (collection == 'memoriapalota_allomasok') {
         if (!mounted) return;
         context.go('/memoriapalota-allomas/$id?from=bundle');
