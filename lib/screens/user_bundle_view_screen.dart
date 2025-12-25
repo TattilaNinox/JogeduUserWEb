@@ -188,15 +188,9 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
       builder: (context, snapshot) {
-        String title = 'Betöltés...';
-        IconData icon = Icons.description;
-        final bool isLoading =
-            snapshot.connectionState == ConnectionState.waiting;
-        final bool exists = snapshot.hasData && snapshot.data!.exists;
-
-        if (isLoading) {
-          return ListTile(
-            leading: const SizedBox(
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const ListTile(
+            leading: SizedBox(
               width: 40,
               height: 40,
               child: Center(
@@ -207,19 +201,20 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                 ),
               ),
             ),
-            title: Text(title),
+            title: Text('Betöltés...'),
           );
         }
 
-        if (exists) {
+        if (snapshot.hasData && snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          title = data['title'] ?? data['name'] ?? 'Névtelen';
+          final String title = data['title'] ?? data['name'] ?? 'Névtelen';
           final type = data['type'] as String? ?? 'standard';
+          IconData icon = Icons.description;
           String? audioUrl;
 
           if (collection == 'dialogus_fajlok') {
             audioUrl = data['audioUrl'] as String?;
-            icon = Icons.mic; // Mikrofon ikon dialógusokhoz
+            icon = Icons.mic;
           } else if (collection == 'memoriapalota_allomasok') {
             icon = Icons.directions_bus;
           } else {
@@ -246,43 +241,57 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
 
           final bool isDialogue = collection == 'dialogus_fajlok';
 
-          return Column(
-            children: [
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: defaultColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: defaultColor,
-                    size: 20,
+          return InkWell(
+            onTap:
+                !isDialogue ? () => _navigateToDocument(id, collection) : null,
+            child: Column(
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: defaultColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: defaultColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF2C3E50),
+                          ),
+                        ),
+                      ),
+                      if (isDialogue && (audioUrl?.isNotEmpty ?? false))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 12),
+                          child: MiniAudioPlayer(
+                            audioUrl: audioUrl!,
+                            compact: false,
+                            large: true,
+                          ),
+                        )
+                      else if (!isDialogue)
+                        Icon(Icons.chevron_right,
+                            color: Colors.grey.shade400, size: 18),
+                    ],
                   ),
                 ),
-                title: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF2C3E50),
-                  ),
-                ),
-                trailing: isDialogue && (audioUrl?.isNotEmpty ?? false)
-                    ? MiniAudioPlayer(
-                        audioUrl: audioUrl!,
-                        compact: false,
-                        large: true,
-                      )
-                    : Icon(Icons.chevron_right,
-                        color: Colors.grey.shade400, size: 18),
-                onTap: !isDialogue
-                    ? () => _navigateToDocument(id, collection)
-                    : null,
-              ),
-              Divider(height: 1, indent: 70, color: Colors.grey.shade100),
-            ],
+                Divider(height: 1, indent: 70, color: Colors.grey.shade100),
+              ],
+            ),
           );
         } else {
           return const ListTile(
