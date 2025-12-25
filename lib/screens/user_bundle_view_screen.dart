@@ -121,33 +121,39 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     final List<String> allDialogusIds =
         List<String>.from(_bundleData!['dialogusIds'] ?? []);
 
-    // Típusok leképezése magyar névre
-    final Map<String, String> typeLabels = {
-      'all': 'Összes típus',
-      'standard': 'Jegyzet',
-      'deck': 'Tanulókártya',
-      'dynamic_quiz': 'Kvíz',
-      'dynamic_quiz_dual': 'Páros kvíz',
-      'interactive': 'Interaktív',
-      'jogeset': 'Jogeset',
-      'mp': 'Memóriapalota',
-      'dialogue': 'Dialógus',
+    // Típusok leképezése magyar névre és ikonra
+    final Map<String, Map<String, dynamic>> typeConfig = {
+      'all': {'label': 'Összes típus', 'icon': Icons.filter_list},
+      'standard': {'label': 'Szöveges jegyzet', 'icon': Icons.description},
+      'text': {'label': 'Szöveges jegyzet', 'icon': Icons.description},
+      'deck': {'label': 'Tanulókártya', 'icon': Icons.style},
+      'dynamic_quiz': {'label': 'Kvíz', 'icon': Icons.quiz},
+      'dynamic_quiz_dual': {'label': 'Páros kvíz', 'icon': Icons.quiz_outlined},
+      'interactive': {'label': 'Interaktív', 'icon': Icons.touch_app},
+      'jogeset': {'label': 'Jogeset', 'icon': Icons.gavel},
+      'mp': {'label': 'Memória útvonal', 'icon': Icons.directions_bus},
+      'dialogue': {'label': 'Dialógus', 'icon': Icons.mic},
     };
 
     // Lista szűrése
     final filteredNoteIds = allNoteIds.where((id) {
       if (_selectedType == 'all') return true;
-      return _docTypes[id] == _selectedType;
+      final docType = _docTypes[id];
+      // Kezeljük a 'text' és 'standard' típusokat azonosan a szűrésnél
+      if (_selectedType == 'standard' || _selectedType == 'text') {
+        return docType == 'standard' || docType == 'text';
+      }
+      return docType == _selectedType;
     }).toList();
 
     final filteredAllomasIds = allAllomasIds.where((id) {
       if (_selectedType == 'all') return true;
-      return _docTypes[id] == _selectedType;
+      return _selectedType == 'mp';
     }).toList();
 
     final filteredDialogusIds = allDialogusIds.where((id) {
       if (_selectedType == 'all') return true;
-      return _docTypes[id] == _selectedType;
+      return _selectedType == 'dialogue';
     }).toList();
 
     final bool isEmpty = filteredNoteIds.isEmpty &&
@@ -155,100 +161,162 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         filteredDialogusIds.isEmpty;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: Text(name),
+        title: Text(
+          name,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
           onPressed: () => context.go('/my-bundles'),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => context.go('/my-bundles/edit/${widget.bundleId}'),
-            tooltip: 'Szerkesztés',
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () =>
+                  context.go('/my-bundles/edit/${widget.bundleId}'),
+              tooltip: 'Szerkesztés',
+            ),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: Colors.grey.shade200),
+        ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
         children: [
           // Leírás
           if (description.isNotEmpty) ...[
-            Card(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: Colors.grey.shade200),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey.shade700,
-                      ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Típusszűrő
-          if (_availableTypes.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Row(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.filter_list, size: 20, color: Colors.grey),
-                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 18, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Leírás',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Text(
-                    'Szűrés:',
+                    description,
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                      height: 1.5,
+                      color: Colors.grey.shade800,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade200),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Típusszűrő - Prémium UI
+          if (_availableTypes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                    child: Text(
+                      'Tartalom szűrése',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade500,
+                        letterSpacing: 0.5,
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedType,
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF2C3E50),
-                            fontWeight: FontWeight.w500,
-                          ),
-                          onChanged: (String? newValue) {
-                            if (newValue != null) {
-                              setState(() {
-                                _selectedType = newValue;
-                              });
-                            }
-                          },
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: 'all',
-                              child: Text('Összes típus'),
-                            ),
-                            ..._availableTypes.map((type) {
-                              return DropdownMenuItem<String>(
-                                value: type,
-                                child: Text(typeLabels[type] ?? type),
-                              );
-                            }),
-                          ],
+                    ),
+                  ),
+                  Container(
+                    height: 54,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
+                      ],
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedType,
+                        isExpanded: true,
+                        icon: Icon(Icons.unfold_more,
+                            size: 20, color: Colors.grey.shade600),
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: Colors.white,
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _selectedType = newValue;
+                            });
+                          }
+                        },
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: 'all',
+                            child: Row(
+                              children: [
+                                Icon(Icons.grid_view_rounded,
+                                    size: 18, color: Colors.blue.shade700),
+                                const SizedBox(width: 12),
+                                const Text('Összes típus'),
+                              ],
+                            ),
+                          ),
+                          ..._availableTypes.map((type) {
+                            final config = typeConfig[type] ??
+                                {'label': type, 'icon': Icons.help_outline};
+                            return DropdownMenuItem<String>(
+                              value: type,
+                              child: Row(
+                                children: [
+                                  Icon(config['icon'] as IconData,
+                                      size: 18, color: Colors.blue.shade700),
+                                  const SizedBox(width: 12),
+                                  Text(config['label'] as String),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
                       ),
                     ),
                   ),
@@ -256,15 +324,33 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               ),
             ),
 
-          // Egyetlen közös lista az összes elemnek
-          if (!isEmpty)
-            Card(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: Colors.grey.shade200),
+          // Lista szakasz
+          if (!isEmpty) ...[
+            if (_selectedType != 'all')
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
+                child: Text(
+                  '${typeConfig[_selectedType]?['label'] ?? _selectedType} (${filteredNoteIds.length + filteredAllomasIds.length + filteredDialogusIds.length})',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C3E50),
+                  ),
+                ),
               ),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   ...filteredNoteIds.map((id) => _buildDocumentTile(
@@ -285,6 +371,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                 ],
               ),
             ),
+          ],
 
           // Ha nincs egyetlen dokumentum sem (vagy a szűrés után üres)
           if (isEmpty)
@@ -330,19 +417,35 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const ListTile(
-            leading: SizedBox(
-              width: 40,
-              height: 40,
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 16),
+                Container(
+                  width: 140,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ],
             ),
-            title: Text('Betöltés...'),
           );
         }
 
@@ -389,14 +492,14 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               children: [
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: defaultColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          color: defaultColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           icon,
@@ -409,9 +512,10 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                         child: Text(
                           title,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w500,
                             color: Color(0xFF2C3E50),
+                            letterSpacing: -0.2,
                           ),
                         ),
                       ),
@@ -425,20 +529,28 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                           ),
                         )
                       else if (!isDialogue)
-                        Icon(Icons.chevron_right,
-                            color: Colors.grey.shade400, size: 18),
+                        Icon(Icons.arrow_forward_ios,
+                            color: Colors.grey.shade300, size: 14),
                     ],
                   ),
                 ),
-                Divider(height: 1, indent: 70, color: Colors.grey.shade100),
+                Divider(height: 1, indent: 68, color: Colors.grey.shade50),
               ],
             ),
           );
         } else {
-          return const ListTile(
-            leading: Icon(Icons.error_outline, color: Colors.red),
-            title: Text('Dokumentum nem található',
-                style: TextStyle(color: Colors.red)),
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade300, size: 20),
+                const SizedBox(width: 12),
+                const Text(
+                  'Dokumentum nem található',
+                  style: TextStyle(color: Colors.red, fontSize: 14),
+                ),
+              ],
+            ),
           );
         }
       },
