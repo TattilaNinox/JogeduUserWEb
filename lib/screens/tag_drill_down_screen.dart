@@ -116,7 +116,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               onPressed: () {
                 final targetDepth = i + 1;
                 final popCount = widget.tagPath.length - targetDepth;
-                for (int j = 0; j < popCount; j++) Navigator.pop(context);
+                for (int j = 0; j < popCount; j++) {
+                  Navigator.pop(context);
+                }
               },
               child:
                   Text(widget.tagPath[i], style: const TextStyle(fontSize: 14)),
@@ -132,9 +134,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null)
+    if (user == null) {
       return const Scaffold(
           body: Center(child: Text('Kérjük, jelentkezzen be.')));
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -155,8 +158,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
             .doc(user.uid)
             .snapshots(),
         builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData)
+          if (!userSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final userData = userSnapshot.data?.data() ?? {};
           final userType =
@@ -216,19 +220,22 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: dStream,
                         builder: (context, dSnap) {
-                          if (notesSnap.hasError)
+                          if (notesSnap.hasError) {
                             return Center(
                                 child: Text('Hiba: ${notesSnap.error}'));
+                          }
 
                           // Adatok összefésülése és szűrése a tagPath alapján
                           final allDocs =
                               <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                          if (notesSnap.hasData)
+                          if (notesSnap.hasData) {
                             allDocs.addAll(notesSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
-                          if (allomasSnap.hasData)
+                          }
+                          if (allomasSnap.hasData) {
                             allDocs.addAll(allomasSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
+                          }
 
                           final Map<String, dynamic> hierarchy =
                               _buildHierarchy(allDocs, jogesetSnap.data?.docs,
@@ -237,9 +244,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                           final widgets = _buildHierarchyWidgets(hierarchy);
 
                           if (widgets.isEmpty) {
-                            if (!notesSnap.hasData && !allomasSnap.hasData)
+                            if (!notesSnap.hasData && !allomasSnap.hasData) {
                               return const Center(
                                   child: CircularProgressIndicator());
+                            }
                             return const Center(
                                 child: Text(
                                     'Nincs megjeleníthető tartalom ezen a szinten.'));
@@ -369,12 +377,15 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
 
     // Jegyzetek
     if (hierarchy.containsKey('_direct')) {
-      for (var doc in hierarchy['_direct']) widgets.add(_buildNoteWidget(doc));
+      for (var doc in hierarchy['_direct']) {
+        widgets.add(_buildNoteWidget(doc));
+      }
     }
     // Jogesetek
     if (hierarchy.containsKey('_directJogeset')) {
-      for (var doc in hierarchy['_directJogeset'])
+      for (var doc in hierarchy['_directJogeset']) {
         widgets.add(_buildJogesetWidget(doc));
+      }
     }
 
     // Mappák

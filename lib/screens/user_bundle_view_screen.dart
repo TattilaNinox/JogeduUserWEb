@@ -269,10 +269,13 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       FilterStorage.tag = tag;
 
       if (collection == 'notes') {
+        if (!mounted) return;
         context.go('/note/$id?from=bundle');
       } else if (collection == 'memoriapalota_allomasok') {
+        if (!mounted) return;
         context.go('/memoriapalota-allomas/$id?from=bundle');
       } else if (collection == 'dialogus_fajlok') {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Dialógus fájl megnyitása még nem implementált')),

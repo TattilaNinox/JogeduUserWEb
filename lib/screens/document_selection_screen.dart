@@ -79,7 +79,9 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        return;
+      }
 
       String bundleId = widget.bundleId;
       final batch = FirebaseConfig.firestore.batch();
@@ -161,9 +163,10 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null)
+    if (user == null) {
       return const Scaffold(
           body: Center(child: Text('Kérjük, jelentkezzen be.')));
+    }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseConfig.firestore
@@ -171,9 +174,10 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
           .doc(user.uid)
           .snapshots(),
       builder: (context, userSnapshot) {
-        if (!userSnapshot.hasData)
+        if (!userSnapshot.hasData) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
+        }
 
         final userData = userSnapshot.data?.data() ?? {};
         final userType = (userData['userType'] as String? ?? '').toLowerCase();
@@ -330,8 +334,9 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
                     final Set<String> availableTags = {};
                     for (var doc in allDocs) {
                       final tags = doc.data()['tags'] as List<dynamic>?;
-                      if (tags != null)
+                      if (tags != null) {
                         availableTags.addAll(tags.cast<String>());
+                      }
                     }
 
                     return Scaffold(

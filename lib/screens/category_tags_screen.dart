@@ -92,9 +92,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null)
+    if (user == null) {
       return const Scaffold(
           body: Center(child: Text('Kérjük, jelentkezzen be.')));
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -115,8 +116,9 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
             .doc(user.uid)
             .snapshots(),
         builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData)
+          if (!userSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final userData = userSnapshot.data?.data() ?? {};
           final userType =
@@ -176,18 +178,21 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: dialogusStream,
                         builder: (context, dSnap) {
-                          if (notesSnap.hasError)
+                          if (notesSnap.hasError) {
                             return Center(
                                 child: Text('Hiba: ${notesSnap.error}'));
+                          }
 
                           final allDocs =
                               <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                          if (notesSnap.hasData)
+                          if (notesSnap.hasData) {
                             allDocs.addAll(notesSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
-                          if (allomasSnap.hasData)
+                          }
+                          if (allomasSnap.hasData) {
                             allDocs.addAll(allomasSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
+                          }
 
                           final tagMap = <String,
                               List<
@@ -209,17 +214,22 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
 
                           if (jogesetSnap.hasData) {
                             for (var doc in jogesetSnap.data!.docs) {
-                              if (doc.data()['deletedAt'] != null) continue;
+                              if (doc.data()['deletedAt'] != null) {
+                                continue;
+                              }
                               final jogesetekList =
                                   doc.data()['jogesetek'] as List? ?? [];
                               for (var jogesetData in jogesetekList) {
                                 final jogeset =
                                     jogesetData as Map<String, dynamic>;
-                                if (jogeset['category'] != widget.category)
+                                if (jogeset['category'] != widget.category) {
                                   continue;
+                                }
                                 final status =
                                     jogeset['status'] as String? ?? 'Draft';
-                                if (!isAdmin && status != 'Published') continue;
+                                if (!isAdmin && status != 'Published') {
+                                  continue;
+                                }
                                 final tags = (jogeset['tags'] as List? ?? [])
                                     .cast<String>();
                                 if (tags.isNotEmpty) {
@@ -236,14 +246,19 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                           if (widget.category == 'Dialogus tags' &&
                               dSnap.hasData) {
                             for (var doc in dSnap.data!.docs) {
-                              if (doc.data()['deletedAt'] != null) continue;
+                              if (doc.data()['deletedAt'] != null) {
+                                continue;
+                              }
                               final data = doc.data();
                               final status =
                                   data['status'] as String? ?? 'Draft';
-                              if (!isAdmin && status != 'Published') continue;
-                              final audioUrl = data['audioUrl'] as String?;
-                              if (audioUrl == null || audioUrl.isEmpty)
+                              if (!isAdmin && status != 'Published') {
                                 continue;
+                              }
+                              final audioUrl = data['audioUrl'] as String?;
+                              if (audioUrl == null || audioUrl.isEmpty) {
+                                continue;
+                              }
                               tagMap
                                   .putIfAbsent(
                                       data['category'] ?? 'Egyéb', () => [])
@@ -252,9 +267,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                           }
 
                           if (tagMap.isEmpty && directDocs.isEmpty) {
-                            if (!notesSnap.hasData && !allomasSnap.hasData)
+                            if (!notesSnap.hasData && !allomasSnap.hasData) {
                               return const Center(
                                   child: CircularProgressIndicator());
+                            }
                             return const Center(
                                 child: Text('Nincs megjeleníthető tartalom.'));
                           }
