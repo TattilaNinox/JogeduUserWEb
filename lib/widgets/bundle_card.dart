@@ -43,102 +43,86 @@ class BundleCard extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: InkWell(
-        onTap: () {
-          context.go('/my-bundles/view/$id');
-        },
-        onLongPress: () {
-          _showContextMenu(context);
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.folder_special,
-                color: Color(0xFF1976D2),
-                size: 24,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w400,
-                        color: Color(0xFF202122),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Row(
+          children: [
+            // Kattintható rész a megtekintéshez
+            Expanded(
+              child: InkWell(
+                onTap: () => context.go('/my-bundles/view/$id'),
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.folder_special,
+                        color: Color(0xFF1976D2),
+                        size: 24,
                       ),
-                    ),
-                    if (description != null && description!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        description!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w400,
+                                color: Color(0xFF202122),
+                              ),
+                            ),
+                            if (description != null &&
+                                description!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                description!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        totalCount.toString(),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-              Text(
-                totalCount.toString(),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade400,
-                size: 24,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+            ),
 
-  void _showContextMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.visibility),
-              title: const Text('Megtekintés'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/my-bundles/view/$id');
-              },
+            // Akció ikonok
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              onPressed: () => context.go('/my-bundles/edit/$id'),
+              tooltip: 'Szerkesztés',
+              color: Colors.grey.shade700,
             ),
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Szerkesztés'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/my-bundles/edit/$id');
-              },
+            IconButton(
+              icon:
+                  const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+              onPressed: () => _confirmDelete(context),
+              tooltip: 'Törlés',
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Törlés', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(context);
-              },
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey.shade400,
+              size: 20,
             ),
           ],
         ),
