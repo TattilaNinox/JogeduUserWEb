@@ -132,20 +132,17 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                   ...noteIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'notes',
-                        icon: Icons.description,
-                        iconColor: Colors.blue.shade700,
+                        defaultColor: Colors.blue.shade700,
                       )),
                   ...allomasIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'memoriapalota_allomasok',
-                        icon: Icons.directions_bus,
-                        iconColor: Colors.orange.shade700,
+                        defaultColor: Colors.orange.shade700,
                       )),
                   ...dialogusIds.map((id) => _buildDocumentTile(
                         id: id,
                         collection: 'dialogus_fajlok',
-                        icon: Icons.chat_bubble_outline,
-                        iconColor: Colors.green.shade700,
+                        defaultColor: Colors.green.shade700,
                       )),
                 ],
               ),
@@ -185,51 +182,83 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
   Widget _buildDocumentTile({
     required String id,
     required String collection,
-    required IconData icon,
-    required Color iconColor,
+    required Color defaultColor,
   }) {
-    return Column(
-      children: [
-        ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          title: FutureBuilder<DocumentSnapshot>(
-            future:
-                FirebaseConfig.firestore.collection(collection).doc(id).get(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Text('Betöltés...',
-                    style:
-                        TextStyle(color: Colors.grey.shade400, fontSize: 14));
-              }
-              if (!snapshot.hasData || !snapshot.data!.exists) {
-                return Text('Dokumentum nem található',
-                    style: TextStyle(color: Colors.red.shade300, fontSize: 14));
-              }
-              final data = snapshot.data!.data() as Map<String, dynamic>;
-              final title = data['title'] ?? data['name'] ?? 'Névtelen';
-              return Text(
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
+      builder: (context, snapshot) {
+        IconData icon = Icons.description;
+        String title = 'Betöltés...';
+        bool isLoading = snapshot.connectionState == ConnectionState.waiting;
+        bool exists = snapshot.hasData && snapshot.data!.exists;
+
+        if (!isLoading && exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          title = data['title'] ?? data['name'] ?? 'Névtelen';
+          final type = data['type'] as String? ?? 'standard';
+
+          // Ikon meghatározása típus alapján (NoteListTile logika szerint)
+          if (collection == 'memoriapalota_allomasok') {
+            icon = Icons.directions_bus;
+          } else if (collection == 'dialogus_fajlok') {
+            icon = Icons.chat_bubble_outline;
+          } else {
+            switch (type) {
+              case 'deck':
+                icon = Icons.style;
+                break;
+              case 'dynamic_quiz':
+                icon = Icons.quiz;
+                break;
+              case 'dynamic_quiz_dual':
+                icon = Icons.quiz_outlined;
+                break;
+              case 'interactive':
+                icon = Icons.touch_app;
+                break;
+              case 'jogeset':
+                icon = Icons.gavel;
+                break;
+              default:
+                icon = Icons.description;
+            }
+          }
+        } else if (!isLoading && !exists) {
+          title = 'Dokumentum nem található';
+          icon = Icons.error_outline;
+        }
+
+        return Column(
+          children: [
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (exists ? defaultColor : Colors.grey).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: exists ? defaultColor : Colors.grey,
+                  size: 20,
+                ),
+              ),
+              title: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF2C3E50),
+                  color: exists ? const Color(0xFF2C3E50) : Colors.red.shade300,
                 ),
-              );
-            },
-          ),
-          trailing:
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 18),
-          onTap: () => _navigateToDocument(id, collection),
-        ),
-        Divider(height: 1, indent: 70, color: Colors.grey.shade100),
-      ],
+              ),
+              trailing: Icon(Icons.chevron_right,
+                  color: Colors.grey.shade400, size: 18),
+              onTap: exists ? () => _navigateToDocument(id, collection) : null,
+            ),
+            Divider(height: 1, indent: 70, color: Colors.grey.shade100),
+          ],
+        );
+      },
     );
   }
 
