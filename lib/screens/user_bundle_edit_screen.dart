@@ -602,12 +602,13 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     );
   }
 
-  Widget _buildDocumentListTile(String id, IconData icon, String type) {
+  Widget _buildDocumentListTile(
+      String id, IconData defaultIcon, String sectionType) {
     // Kollekció név meghatározása
     String collectionName;
-    if (type == 'notes') {
+    if (sectionType == 'notes') {
       collectionName = 'notes';
-    } else if (type == 'allomasok') {
+    } else if (sectionType == 'allomasok') {
       collectionName = 'memoriapalota_allomasok';
     } else {
       collectionName = 'dialogus_fajlok';
@@ -617,6 +618,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
       future: FirebaseConfig.firestore.collection(collectionName).doc(id).get(),
       builder: (context, snapshot) {
         String title = id; // Alapértelmezett: ID
+        IconData itemIcon = defaultIcon;
 
         if (snapshot.hasData && snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>?;
@@ -627,6 +629,32 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
                 data['utvonalNev'] ??
                 data['cím'] ??
                 id;
+
+            // Ikon meghatározása típus alapján (csak jegyzetek esetén)
+            if (sectionType == 'notes') {
+              final type = data['type'] as String?;
+              switch (type) {
+                case 'deck':
+                  itemIcon = Icons.style;
+                  break;
+                case 'interactive':
+                  itemIcon = Icons.touch_app;
+                  break;
+                case 'dynamic_quiz':
+                case 'dynamic_quiz_dual':
+                  itemIcon = Icons.quiz;
+                  break;
+                case 'jogeset':
+                  itemIcon = Icons.gavel;
+                  break;
+                default:
+                  itemIcon = Icons.description;
+              }
+            } else if (sectionType == 'allomasok') {
+              itemIcon = Icons.train;
+            } else if (sectionType == 'dialogus') {
+              itemIcon = Icons.mic;
+            }
           }
         }
 
@@ -650,7 +678,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: Icon(
-                  icon,
+                  itemIcon,
                   size: 16,
                   color: Theme.of(context).primaryColor,
                 ),
@@ -673,7 +701,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
                   size: 18,
                   color: Colors.grey.shade600,
                 ),
-                onPressed: () => _removeDocument(id, type),
+                onPressed: () => _removeDocument(id, sectionType),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(
                   minWidth: 32,
