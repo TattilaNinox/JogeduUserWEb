@@ -496,6 +496,8 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     required String type,
     required List<String> ids,
   }) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
       elevation: 0,
@@ -549,19 +551,32 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
                     ],
                   ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _addDocuments(type),
-                  icon: const Icon(Icons.add, size: 16),
-                  label:
-                      const Text('Hozzáadás', style: TextStyle(fontSize: 13)),
-                  style: ElevatedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(2),
+                if (isMobile)
+                  ElevatedButton(
+                    onPressed: () => _addDocuments(type),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(36, 36),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    child: const Icon(Icons.add, size: 20),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: () => _addDocuments(type),
+                    icon: const Icon(Icons.add, size: 16),
+                    label:
+                        const Text('Hozzáadás', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
 
