@@ -103,11 +103,6 @@ class _UserBundleListScreenState extends State<UserBundleListScreen> {
               showSidebar: false,
               includeHeader: true,
             ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: _createNewBundle,
-              backgroundColor: Theme.of(context).primaryColor,
-              child: const Icon(Icons.add),
-            ),
           );
         } else {
           // Mobil: csak grid, header drawer-ben
@@ -135,11 +130,6 @@ class _UserBundleListScreenState extends State<UserBundleListScreen> {
             body: _buildContent(
               showSidebar: false,
               includeHeader: false,
-            ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: _createNewBundle,
-              backgroundColor: Theme.of(context).primaryColor,
-              child: const Icon(Icons.add),
             ),
           );
         }
