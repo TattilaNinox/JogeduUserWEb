@@ -165,15 +165,6 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        centerTitle: isMobile,
-        title: Text(
-          name,
-          textAlign: isMobile ? TextAlign.center : TextAlign.start,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: isMobile ? 12 : 20,
-          ),
-        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -202,6 +193,21 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           vertical: isMobile ? 16.0 : 24.0,
         ),
         children: [
+          // Köteg címe
+          Padding(
+            padding: EdgeInsets.only(bottom: isMobile ? 16.0 : 24.0),
+            child: Text(
+              name,
+              textAlign: isMobile ? TextAlign.center : TextAlign.start,
+              style: TextStyle(
+                fontSize: isMobile ? 20 : 26,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF2C3E50),
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+
           // Leírás
           if (description.isNotEmpty) ...[
             Container(
