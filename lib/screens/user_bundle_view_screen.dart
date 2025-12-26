@@ -165,11 +165,12 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
+        centerTitle: isMobile,
         title: Text(
           name,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: isMobile ? 18 : 20,
+            fontSize: isMobile ? 12 : 20,
           ),
         ),
         backgroundColor: Colors.white,
