@@ -200,7 +200,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               name,
               textAlign: isMobile ? TextAlign.center : TextAlign.start,
               style: TextStyle(
-                fontSize: isMobile ? 20 : 26,
+                fontSize: isMobile ? 19 : 26,
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF2C3E50),
                 letterSpacing: -0.5,
