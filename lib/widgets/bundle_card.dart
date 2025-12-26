@@ -75,7 +75,7 @@ class BundleCard extends StatelessWidget {
                             Text(
                               name,
                               style: TextStyle(
-                                fontSize: isMobile ? 14 : 15,
+                                fontSize: isMobile ? 12 : 15,
                                 fontWeight: FontWeight.w400,
                                 color: const Color(0xFF202122),
                               ),

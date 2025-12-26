@@ -541,7 +541,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                                   child: Text(
                                     title,
                                     style: TextStyle(
-                                      fontSize: isMobile ? 14 : 15,
+                                      fontSize: isMobile ? 12 : 15,
                                       fontWeight: FontWeight.w500,
                                       color: const Color(0xFF2C3E50),
                                       letterSpacing: -0.2,
@@ -583,7 +583,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                               child: Text(
                                 title,
                                 style: TextStyle(
-                                  fontSize: isMobile ? 14 : 15,
+                                  fontSize: isMobile ? 12 : 15,
                                   fontWeight: FontWeight.w500,
                                   color: const Color(0xFF2C3E50),
                                   letterSpacing: -0.2,
