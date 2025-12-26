@@ -47,7 +47,7 @@ class BundleCard extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12 : 16,
+          horizontal: isMobile ? 8 : 16,
           vertical: isMobile ? 2 : 4,
         ),
         child: Row(
@@ -66,7 +66,7 @@ class BundleCard extends StatelessWidget {
                         color: const Color(0xFF1976D2),
                         size: isMobile ? 22 : 24,
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: isMobile ? 8 : 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,81 +96,86 @@ class BundleCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        totalCount.toString(),
-                        style: TextStyle(
-                          fontSize: isMobile ? 13 : 14,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
             ),
 
-            if (isMobile)
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert,
-                    size: 20, color: Colors.grey.shade600),
-                padding: EdgeInsets.zero,
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    context.go('/my-bundles/edit/$id');
-                  } else if (value == 'delete') {
-                    _confirmDelete(context);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit_outlined,
-                            size: 18, color: Colors.grey.shade700),
-                        const SizedBox(width: 12),
-                        const Text('Szerkesztés'),
-                      ],
-                    ),
+            // Jobb oldali szekció (szám és menü)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  totalCount.toString(),
+                  style: TextStyle(
+                    fontSize: isMobile ? 13 : 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w400,
                   ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.delete_outline,
-                            size: 18, color: Colors.red),
-                        const SizedBox(width: 12),
-                        const Text('Törlés',
-                            style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
+                ),
+                if (isMobile)
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert,
+                        size: 20, color: Colors.grey.shade600),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        context.go('/my-bundles/edit/$id');
+                      } else if (value == 'delete') {
+                        _confirmDelete(context);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 12),
+                            const Text('Szerkesztés'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline,
+                                size: 18, color: Colors.red),
+                            const SizedBox(width: 12),
+                            const Text('Törlés',
+                                style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  const SizedBox(width: 8),
+                  // Desktop akció ikonok
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    onPressed: () => context.go('/my-bundles/edit/$id'),
+                    tooltip: 'Szerkesztés',
+                    color: Colors.grey.shade700,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        size: 20, color: Colors.red),
+                    onPressed: () => _confirmDelete(context),
+                    tooltip: 'Törlés',
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey.shade400,
+                    size: 20,
                   ),
                 ],
-              )
-            else ...[
-              // Desktop akció ikonok
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 20),
-                onPressed: () => context.go('/my-bundles/edit/$id'),
-                tooltip: 'Szerkesztés',
-                color: Colors.grey.shade700,
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 20, color: Colors.red),
-                onPressed: () => _confirmDelete(context),
-                tooltip: 'Törlés',
-              ),
-            ],
-
-            if (!isMobile)
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade400,
-                size: 20,
-              ),
+              ],
+            ),
           ],
         ),
       ),
