@@ -69,11 +69,12 @@ class BundleCard extends StatelessWidget {
                       SizedBox(width: isMobile ? 8 : 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               name,
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: isMobile ? 12 : 15,
                                 fontWeight: FontWeight.w400,
@@ -85,6 +86,7 @@ class BundleCard extends StatelessWidget {
                               const SizedBox(height: 1),
                               Text(
                                 description!,
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: isMobile ? 12 : 13,
                                   color: Colors.grey.shade600,
