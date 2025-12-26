@@ -9,8 +9,8 @@ import '../core/firebase_config.dart';
 /// Új köteg létrehozása vagy meglévő szerkesztése.
 /// Három típus szerinti csoportosított szekció:
 /// - Jegyzetek (notes)
-/// - Memóriapalota állomások (memoriapalota_allomasok)
-/// - Dialógus fájlok (dialogus_fajlok)
+/// - Memória útvonalak (memoriapalota_allomasok)
+/// - Dialógusok (dialogus_fajlok)
 class UserBundleEditScreen extends StatefulWidget {
   final String? bundleId;
 
@@ -378,7 +378,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
 
               // Állomások szekció
               _buildDocumentSection(
-                title: 'Memóriapalota állomások',
+                title: 'Memória útvonalak',
                 icon: Icons.route,
                 count: _allomasIds.length,
                 type: 'allomasok',
@@ -388,7 +388,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
 
               // Dialógusok szekció
               _buildDocumentSection(
-                title: 'Dialógus fájlok',
+                title: 'Dialógusok',
                 icon: Icons.headset,
                 count: _dialogusIds.length,
                 type: 'dialogus',
