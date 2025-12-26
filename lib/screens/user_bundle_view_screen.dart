@@ -168,6 +168,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         centerTitle: isMobile,
         title: Text(
           name,
+          textAlign: isMobile ? TextAlign.center : TextAlign.start,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: isMobile ? 12 : 20,
