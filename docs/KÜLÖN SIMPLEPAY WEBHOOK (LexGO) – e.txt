@@ -1,0 +1,47 @@
+KÜLÖN SIMPLEPAY WEBHOOK (LexGO) – emlékeztető / teendőlista
+
+KONTEXTUS
+- A Hosting rewrite jelenleg a /api/webhook/simplepay útvonalat a simplepayWebhook (régi app) functionre irányítja.
+- A régi webhook a régi PAYMENT_PLANS/CANONICAL_PLAN_ID szerint validál; ha új planId-k vannak, “Érvénytelen csomag” lehet.
+- A LexGO app más csomagokat fog értékesíteni, ezért külön webhook kell.
+
+CÉL
+- Készíteni egy új HTTP webhookot: simplepayWebhookLexgo (vagy hasonló név)
+- Ezt a LexGO functions codebase-ből deployolni (functions_lexgo)
+- A LexGO app/hosting a LexGO webhook útvonalát használja, ne a régit.
+
+LÉPÉSEK (amikor odaérsz)
+1) Új function létrehozása a LexGO codebase-ben
+   - Hely: functions_lexgo/index.js
+   - Típus: onRequest (HTTP)
+   - Region: europe-west1
+   - Secrets/env: SIMPLEPAY_SECRET_KEY, SIMPLEPAY_ENV (+ ami kell még: pl. NEXTAUTH_URL / RETURN_BASES)
+   - Signature ellenőrzés: HMAC-SHA384 + base64 a RAW BODY-ra (ugyanúgy, mint a régi simplepayWebhook-ban)
+   - CORS/OPTIONS kezelés (ha kell böngészős híváshoz; SimplePay IPN-nél nem kritikus, de maradhat)
+
+2) Külön útvonal a Hostingban (ne ütközzön a régivel)
+   - Ajánlott: /api/webhook/simplepay-lexgo
+   - firebase.json hosting rewrites:
+     { "source": "/api/webhook/simplepay-lexgo", "function": { "functionId": "simplepayWebhookLexgo", "region": "europe-west1" } }
+
+3) LexGO fizetésindításnál a webhook URL átállítása
+   - A SimplePay “url” mezőjébe a LexGO webhookot add meg (simplepayWebhookLexgo),
+     ne a régit (simplepayWebhook).
+
+4) Adatmodell / feldolgozás szétválasztása
+   - Ne írj/olvass a régi web_payments dokumentumokra, ha nem kompatibilis.
+   - Javaslat: külön kollekció: web_payments_lexgo (vagy payment_lexgo)
+   - A LexGO webhook csak a LexGO-s rekordokat kezelje, és a LexGO csomag mappinget használja.
+
+5) Deploy ellenőrzés
+   - firebase deploy --only functions:lexgo  (vagy a megfelelő parancs a nálatok használt workflow szerint)
+   - Teszt: SimplePay sandbox IPN próba / logok
+   - Ellenőrizd: secrets be vannak állítva (hiányzó secret megakasztja a deployt)
+
+MEGJEGYZÉS A PREVIEW DEPLOY-RÓL
+- Ha a hosting preview deploy “magával húzza” a functions deployt, az a pinTag miatt volt.
+- Preview hostinghoz érdemes pinTag nélkül hagyni, vagy külön workflow-val deployolni functions-t.
+
+KÉSŐBBI TISZTÍTÁS (opcionális)
+- A régi simplepayWebhook maradhat érintetlenül a régi éles appnak.
+- A LexGO webhook teljesen külön életciklus, külön planId-k, külön logika.

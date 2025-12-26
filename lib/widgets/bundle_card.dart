@@ -79,8 +79,6 @@ class BundleCard extends StatelessWidget {
                                 fontWeight: FontWeight.w400,
                                 color: const Color(0xFF202122),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             if (description != null &&
                                 description!.isNotEmpty) ...[
