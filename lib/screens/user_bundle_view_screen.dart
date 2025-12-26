@@ -216,7 +216,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                 borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -285,7 +285,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                       border: Border.all(color: Colors.grey.shade200),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -534,7 +534,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                                 Container(
                                   padding: EdgeInsets.all(isMobile ? 8 : 10),
                                   decoration: BoxDecoration(
-                                    color: defaultColor.withOpacity(0.08),
+                                    color: defaultColor.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(
                                         isMobile ? 10 : 12),
                                   ),
@@ -576,7 +576,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
                             Container(
                               padding: EdgeInsets.all(isMobile ? 8 : 10),
                               decoration: BoxDecoration(
-                                color: defaultColor.withOpacity(0.08),
+                                color: defaultColor.withValues(alpha: 0.08),
                                 borderRadius:
                                     BorderRadius.circular(isMobile ? 10 : 12),
                               ),

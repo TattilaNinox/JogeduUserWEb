@@ -135,26 +135,26 @@ class BundleCard extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => [
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'edit',
                         child: Row(
                           children: [
                             Icon(Icons.edit_outlined,
-                                size: 18, color: Colors.grey.shade700),
-                            const SizedBox(width: 12),
-                            const Text('Szerkesztés'),
+                                size: 18,
+                                color: Color(0xFF616161)), // grey.shade700
+                            SizedBox(width: 12),
+                            Text('Szerkesztés'),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            const Icon(Icons.delete_outline,
+                            Icon(Icons.delete_outline,
                                 size: 18, color: Colors.red),
-                            const SizedBox(width: 12),
-                            const Text('Törlés',
-                                style: TextStyle(color: Colors.red)),
+                            SizedBox(width: 12),
+                            Text('Törlés', style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
