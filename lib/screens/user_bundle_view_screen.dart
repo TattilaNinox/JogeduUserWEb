@@ -725,6 +725,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       } else if (collection == 'memoriapalota_allomasok') {
         context.go(
             '/memoriapalota-allomas/$id?from=bundle&bundleId=${widget.bundleId}');
+      } else if (collection == 'jogesetek') {
+        context.go('/jogeset/$id?from=bundle&bundleId=${widget.bundleId}');
       } else if (collection == 'dialogus_fajlok') {
         // Dialógus fájlok esetén nincs navigáció, helyben lejátszhatóak
         return;
