@@ -217,6 +217,24 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     }
   }
 
+  /// Egy adott jogesethez ugrik
+  void _jumpToJogeset(int index) {
+    if (_document == null ||
+        index < 0 ||
+        index >= _document!.jogesetek.length) {
+      return;
+    }
+
+    setState(() {
+      _currentIndex = index;
+      _isMegoldasVisible = false;
+      _isHeaderCollapsed = false;
+    });
+
+    // PageController alaphelyzetbe állítása az új jogesetnél
+    _pageController?.jumpToPage(0);
+  }
+
   /// Megoldás láthatóságának váltása
   void _toggleMegoldas() {
     setState(() {
@@ -361,6 +379,28 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           ),
           onPressed: _navigateBack,
         ),
+        actions: [
+          if (isMobile)
+            IconButton(
+              icon: const Icon(Icons.list),
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => Container(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: _buildJogesetNavigationList(isMobile: true),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -382,11 +422,30 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
           // Tartalom
           Expanded(
-            child: Container(
-              color: const Color(0xFFF8F9FA),
-              child: isMobile && _pageController != null
-                  ? _buildMobilePagedContent(currentJogeset, isMobile)
-                  : _buildDesktopContent(currentJogeset, isMobile),
+            child: Row(
+              children: [
+                // Navigációs sidebar (csak asztali nézetben)
+                if (!isMobile)
+                  Container(
+                    width: 300,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        right: BorderSide(color: Colors.grey.shade300),
+                      ),
+                    ),
+                    child: _buildJogesetNavigationList(isMobile: false),
+                  ),
+                // Fő tartalom
+                Expanded(
+                  child: Container(
+                    color: const Color(0xFFF8F9FA),
+                    child: isMobile && _pageController != null
+                        ? _buildMobilePagedContent(currentJogeset, isMobile)
+                        : _buildDesktopContent(currentJogeset, isMobile),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -876,6 +935,83 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Jogeset navigációs lista (közös a mobil és asztali nézethez)
+  Widget _buildJogesetNavigationList({required bool isMobile}) {
+    if (_document == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isMobile)
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.list_alt, color: Theme.of(context).primaryColor),
+                const SizedBox(width: 10),
+                const Text(
+                  'Tartalomjegyzék',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: _document!.jogesetek.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final jogeset = _document!.jogesetek[index];
+              final isSelected = index == _currentIndex;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: isSelected
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey.shade200,
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  jogeset.cim,
+                  style: TextStyle(
+                    fontSize: isMobile ? 14 : 13,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.black87,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () {
+                  _jumpToJogeset(index);
+                  if (isMobile)
+                    Navigator.pop(context); // Mobilnál bezárjuk a sheet-et
+                },
+                selected: isSelected,
+                tileColor:
+                    isSelected ? Colors.blue.withValues(alpha: 0.05) : null,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
