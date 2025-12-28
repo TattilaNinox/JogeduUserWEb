@@ -71,11 +71,32 @@ class MetadataService {
           .toList();
 
       print(
-          '✅ MetadataService: Final Fallback Lists -> Cats: ${categories.length}, Tags: ${tags.length}');
+          '✅ MetadataService: Master Lists loaded -> Cats: ${categories.length}, Tags: ${tags.length}');
+
+      // 3. Lépés: Validálás - Csak olyanokat tartsunk meg, amihez van is jegyzet
+      // Párhuzamosan futtatjuk a két szűrést
+      final results = await Future.wait([
+        _filterActiveItems(activeCollections: [
+          'notes',
+          'jogesetek',
+          'memoriapalota_allomasok'
+        ], field: 'category', items: categories, science: science),
+        _filterActiveItems(activeCollections: [
+          'notes',
+          'jogesetek',
+          'memoriapalota_allomasok'
+        ], field: 'tags', items: tags, science: science, isArray: true),
+      ]);
+
+      final activeCategories = results[0];
+      final activeTags = results[1];
+
+      print(
+          '✅ MetadataService: Active Filtered Lists -> Cats: ${activeCategories.length}, Tags: ${activeTags.length}');
 
       return {
-        'categories': categories,
-        'tags': tags,
+        'categories': activeCategories,
+        'tags': activeTags,
       };
     } catch (e) {
       print('🔴 MetadataService CRITICAL FALLBACK ERROR: $e');
@@ -84,6 +105,81 @@ class MetadataService {
         'tags': [],
       };
     }
+  }
+
+  /// Segédfüggvény: Ellenőrzi, hogy a lista elemeihez tartozik-e legalább egy aktív jegyzet.
+  /// Több kollekciót is ellenőriz párhuzamosan: notes, jogesetek, memoriapalota_allomasok
+  static Future<List<String>> _filterActiveItems({
+    required List<String> activeCollections, // Módosítva lista típusra
+    required String field,
+    required List<String> items,
+    required String science,
+    bool isArray = false,
+  }) async {
+    if (items.isEmpty) return [];
+
+    final itemsToCheck =
+        isArray && items.length > 50 ? items.take(50).toList() : items;
+    final Set<String> activeItems = {}; // Set a duplikációk elkerülésére
+
+    const chunkSize = 10;
+
+    // Minden kollekcióra külön futtatjuk az ellenőrzést párhuzamosan
+    final collectionFutures = activeCollections.map((collection) async {
+      List<String> foundInCollection = [];
+      for (var i = 0; i < itemsToCheck.length; i += chunkSize) {
+        final end = (i + chunkSize < itemsToCheck.length)
+            ? i + chunkSize
+            : itemsToCheck.length;
+        final chunk = itemsToCheck.sublist(i, end);
+
+        final futures = chunk.map((item) async {
+          // Ha már megtaláltuk bármelyik kollekcióban, ne keressük tovább feleslegesen
+          // (Ez a szinkronizáció miatt bonyolult lenne, egyszerűbb hagyni futni)
+          try {
+            var query = FirebaseConfig.firestore
+                .collection(collection)
+                .where('science', isEqualTo: science);
+
+            // Csak notes és jogesetek esetén van status mező, amit figyelni kell
+            // Állomásoknál nem feltétlenül van Published/Draft status szűrés a listában (ott minden látszik?)
+            // A NoteCardGrid szerint: allomasQuery = isAdmin ? ... status IN [Pub, Draft] : ... Pub
+            // Tehát mindenhol van status mező.
+            query = query
+                .where('status', whereIn: ['Published', 'Draft', 'Public']);
+
+            if (isArray) {
+              query = query.where(field, arrayContains: item);
+            } else {
+              query = query.where(field, isEqualTo: item);
+            }
+
+            final snapshot = await query.limit(1).get();
+            return snapshot.docs.isNotEmpty ? item : null;
+          } catch (e) {
+            // print('⚠️ Check failed for $item in $collection: $e');
+            return null;
+          }
+        });
+
+        final results = await Future.wait(futures);
+        foundInCollection.addAll(results.whereType<String>());
+      }
+      return foundInCollection;
+    });
+
+    final resultsList = await Future.wait(collectionFutures);
+
+    for (final list in resultsList) {
+      activeItems.addAll(list);
+    }
+
+    if (isArray && items.length > 50) {
+      print(
+          '⚠️ MetadataService: Tag list truncated for implementation performance (${items.length} -> 50 checked)');
+    }
+
+    return activeItems.toList()..sort();
   }
 
   /// Metadata frissítése (Admin funkció - opcionális kiegészítés a jövőre nézve)
