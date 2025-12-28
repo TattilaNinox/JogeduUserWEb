@@ -77,6 +77,7 @@ class MetadataService {
         'tags': tags,
       };
     } catch (e) {
+      print('🔴 MetadataService CRITICAL ERROR: $e');
       return {
         'categories': [],
         'tags': [],
