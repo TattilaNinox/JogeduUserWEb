@@ -59,13 +59,20 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
 
       Future<void> processIds(
           List<String> ids, String collection, String defaultType) async {
-        for (String id in ids) {
-          final d = await FirebaseConfig.firestore
+        if (ids.isEmpty) return;
+
+        // Firestore whereIn limit is 30
+        for (var i = 0; i < ids.length; i += 30) {
+          final chunk =
+              ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
+          final snapshots = await FirebaseConfig.firestore
               .collection(collection)
-              .doc(id)
+              .where(FieldPath.documentId, whereIn: chunk)
               .get();
-          if (d.exists) {
-            final data = d.data()!;
+
+          for (var d in snapshots.docs) {
+            final data = d.data();
+            final id = d.id;
             final title = (data['title'] ??
                     data['name'] ??
                     (collection == 'jogesetek' ? data['documentId'] : null) ??
@@ -81,10 +88,13 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         }
       }
 
-      await processIds(noteIds, 'notes', 'standard');
-      await processIds(allomasIds, 'memoriapalota_allomasok', 'mp');
-      await processIds(dialogusIds, 'dialogus_fajlok', 'dialogue');
-      await processIds(jogesetIds, 'jogesetek', 'jogeset');
+      // Elindítjuk a lekérdezéseket párhuzamosan a gyorsabb betöltésért
+      await Future.wait([
+        processIds(noteIds, 'notes', 'standard'),
+        processIds(allomasIds, 'memoriapalota_allomasok', 'mp'),
+        processIds(dialogusIds, 'dialogus_fajlok', 'dialogue'),
+        processIds(jogesetIds, 'jogesetek', 'jogeset'),
+      ]);
 
       if (mounted) {
         setState(() {

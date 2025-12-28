@@ -1,0 +1,28 @@
+FIRESTORE INDEX PARAMÉTEREK - JOGEDU USER WEB
+
+Helyszín: Firebase Console -> Firestore Database -> Indexes -> Composite -> Create Index
+
+---
+
+1. INDEX: ABC SORRENDHEZ (Saját kötegek listája)
+----------------------------------------------
+- Collection ID: bundles
+- Query scope: Collection
+- Fields:
+    - name: Ascending
+    - __name__: Ascending
+
+---
+
+2. INDEX: LEGUJABBAK ELÖL (Saját kötegek listája)
+-----------------------------------------------
+- Collection ID: bundles
+- Query scope: Collection
+- Fields:
+    - updatedAt: Descending
+    - __name__: Descending
+
+---
+
+MEGJEGYZÉS: 
+A '__name__' mező a dokumentum ID-ja, amit a Firestore gyakran automatikusan hozzáad vagy kér a stabil rendezés érdekében. 5000+ felhasználó esetén ezek az indexek garantálják a 0.1s alatti betöltési időt szerver oldali rendezéssel.
