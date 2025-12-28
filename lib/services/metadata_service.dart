@@ -12,6 +12,7 @@ class MetadataService {
       // Megjegyzés: A 'science' paraméter alapján keressük a megfelelő dokumentumot.
       // Példa: metadata/jogasz
       final docId = science.toLowerCase().replaceAll('á', 'a');
+      print('🔍 MetadataService: Keresés docId=$docId (science=$science)');
       final doc = await FirebaseConfig.firestore
           .collection('metadata')
           .doc(docId)
@@ -22,24 +23,39 @@ class MetadataService {
         final categories = List<String>.from(data['categories'] ?? []);
         final tags = List<String>.from(data['tags'] ?? []);
 
+        print(
+            '🔍 MetadataService: Doc found. Cats: ${categories.length}, Tags: ${tags.length}');
+
         if (categories.isNotEmpty) {
           return {
             'categories': categories,
             'tags': tags,
           };
+        } else {
+          print(
+              '⚠️ MetadataService: Doc exists but categories empty -> Fallback');
         }
+      } else {
+        print(
+            '⚠️ MetadataService: Metadata doc ($docId) NOT found -> Fallback');
       }
 
       // Fallback: ha nincs metadata, olvassuk ki a kollekciókból
-      // Ez lassabb, de garantáltan működik
+      print('🔄 MetadataService: Fallback indul...');
       final categoriesSnapshot = await FirebaseConfig.firestore
           .collection('categories')
           .where('science', isEqualTo: science)
           .get();
 
+      print(
+          '🔄 MetadataService: Fallback cats query result: ${categoriesSnapshot.docs.length} docs');
+
       final tagsSnapshot = await FirebaseConfig.firestore
           .collection('tags') // Feltételezve, hogy van tags kollekció
           .get();
+
+      print(
+          '🔄 MetadataService: Fallback tags query result: ${tagsSnapshot.docs.length} docs');
 
       final categories = categoriesSnapshot.docs
           .map((d) => d.data()['name'] as String? ?? '')
@@ -53,6 +69,8 @@ class MetadataService {
 
       // Opcionális: frissíthetjük a metadata-t a jövőre nézve
       // if (categories.isNotEmpty) updateMetadata(science, categories, tags);
+      print(
+          '✅ MetadataService: Final Fallback Lists -> Cats: ${categories.length}, Tags: ${tags.length}');
 
       return {
         'categories': categories,
