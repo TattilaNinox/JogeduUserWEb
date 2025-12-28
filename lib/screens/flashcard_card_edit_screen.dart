@@ -160,7 +160,11 @@ class _FlashcardCardEditScreenState extends State<FlashcardCardEditScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0),
                   child: _audio!['url'] != null
-                      ? MiniAudioPlayer(audioUrl: _audio!['url'])
+                      ? MiniAudioPlayer(
+                          audioUrl: _audio!['url'],
+                          compact: false,
+                          large: true,
+                        )
                       : ElevatedButton.icon(
                           onPressed: () {
                             if (_audio!['bytes'] != null) {

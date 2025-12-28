@@ -341,10 +341,10 @@ class NoteListTile extends StatelessWidget {
                 } else if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
                   audioWidget = Align(
                     alignment: Alignment.center,
-                    child: SizedBox(
-                      width: isNarrow ? double.infinity : 150,
-                      child:
-                          MiniAudioPlayer(audioUrl: audioUrl!, compact: true),
+                    child: MiniAudioPlayer(
+                      audioUrl: audioUrl!,
+                      compact: false,
+                      large: true,
                     ),
                   );
                 } else if (hasAudio) {
@@ -463,25 +463,13 @@ class NoteListTile extends StatelessWidget {
                     Expanded(
                       child: titleAndMeta,
                     ),
-                    // Jobb oldali lejátszó - fix szélesség
-                    // Dialogus fájlok esetén mindig megjelenítjük az audio lejátszót, ha van audioUrl
-                    if (type == 'dialogus_fajlok' &&
-                        (audioUrl?.isNotEmpty ?? false)) ...[
+                    // Jobb oldali lejátszó
+                    if (audioUrl?.isNotEmpty ?? false) ...[
                       const SizedBox(width: 12),
-                      MiniAudioPlayer(
-                        audioUrl: audioUrl!,
-                        compact: false,
-                        large: true,
-                      ),
+                      audioWidget,
                     ] else if (hasAudio) ...[
                       const SizedBox(width: 12),
-                      SizedBox(
-                        width: 150,
-                        child: MiniAudioPlayer(
-                          audioUrl: audioUrl!,
-                          compact: true,
-                        ),
-                      ),
+                      audioWidget,
                     ],
                   ],
                 );

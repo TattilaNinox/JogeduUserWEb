@@ -2109,6 +2109,8 @@ class _MemoriapalotaAllomasViewScreenState
                       // ValueKey forces widget recreation on URL change = fresh state like first load
                       key: ValueKey(_currentAudioUrl),
                       audioUrl: _currentAudioUrl!,
+                      compact: false,
+                      large: true,
                     ),
                   ),
                 ],

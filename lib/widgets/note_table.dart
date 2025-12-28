@@ -385,7 +385,8 @@ class _NoteTableState extends State<NoteTable> {
                     alignment: Alignment.center,
                     child: MiniAudioPlayer(
                       audioUrl: data['audioUrl'],
-                      compact: true,
+                      compact: false,
+                      large: true,
                     ),
                   ),
                 if (hasVideo)
@@ -555,7 +556,8 @@ class _NoteTableState extends State<NoteTable> {
                     alignment: Alignment.center,
                     child: MiniAudioPlayer(
                       audioUrl: data['audioUrl'],
-                      compact: true,
+                      compact: false,
+                      large: true,
                     ),
                   ),
                 if (hasVideo)
