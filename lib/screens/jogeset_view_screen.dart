@@ -141,19 +141,19 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         }
       }
 
+      // PageController inicializálása mobilnézetben
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+      if (isMobile && document != null && document.jogesetek.isNotEmpty) {
+        _pageController ??= PageController(initialPage: 0);
+      }
+
       setState(() {
         _document = document;
         _currentIndex = initialIndex;
         _isLoading = false;
         _isMegoldasVisible = false;
       });
-
-      // PageController inicializálása mobilnézetben
-      final screenWidth = MediaQuery.of(context).size.width;
-      final isMobile = screenWidth < 600;
-      if (isMobile && document != null && document.jogesetek.isNotEmpty) {
-        _pageController = PageController(initialPage: 0);
-      }
 
       // Betöltjük a jegyzet adatait breadcrumb-hoz
       if (document != null && document.jogesetek.isNotEmpty) {
@@ -184,16 +184,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex++;
       _isMegoldasVisible = false;
-      _isHeaderCollapsed = false; // Visszaállítás új jogesetnél
+      _isHeaderCollapsed = false;
     });
 
-    // PageController újrainicializálása új jogesethez
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    if (isMobile && _document != null) {
-      _pageController?.dispose();
-      _pageController = PageController(initialPage: 0);
-    }
+    // PageController alaphelyzetbe állítása az új jogesetnél
+    _pageController?.jumpToPage(0);
   }
 
   /// Előző jogeset megjelenítése
@@ -205,16 +200,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex--;
       _isMegoldasVisible = false;
-      _isHeaderCollapsed = false; // Visszaállítás új jogesetnél
+      _isHeaderCollapsed = false;
     });
 
-    // PageController újrainicializálása új jogesethez
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    if (isMobile && _document != null) {
-      _pageController?.dispose();
-      _pageController = PageController(initialPage: 0);
-    }
+    // PageController alaphelyzetbe állítása az új jogesetnél
+    _pageController?.jumpToPage(0);
   }
 
   /// Egy adott jogesethez ugrik
@@ -539,8 +529,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       onNotification: (notification) {
         if (notification is ScrollUpdateNotification) {
           // Csak a függőleges görgetést figyeljük a belső tartalomnál (SingleChildScrollView)
-          // Mivel a PageView alatt vannak, a depth itt > 0 lesz
-          if (notification.metrics.axis == Axis.vertical) {
+          // Mivel a PageView alatt vannak, a depth itt 1 lesz
+          if (notification.metrics.axis == Axis.vertical &&
+              notification.depth == 1) {
             final pixels = notification.metrics.pixels;
             // Magasabb küszöb az összecsukáshoz (40px)
             if (pixels > 40 && !_isHeaderCollapsed) {
@@ -658,6 +649,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   /// Asztali nézeti tartalom (eredeti)
   Widget _buildDesktopContent(Jogeset currentJogeset, bool isMobile) {
     return SingleChildScrollView(
+      key: PageStorageKey(
+          'jogeset_desktop_${_document?.documentId}_$_currentIndex'),
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 900),
