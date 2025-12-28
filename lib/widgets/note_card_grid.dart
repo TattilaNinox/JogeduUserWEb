@@ -244,9 +244,9 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           }
 
           // Pagination: Add ordering by title (ABC) and limit
-          // orderBy('title') ELTÁVOLÍTVA: a Firestore index hiba elkerülése végett.
-          // jogesetQuery = jogesetQuery.orderBy('title').limit(_currentLimit);
-          jogesetQuery = jogesetQuery.limit(queryLimit);
+          // A jogeseteknél a documentId a "cím", és az index is __name__ alapú
+          jogesetQuery =
+              jogesetQuery.orderBy(FieldPath.documentId).limit(queryLimit);
         }
 
         // Create a unique key for the combined query to help FutureBuilder
@@ -363,8 +363,8 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             if (shouldLoadJogeset && jogesetSnapshot != null) {
               final jogesetDocs = jogesetSnapshot.docs.where((d) {
                 final data = d.data();
-                // Szűrés cím alapján (title mező)
-                final title = (data['title'] ?? '').toString();
+                // Szűrés cím alapján (title mező VAGY ID)
+                final title = (data['title'] ?? d.id).toString();
                 return title
                     .toLowerCase()
                     .contains(widget.searchText.toLowerCase());
@@ -527,14 +527,18 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                       return typeCompare;
                     }
 
-                    final titleA = isAllomasA || isDialogusA || isJogesetA
-                        ? (a.data()['title'] ?? a.data()['cim'] ?? '')
-                            .toString()
-                        : (a.data()['title'] as String? ?? '');
-                    final titleB = isAllomasB || isDialogusB || isJogesetB
-                        ? (b.data()['title'] ?? b.data()['cim'] ?? '')
-                            .toString()
-                        : (b.data()['title'] as String? ?? '');
+                    final titleA = isJogesetA
+                        ? (a.data()['title'] ?? a.id).toString()
+                        : (isAllomasA || isDialogusA
+                            ? (a.data()['title'] ?? a.data()['cim'] ?? '')
+                                .toString()
+                            : (a.data()['title'] as String? ?? ''));
+                    final titleB = isJogesetB
+                        ? (b.data()['title'] ?? b.id).toString()
+                        : (isAllomasB || isDialogusB
+                            ? (b.data()['title'] ?? b.data()['cim'] ?? '')
+                                .toString()
+                            : (b.data()['title'] as String? ?? ''));
                     return titleA.compareTo(titleB);
                   });
                 } else if (value is Map<String, dynamic>) {

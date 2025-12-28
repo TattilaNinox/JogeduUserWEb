@@ -26,3 +26,26 @@ HelyszÃ­n: Firebase Console -> Firestore Database -> Indexes -> Composite -> Cre
 
 MEGJEGYZÃ‰S: 
 A '__name__' mezÅ‘ a dokumentum ID-ja, amit a Firestore gyakran automatikusan hozzÃ¡ad vagy kÃ©r a stabil rendezÃ©s Ã©rdekÃ©ben. 5000+ felhasznÃ¡lÃ³ esetÃ©n ezek az indexek garantÃ¡ljÃ¡k a 0.1s alatti betÃ¶ltÃ©si idÅ‘t szerver oldali rendezÃ©ssel.
+
+
+3. INDEX: USER BUNDLE VIEW (Dokumentumok rendezése)
+------------------------------------------------
+- Collection ID: notes, jogesetek, memoriapalota_allomasok, dialogus_fajlok
+- Fields:
+    - science: Ascending
+    - status: Ascending
+    - title: Ascending
+
+MEGJEGYZÉS: A 'NoteCardGrid' komplex szûrései (science + status + title rendezés) igénylik ezt. A linkre kattintva hozd létre!
+
+
+3. INDEX (MANUÁLIS): NOTE CARD GRID KERESÉS
+------------------------------------------------
+Kezeld ezeket külön-külön mind a 4 kollekcióra: 'notes', 'jogesetek', 'memoriapalota_allomasok', 'dialogus_fajlok'
+
+- Query scope: Collection
+- Fields:
+    1. science: Ascending
+    2. status: Ascending
+    3. title: Ascending
+
