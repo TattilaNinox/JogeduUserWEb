@@ -612,12 +612,13 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Expanded(
             child: PageView.builder(
               controller: _pageController,
-              dragStartBehavior: DragStartBehavior.down,
+              physics: const PageScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics()),
+              allowImplicitScrolling: false,
               itemCount: pages.length,
               itemBuilder: (context, index) {
                 return SingleChildScrollView(
-                  dragStartBehavior: DragStartBehavior.down,
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  physics: const ClampingScrollPhysics(),
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
