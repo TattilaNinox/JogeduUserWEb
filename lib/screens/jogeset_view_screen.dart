@@ -344,9 +344,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 currentJogeset.title,
                 style: TextStyle(
-                  fontSize: isMobile
-                      ? 12
-                      : 18, // Mobilnézetben tovább csökkentve (14-2)
+                  fontSize:
+                      isMobile ? 10 : 18, // Mobilnézetben 2px-el kisebb (12-2)
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -587,7 +586,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 Text(
                   currentJogeset.cim,
                   style: TextStyle(
-                    fontSize: _isHeaderCollapsed ? 11 : 16,
+                    fontSize: _isHeaderCollapsed ? 9 : 14,
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF202122),
                   ),
@@ -797,7 +796,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
-              fontSize: FontSize(10), // 12-2
+              fontSize: FontSize(10.5), // 10 + 0.5
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -878,8 +877,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
-              fontSize: FontSize(
-                  isMobile ? 10 : 16), // Mobilnézetben 2px-el kisebb (12-2)
+              fontSize: FontSize(isMobile ? 10.5 : 16), // Mobilnézetben +0.5
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -924,8 +922,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(
-                    isMobile ? 10 : 16), // Mobilnézetben 2px-el kisebb (12-2)
+                fontSize: FontSize(isMobile ? 10.5 : 16), // Mobilnézetben +0.5
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
