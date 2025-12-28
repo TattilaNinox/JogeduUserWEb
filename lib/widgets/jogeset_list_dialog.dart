@@ -36,19 +36,45 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await _checkAdminStatus();
     _loadDocument();
   }
 
   Future<void> _checkAdminStatus() async {
     final user = FirebaseAuth.instance.currentUser;
-    setState(() {
-      _isAdmin = user?.email == 'tattila.ninox@gmail.com';
-    });
+    if (user == null) {
+      if (mounted) setState(() => _isAdmin = false);
+      return;
+    }
+
+    try {
+      final userDoc = await FirebaseConfig.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDoc.data() ?? {};
+      final userType = (userData['userType'] as String? ?? '').toLowerCase();
+      final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
+      final isAdminBool = userData['isAdmin'] == true;
+
+      if (mounted) {
+        setState(() {
+          _isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+        });
+      }
+    } catch (e) {
+      debugPrint('🔴 Hiba az admin státusz ellenőrzésekor: $e');
+      if (mounted) setState(() => _isAdmin = false);
+    }
   }
 
   Future<void> _loadDocument() async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
 
     try {
       final document = await JogesetService.getJogesetDocument(
@@ -264,9 +290,9 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                // Tények
+                // Fikció
                 const Text(
-                  'Tények:',
+                  'Fikció:',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,

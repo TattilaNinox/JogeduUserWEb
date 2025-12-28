@@ -48,7 +48,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   void initState() {
     super.initState();
     _loadFiltersFromUrl();
-    _checkAdminStatus();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await _checkAdminStatus();
     _loadDocument();
   }
 
@@ -86,7 +90,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   Future<void> _checkAdminStatus() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      setState(() => _isAdmin = false);
+      if (mounted) setState(() => _isAdmin = false);
       return;
     }
 
@@ -101,12 +105,14 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
       final isAdminBool = userData['isAdmin'] == true;
 
-      setState(() {
-        _isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
-      });
+      if (mounted) {
+        setState(() {
+          _isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+        });
+      }
     } catch (e) {
       debugPrint('🔴 Hiba az admin státusz ellenőrzésekor: $e');
-      setState(() => _isAdmin = false);
+      if (mounted) setState(() => _isAdmin = false);
     }
   }
 
@@ -314,8 +320,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 currentJogeset.title,
                 style: TextStyle(
-                  fontSize:
-                      isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
+                  fontSize: isMobile
+                      ? 12
+                      : 18, // Mobilnézetben tovább csökkentve (14-2)
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -329,7 +336,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 '${_currentIndex + 1}/$totalJogesetek',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: isMobile ? 12 : 14,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).primaryColor,
                 ),
@@ -344,7 +351,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           icon: Icon(
             Icons.arrow_back_ios,
             color: Theme.of(context).primaryColor,
-            size: isMobile ? 20 : 22,
+            size: isMobile ? 18 : 22,
           ),
           onPressed: _navigateBack,
         ),
@@ -390,67 +397,34 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 ),
               ],
             ),
-            child: isMobile && _pageController != null
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Előző jogeset gomb
-                      ElevatedButton.icon(
-                        onPressed: _currentIndex > 0 ? _previousJogeset : null,
-                        icon: const Icon(Icons.arrow_back),
-                        label: const Text('Előző'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                      // Következő jogeset gomb
-                      ElevatedButton.icon(
-                        onPressed: _currentIndex < totalJogesetek - 1
-                            ? _nextJogeset
-                            : null,
-                        icon: const Icon(Icons.arrow_forward),
-                        label: const Text('Következő'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _currentIndex > 0 ? _previousJogeset : null,
-                        icon: const Icon(Icons.arrow_back),
-                        label: const Text('Előző'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 16 : 24,
-                            vertical: isMobile ? 12 : 16,
-                          ),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: _currentIndex < totalJogesetek - 1
-                            ? _nextJogeset
-                            : null,
-                        icon: const Icon(Icons.arrow_forward),
-                        label: const Text('Következő'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 16 : 24,
-                            vertical: isMobile ? 12 : 16,
-                          ),
-                        ),
-                      ),
-                    ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _currentIndex > 0 ? _previousJogeset : null,
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Előző'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 16 : 24,
+                      vertical: isMobile ? 12 : 16,
+                    ),
                   ),
+                ),
+                ElevatedButton.icon(
+                  onPressed:
+                      _currentIndex < totalJogesetek - 1 ? _nextJogeset : null,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Következő'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 16 : 24,
+                      vertical: isMobile ? 12 : 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -461,9 +435,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   Widget _buildMobilePagedContent(Jogeset currentJogeset, bool isMobile) {
     final pages = <Widget>[];
 
-    // Oldal 1: Tényállás
+    // Oldal 1: Fikció
     pages.add(_buildMobilePage(
-      title: 'Tényállás',
+      title: 'Fikció:',
       content: currentJogeset.tenyek,
       isMobile: isMobile,
     ));
@@ -497,99 +471,83 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       ));
     }
 
-    return PageView.builder(
-      controller: _pageController,
-      itemCount: pages.length,
-      itemBuilder: (context, index) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 900),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+    return Column(
+      children: [
+        // Fix fejléc a mobil lapozó fölött
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                currentJogeset.cim,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF202122),
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Cím és komplexitás badge (csak első oldalon)
-                if (index == 0) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              currentJogeset.cim,
-                              style: const TextStyle(
-                                fontSize: 16, // További csökkentés: 18-2
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF202122),
-                              ),
-                            ),
-                            // Lapozási ikon és szöveg mobilnézetben
-                            if (isMobile && _pageController != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.swipe,
-                                    size: 14,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Lapozz jobbra a következő oldalért',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade600,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.swipe,
+                    size: 14,
+                    color: Colors.grey.shade600,
                   ),
-                  const SizedBox(height: 16),
-                  _buildInfoRow(
-                    label: 'Alkalmazandó jogszabály:',
-                    value: currentJogeset.alkalmazandoJogszabaly,
-                    isMobile: true,
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                pages[index],
-                // Oldal számláló
-                const SizedBox(height: 24),
-                Center(
-                  child: Text(
-                    '${index + 1}/${pages.length}',
+                  const SizedBox(width: 4),
+                  Text(
+                    'Lapozz jobbra a következő oldalért',
                     style: TextStyle(
-                      fontSize: 12, // 14-2
+                      fontSize: 9,
                       color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                label: 'Alkalmazandó jogszabály:',
+                value: currentJogeset.alkalmazandoJogszabaly,
+                isMobile: true,
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+            ],
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: pages.length,
+            itemBuilder: (context, index) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    pages[index],
+                    // Oldal számláló
+                    const SizedBox(height: 24),
+                    Center(
+                      child: Text(
+                        '${index + 1}/${pages.length}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -629,9 +587,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
             const SizedBox(height: 24),
 
-            // Tényállás
+            // Fikció
             _buildSection(
-              title: 'Tényállás',
+              title: 'Fikció:',
               content: currentJogeset.tenyek,
               isMobile: isMobile,
             ),
@@ -732,7 +690,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 14, // 16-2
+            fontSize: 12, // 14-2
             fontWeight: FontWeight.w600,
             color: Color(0xFF202122),
           ),
@@ -743,7 +701,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
-              fontSize: FontSize(12), // 14-2
+              fontSize: FontSize(10), // 12-2
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -768,7 +726,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color,
-        border: Border.all(color: borderColor, width: 2),
+        border: isMobile ? null : Border.all(color: borderColor, width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -777,7 +735,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 14, // 16-2
+              fontSize: 12, // 14-2
               fontWeight: FontWeight.w600,
               color: Color(0xFF202122),
             ),
@@ -788,7 +746,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(12), // 14-2
+                fontSize: FontSize(10), // 12-2
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
@@ -813,7 +771,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         Text(
           title,
           style: TextStyle(
-            fontSize: isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
+            fontSize: isMobile ? 12 : 18, // Mobilnézetben 2px-el kisebb (14-2)
             fontWeight: FontWeight.w600,
             color: const Color(0xFF202122),
           ),
@@ -825,7 +783,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           style: {
             "div": Style(
               fontSize: FontSize(
-                  isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
+                  isMobile ? 10 : 16), // Mobilnézetben 2px-el kisebb (12-2)
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -849,7 +807,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
         color: color,
-        border: Border.all(color: borderColor, width: 2),
+        border: isMobile ? null : Border.all(color: borderColor, width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -859,7 +817,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             title,
             style: TextStyle(
               fontSize:
-                  isMobile ? 14 : 18, // Mobilnézetben 2px-el kisebb (16-2)
+                  isMobile ? 12 : 18, // Mobilnézetben 2px-el kisebb (14-2)
               fontWeight: FontWeight.w600,
               color: const Color(0xFF202122),
             ),
@@ -871,7 +829,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             style: {
               "div": Style(
                 fontSize: FontSize(
-                    isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
+                    isMobile ? 10 : 16), // Mobilnézetben 2px-el kisebb (12-2)
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
@@ -896,7 +854,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: isMobile ? 12 : 16, // Mobilnézetben 2px-el kisebb (14-2)
+            fontSize: isMobile ? 10 : 16, // Mobilnézetben 2px-el kisebb (12-2)
             fontWeight: FontWeight.w600,
             color: const Color(0xFF202122),
           ),
@@ -909,7 +867,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             style: {
               "div": Style(
                 fontSize: FontSize(
-                    isMobile ? 12 : 16), // Mobilnézetben 2px-el kisebb (14-2)
+                    isMobile ? 10 : 16), // Mobilnézetben 2px-el kisebb (12-2)
                 color: const Color(0xFF444444),
                 padding: HtmlPaddings.zero,
                 margin: Margins.zero,

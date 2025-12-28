@@ -178,10 +178,11 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               .where('category', isEqualTo: widget.category);
 
           if (isAdmin) {
-            notesQuery = notesQuery
-                .where('status', whereIn: const ['Published', 'Draft']);
+            notesQuery = notesQuery.where('status',
+                whereIn: const ['Published', 'Public', 'Draft']);
           } else {
-            notesQuery = notesQuery.where('status', isEqualTo: 'Published');
+            notesQuery = notesQuery
+                .where('status', whereIn: const ['Published', 'Public']);
           }
 
           Query<Map<String, dynamic>> jogesetQuery =
@@ -193,10 +194,11 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               .where('category', isEqualTo: widget.category);
 
           if (isAdmin) {
-            allomasQuery = allomasQuery
-                .where('status', whereIn: const ['Published', 'Draft']);
+            allomasQuery = allomasQuery.where('status',
+                whereIn: const ['Published', 'Public', 'Draft']);
           } else {
-            allomasQuery = allomasQuery.where('status', isEqualTo: 'Published');
+            allomasQuery = allomasQuery
+                .where('status', whereIn: const ['Published', 'Public']);
           }
 
           Query<Map<String, dynamic>>? dialogusQuery;
@@ -298,25 +300,41 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       for (var doc in jogesetDocs) {
         if (doc.data()['deletedAt'] != null) continue;
         final jogesetekList = doc.data()['jogesetek'] as List<dynamic>? ?? [];
+
+        final Set<String> targetNextTags = {};
+        bool isDirect = false;
+
         for (var jogesetData in jogesetekList) {
           final jogeset = jogesetData as Map<String, dynamic>;
           if (jogeset['category'] != widget.category) continue;
           final status = jogeset['status'] as String? ?? 'Draft';
-          if (!isAdmin && status != 'Published') continue;
+          if (!isAdmin && status != 'Published' && status != 'Public') continue;
 
           final tags = (jogeset['tags'] as List<dynamic>? ?? []).cast<String>();
           if (!_matchesPath(tags)) continue;
 
           if (tags.length > _currentDepth) {
-            final nextTag = tags[_currentDepth];
-            _addToHierarchy(
-                hierarchy, nextTag, doc, tags.length > _currentDepth + 1);
+            targetNextTags.add(tags[_currentDepth]);
           } else {
-            hierarchy.putIfAbsent('_directJogeset',
-                () => <QueryDocumentSnapshot<Map<String, dynamic>>>[]);
-            (hierarchy['_directJogeset'] as List).add(doc);
+            isDirect = true;
           }
-          break; // Csak egyszer adjuk hozzá a dokumentumot
+        }
+
+        for (var nextTag in targetNextTags) {
+          final tagsForThisTag = jogesetekList.firstWhere((j) {
+                final t = (j['tags'] as List<dynamic>? ?? []).cast<String>();
+                return t.length > _currentDepth && t[_currentDepth] == nextTag;
+              })['tags'] as List<dynamic>? ??
+              [];
+
+          _addToHierarchy(hierarchy, nextTag, doc,
+              tagsForThisTag.length > _currentDepth + 1);
+        }
+
+        if (isDirect) {
+          hierarchy.putIfAbsent('_directJogeset',
+              () => <QueryDocumentSnapshot<Map<String, dynamic>>>[]);
+          (hierarchy['_directJogeset'] as List).add(doc);
         }
       }
     }

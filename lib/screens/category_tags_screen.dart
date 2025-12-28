@@ -136,10 +136,11 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
               .where('category', isEqualTo: widget.category);
 
           if (isAdmin) {
-            notesQuery = notesQuery
-                .where('status', whereIn: const ['Published', 'Draft']);
+            notesQuery = notesQuery.where('status',
+                whereIn: const ['Published', 'Public', 'Draft']);
           } else {
-            notesQuery = notesQuery.where('status', isEqualTo: 'Published');
+            notesQuery = notesQuery
+                .where('status', whereIn: const ['Published', 'Public']);
           }
 
           Query<Map<String, dynamic>> jogesetQuery =
@@ -151,10 +152,11 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
               .where('category', isEqualTo: widget.category);
 
           if (isAdmin) {
-            allomasQuery = allomasQuery
-                .where('status', whereIn: const ['Published', 'Draft']);
+            allomasQuery = allomasQuery.where('status',
+                whereIn: const ['Published', 'Public', 'Draft']);
           } else {
-            allomasQuery = allomasQuery.where('status', isEqualTo: 'Published');
+            allomasQuery = allomasQuery
+                .where('status', whereIn: const ['Published', 'Public']);
           }
 
           Query<Map<String, dynamic>>? dialogusQuery;
@@ -219,6 +221,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                               }
                               final jogesetekList =
                                   doc.data()['jogesetek'] as List? ?? [];
+
+                              final Set<String> targetTags = {};
+                              bool isDirect = false;
+
                               for (var jogesetData in jogesetekList) {
                                 final jogeset =
                                     jogesetData as Map<String, dynamic>;
@@ -227,18 +233,25 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                                 }
                                 final status =
                                     jogeset['status'] as String? ?? 'Draft';
-                                if (!isAdmin && status != 'Published') {
+                                if (!isAdmin &&
+                                    status != 'Published' &&
+                                    status != 'Public') {
                                   continue;
                                 }
                                 final tags = (jogeset['tags'] as List? ?? [])
                                     .cast<String>();
                                 if (tags.isNotEmpty) {
-                                  tagMap
-                                      .putIfAbsent(tags[0], () => [])
-                                      .add(doc);
+                                  targetTags.add(tags[0]);
                                 } else {
-                                  directDocs.add(doc);
+                                  isDirect = true;
                                 }
+                              }
+
+                              for (var tag in targetTags) {
+                                tagMap.putIfAbsent(tag, () => []).add(doc);
+                              }
+                              if (isDirect) {
+                                directDocs.add(doc);
                               }
                             }
                           }

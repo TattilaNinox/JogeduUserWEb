@@ -74,15 +74,18 @@ class JogesetService {
     bool isAdmin = false,
   }) {
     if (isAdmin) {
-      // Admin látja a Published és Draft státuszú jogeseteket
+      // Admin látja a Published, Public és Draft státuszú jogeseteket
       return jogesetek
           .where((jogeset) =>
-              jogeset.status == 'Published' || jogeset.status == 'Draft')
+              jogeset.status == 'Published' ||
+              jogeset.status == 'Public' ||
+              jogeset.status == 'Draft')
           .toList();
     } else {
-      // User csak a Published státuszú jogeseteket látja
+      // User csak a Published és Public státuszú jogeseteket látja
       return jogesetek
-          .where((jogeset) => jogeset.status == 'Published')
+          .where((jogeset) =>
+              jogeset.status == 'Published' || jogeset.status == 'Public')
           .toList();
     }
   }
