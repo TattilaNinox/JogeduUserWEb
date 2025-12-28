@@ -44,6 +44,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   String? _noteCategory;
   String? _noteTag;
 
+  // Header összecsukott állapota mobilnézetben
+  bool _isHeaderCollapsed = false;
+
   @override
   void initState() {
     super.initState();
@@ -180,6 +183,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex++;
       _isMegoldasVisible = false;
+      _isHeaderCollapsed = false; // Visszaállítás új jogesetnél
     });
 
     // PageController újrainicializálása új jogesethez
@@ -200,6 +204,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex--;
       _isMegoldasVisible = false;
+      _isHeaderCollapsed = false; // Visszaállítás új jogesetnél
     });
 
     // PageController újrainicializálása új jogesethez
@@ -471,83 +476,118 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       ));
     }
 
-    return Column(
-      children: [
-        // Fix fejléc a mobil lapozó fölött
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                currentJogeset.cim,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF202122),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollUpdateNotification) {
+          // Csak a függőleges görgetést figyeljük az Expanded területén belül
+          if (notification.metrics.axis == Axis.vertical) {
+            final shouldCollapse = notification.metrics.pixels > 20;
+            if (shouldCollapse != _isHeaderCollapsed) {
+              setState(() {
+                _isHeaderCollapsed = shouldCollapse;
+              });
+            }
+          }
+        }
+        return false;
+      },
+      child: Column(
+        children: [
+          // Fix fejléc a mobil lapozó fölött (animált összecsukással)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+              20,
+              _isHeaderCollapsed ? 10 : 20,
+              20,
+              _isHeaderCollapsed ? 10 : 0,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: _isHeaderCollapsed ? 1 : 0,
                 ),
               ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(
-                    Icons.swipe,
-                    size: 14,
-                    color: Colors.grey.shade600,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  currentJogeset.cim,
+                  style: TextStyle(
+                    fontSize: _isHeaderCollapsed ? 11 : 16,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF202122),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Lapozz jobbra a következő oldalért',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                label: 'Alkalmazandó jogszabály:',
-                value: currentJogeset.alkalmazandoJogszabaly,
-                isMobile: true,
-              ),
-              const SizedBox(height: 16),
-              const Divider(),
-            ],
-          ),
-        ),
-        Expanded(
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: pages.length,
-            itemBuilder: (context, index) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    pages[index],
-                    // Oldal számláló
-                    const SizedBox(height: 24),
-                    Center(
-                      child: Text(
-                        '${index + 1}/${pages.length}',
+                  maxLines: _isHeaderCollapsed ? 1 : null,
+                  overflow: _isHeaderCollapsed ? TextOverflow.ellipsis : null,
+                ),
+                if (!_isHeaderCollapsed) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.swipe,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Lapozz jobbra a következő oldalért',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoRow(
+                    label: 'Alkalmazandó jogszabály:',
+                    value: currentJogeset.alkalmazandoJogszabaly,
+                    isMobile: true,
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                ],
+              ],
+            ),
           ),
-        ),
-      ],
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: pages.length,
+              itemBuilder: (context, index) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      pages[index],
+                      // Oldal számláló
+                      const SizedBox(height: 24),
+                      Center(
+                        child: Text(
+                          '${index + 1}/${pages.length}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
