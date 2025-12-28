@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -449,16 +450,16 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
     // Oldal 2: Jogi kérdés
     pages.add(_buildMobilePageHighlighted(
-      title: 'Jogi kérdés',
+      title: 'Kérdés',
       content: currentJogeset.kerdes,
       color: Colors.blue.shade50,
       borderColor: Colors.blue.shade200,
       isMobile: isMobile,
     ));
 
-    // Oldal 3: Megoldás
+    // Oldal 3: Következtetés
     pages.add(_buildMobilePageHighlighted(
-      title: 'Megoldás',
+      title: 'Következtetés',
       content: currentJogeset.megoldas,
       color: Colors.green.shade50,
       borderColor: Colors.green.shade300,
@@ -479,12 +480,21 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollUpdateNotification) {
-          // Csak a függőleges görgetést figyeljük az Expanded területén belül
+          // Csak a függőleges görgetést figyeljük a belső tartalomnál (SingleChildScrollView)
+          // Mivel a PageView alatt vannak, a depth itt > 0 lesz
           if (notification.metrics.axis == Axis.vertical) {
-            final shouldCollapse = notification.metrics.pixels > 20;
-            if (shouldCollapse != _isHeaderCollapsed) {
+            final pixels = notification.metrics.pixels;
+            // Magasabb küszöb az összecsukáshoz (40px)
+            if (pixels > 40 && !_isHeaderCollapsed) {
               setState(() {
-                _isHeaderCollapsed = shouldCollapse;
+                _isHeaderCollapsed = true;
+              });
+            }
+            // Késleltetett kinyitás: csak akkor nyílik vissza, ha közel érünk a tetejéhez (20px)
+            // Így görgetés közben nem ugrik be rögtön, csak ha tényleg visszaértünk
+            else if (pixels < 20 && _isHeaderCollapsed) {
+              setState(() {
+                _isHeaderCollapsed = false;
               });
             }
           }
@@ -545,14 +555,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _buildInfoRow(
-                    label: 'Alkalmazandó jogszabály:',
-                    value: currentJogeset.alkalmazandoJogszabaly,
-                    isMobile: true,
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
+                  const SizedBox(height: 8),
                 ],
               ],
             ),
@@ -563,6 +566,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               itemCount: pages.length,
               itemBuilder: (context, index) {
                 return SingleChildScrollView(
+                  key: PageStorageKey(
+                      'jogeset_${_document?.documentId}_${_currentIndex}_$index'),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,25 +644,16 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
             // Kérdés (kiemelt)
             _buildHighlightedSection(
-              title: 'Jogi kérdés',
+              title: 'Kérdés',
               content: currentJogeset.kerdes,
               color: Colors.blue.shade50,
               borderColor: Colors.blue.shade200,
               isMobile: isMobile,
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
 
-            // Alkalmazandó jogszabály
-            _buildInfoRow(
-              label: 'Alkalmazandó jogszabály:',
-              value: currentJogeset.alkalmazandoJogszabaly,
-              isMobile: isMobile,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Megoldás megjelenítése/elrejtése gomb
+            // Következtetés megjelenítése/elrejtése gomb
             Center(
               child: ElevatedButton.icon(
                 onPressed: _toggleMegoldas,
@@ -664,8 +661,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                     ? Icons.visibility_off
                     : Icons.visibility),
                 label: Text(_isMegoldasVisible
-                    ? 'Megoldás elrejtése'
-                    : 'Megoldás megjelenítése'),
+                    ? 'Következtetés elrejtése'
+                    : 'Következtetés megjelenítése'),
                 style: ElevatedButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -675,11 +672,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               ),
             ),
 
-            // Megoldás (kiemelt, feltételesen látható)
+            // Következtetés (kiemelt, feltételesen látható)
             if (_isMegoldasVisible) ...[
               const SizedBox(height: 24),
               _buildHighlightedSection(
-                title: 'Megoldás',
+                title: 'Következtetés',
                 content: currentJogeset.megoldas,
                 color: Colors.green.shade50,
                 borderColor: Colors.green.shade300,
@@ -879,43 +876,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  /// Info sor widget
-  Widget _buildInfoRow({
-    required String label,
-    required String value,
-    required bool isMobile,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isMobile ? 10 : 16, // Mobilnézetben 2px-el kisebb (12-2)
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF202122),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Html(
-            data:
-                '<div style="text-align: justify;">${_escapeHtml(value)}</div>',
-            style: {
-              "div": Style(
-                fontSize: FontSize(
-                    isMobile ? 10 : 16), // Mobilnézetben 2px-el kisebb (12-2)
-                color: const Color(0xFF444444),
-                padding: HtmlPaddings.zero,
-                margin: Margins.zero,
-              ),
-            },
-          ),
-        ),
-      ],
     );
   }
 

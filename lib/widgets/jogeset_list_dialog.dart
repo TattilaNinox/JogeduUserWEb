@@ -12,7 +12,7 @@ import '../core/firebase_config.dart';
 /// - Eredeti jogszabály szövegét (opcionális, lenyitható)
 /// - Tények
 /// - Kérdés (világoskék háttérrel)
-/// - Megoldás (világoszöld háttérrel)
+/// - Következtetés (világoszöld háttérrel)
 /// - Törlés gomb (admin esetén)
 class JogesetListDialog extends StatefulWidget {
   final String documentId;
@@ -340,9 +340,9 @@ class _JogesetListDialogState extends State<JogesetListDialog> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Megoldás (világoszöld háttérrel)
+                // Következtetés (világoszöld háttérrel)
                 const Text(
-                  'Megoldás:',
+                  'Következtetés:',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
