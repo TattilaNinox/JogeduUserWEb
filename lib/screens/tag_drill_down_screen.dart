@@ -185,8 +185,19 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                 .where('status', whereIn: const ['Published', 'Public']);
           }
 
-          Query<Map<String, dynamic>> jogesetQuery =
-              FirebaseConfig.firestore.collection('jogesetek');
+          // Jogesetek: Restore science and category filters
+          Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
+              .collection('jogesetek')
+              .where('science', isEqualTo: science)
+              .where('category', isEqualTo: widget.category);
+
+          if (isAdmin) {
+            jogesetQuery = jogesetQuery.where('status',
+                whereIn: const ['Published', 'Public', 'Draft']);
+          } else {
+            jogesetQuery = jogesetQuery
+                .where('status', whereIn: const ['Published', 'Public']);
+          }
 
           Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
               .collection('memoriapalota_allomasok')
@@ -232,6 +243,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                               <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                           if (notesSnap.hasData) {
                             allDocs.addAll(notesSnap.data!.docs
+                                .where((d) => d.data()['deletedAt'] == null));
+                          }
+                          if (jogesetSnap.hasData) {
+                            allDocs.addAll(jogesetSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
                           }
                           if (allomasSnap.hasData) {
@@ -281,63 +296,32 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     final hierarchy = <String, dynamic>{};
     final direct = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-    // Standard dokumentumok (notes, allomasok)
+    // Standard dokumentumok (notes, allomasok, jogesetek)
     for (var doc in docs) {
-      final tags = (doc.data()['tags'] as List<dynamic>? ?? []).cast<String>();
+      final data = doc.data();
+      final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
       if (!_matchesPath(tags)) continue;
+
+      final isJogeset = doc.reference.path.contains('jogesetek');
 
       if (tags.length > _currentDepth) {
         final nextTag = tags[_currentDepth];
         _addToHierarchy(
             hierarchy, nextTag, doc, tags.length > _currentDepth + 1);
       } else {
-        direct.add(doc);
-      }
-    }
-
-    // Jogesetek
-    if (jogesetDocs != null) {
-      for (var doc in jogesetDocs) {
-        if (doc.data()['deletedAt'] != null) continue;
-        final jogesetekList = doc.data()['jogesetek'] as List<dynamic>? ?? [];
-
-        final Set<String> targetNextTags = {};
-        bool isDirect = false;
-
-        for (var jogesetData in jogesetekList) {
-          final jogeset = jogesetData as Map<String, dynamic>;
-          if (jogeset['category'] != widget.category) continue;
-          final status = jogeset['status'] as String? ?? 'Draft';
-          if (!isAdmin && status != 'Published' && status != 'Public') continue;
-
-          final tags = (jogeset['tags'] as List<dynamic>? ?? []).cast<String>();
-          if (!_matchesPath(tags)) continue;
-
-          if (tags.length > _currentDepth) {
-            targetNextTags.add(tags[_currentDepth]);
-          } else {
-            isDirect = true;
-          }
-        }
-
-        for (var nextTag in targetNextTags) {
-          final tagsForThisTag = jogesetekList.firstWhere((j) {
-                final t = (j['tags'] as List<dynamic>? ?? []).cast<String>();
-                return t.length > _currentDepth && t[_currentDepth] == nextTag;
-              })['tags'] as List<dynamic>? ??
-              [];
-
-          _addToHierarchy(hierarchy, nextTag, doc,
-              tagsForThisTag.length > _currentDepth + 1);
-        }
-
-        if (isDirect) {
-          hierarchy.putIfAbsent('_directJogeset',
-              () => <QueryDocumentSnapshot<Map<String, dynamic>>>[]);
-          (hierarchy['_directJogeset'] as List).add(doc);
+        if (isJogeset) {
+          hierarchy
+              .putIfAbsent('_directJogeset',
+                  () => <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+              .add(doc);
+        } else {
+          direct.add(doc);
         }
       }
     }
+
+    // Jogesetek: top-level fields are processed in the docs loop above.
+    // Removed redundant nested jogesetek loop.
 
     // Dialógusok
     if (widget.category == 'Dialogus tags' && dialogusDocs != null) {
@@ -453,14 +437,12 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   }
 
   Widget _buildJogesetWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    // Nagyon leegyszerűsítve a NoteListTile-nak átadva
     final data = doc.data();
+    final title = (data['title'] ?? 'Jogeset').toString();
+
+    // Kiszámoljuk a jogesetek számát a tömbből
     final jogesetekList = data['jogesetek'] as List? ?? [];
-    final first = jogesetekList.isNotEmpty
-        ? jogesetekList[0] as Map<String, dynamic>
-        : {};
-    final title = (data['title'] ?? first['title'] ?? first['cim'] ?? 'Jogeset')
-        .toString();
+    final int count = jogesetekList.length;
 
     return NoteListTile(
       id: doc.id,
@@ -469,8 +451,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       hasDoc: false,
       hasAudio: false,
       hasVideo: false,
-      isLocked: !_hasPremiumAccess && !(first['isFree'] == true),
-      jogesetCount: jogesetekList.length,
+      isLocked: !_hasPremiumAccess && !(data['isFree'] == true),
+      jogesetCount: count,
       category: widget.category,
       customFromUrl: '/notes',
     );

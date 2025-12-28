@@ -126,10 +126,36 @@ class JogesetDocument {
 
   /// Factory konstruktor Firestore dokumentumból való létrehozáshoz
   factory JogesetDocument.fromMap(Map<String, dynamic> map, String documentId) {
-    final jogesetekList = map['jogesetek'] as List<dynamic>? ?? [];
-    final jogesetek = jogesetekList
-        .map((item) => Jogeset.fromMap(item as Map<String, dynamic>))
-        .toList();
+    List<Jogeset> jogesetek = [];
+
+    // 1. Megnézzük a standard 'jogesetek' listát
+    if (map['jogesetek'] != null && map['jogesetek'] is List) {
+      final list = map['jogesetek'] as List;
+      jogesetek.addAll(
+          list.map((item) => Jogeset.fromMap(item as Map<String, dynamic>)));
+    }
+
+    // 2. Megnézzük a számozott kulcsokat ("1", "2", "3"...)
+    // A képernyőképek alapján ez a struktúra használatos
+    final sortedKeys = map.keys.where((k) {
+      final n = int.tryParse(k);
+      return n != null && map[k] is Map;
+    }).toList()
+      ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+
+    for (var key in sortedKeys) {
+      final caseMap = Map<String, dynamic>.from(map[key] as Map);
+      // Ha az ID nincs benne a map-ben, használjuk a kulcsot
+      if (caseMap['id'] == null) {
+        caseMap['id'] = int.parse(key);
+      }
+      jogesetek.add(Jogeset.fromMap(caseMap));
+    }
+
+    // 3. Ha semmi nem volt, de a dokumentum tetején ott vannak a mezők, kezeljük egyetlen jogesetként
+    if (jogesetek.isEmpty && (map['tenyek'] != null || map['kerdes'] != null)) {
+      jogesetek.add(Jogeset.fromMap(map));
+    }
 
     // Dokumentum szintű title mező (ha van)
     final title = map['title'] as String?;

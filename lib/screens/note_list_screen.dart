@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../core/firebase_config.dart';
+import '../services/metadata_service.dart';
 
 import '../utils/filter_storage.dart';
 import '../utils/category_state.dart';
@@ -162,142 +161,19 @@ class _NoteListScreenState extends State<NoteListScreen> {
   /// a felhasználó tudományágával és Published státuszúak (admin esetén Draft is).
   Future<void> _loadCategories() async {
     try {
-      // Lekérjük a bejelentkezett felhasználó tudományágát
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() => _categories = []);
-        return;
-      }
-
-      // Admin ellenőrzés
-      bool isAdmin = false;
-      try {
-        final userDoc = await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final userData = userDoc.data() ?? {};
-        final userType = (userData['userType'] as String? ?? '').toLowerCase();
-        final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
-        final isAdminBool = userData['isAdmin'] == true;
-        isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
-      } catch (e) {
-        // Ha hiba van az admin ellenőrzésben, nem adminként kezeljük
-        isAdmin = false;
-      }
-
-      // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
       const userScience = 'Jogász';
 
-      // Lekérjük a notes-okat, szűrve a felhasználó tudományágára és státuszra
-      // Admin esetén Draft státuszú jegyzeteket is betöltjük
-      Query<Map<String, dynamic>> query = FirebaseConfig.firestore
-          .collection('notes')
-          .where('science', isEqualTo: userScience);
+      // Használjuk a MetadataService-t a felesleges olvasások elkerülése végett
+      final metadata = await MetadataService.getMetadata(userScience);
+      final categories = metadata['categories'] ?? [];
 
-      if (isAdmin) {
-        query = query.where('status', whereIn: ['Published', 'Draft']);
-      } else {
-        query = query.where('status', isEqualTo: 'Published');
+      if (mounted) {
+        setState(() {
+          _categories = categories..sort();
+        });
       }
-
-      final snapshot = await query.get();
-
-      // Kinyerjük az egyedi kategóriákat
-      final categoriesSet = <String>{};
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        if (data['deletedAt'] == null) {
-          final category = data['category'] as String?;
-          if (category != null && category.isNotEmpty) {
-            categoriesSet.add(category);
-          }
-        }
-      }
-
-      // Hozzáadjuk a "Dialogus tags" kategóriát, ha van legalább egy dialogus_fajlok dokumentum
-      // Ellenőrizzük, hogy van-e legalább egy dialogus_fajlok dokumentum audioUrl-lel
-      try {
-        Query<Map<String, dynamic>> dialogusQuery = FirebaseConfig.firestore
-            .collection('dialogus_fajlok')
-            .where('science', isEqualTo: userScience);
-
-        if (isAdmin) {
-          dialogusQuery =
-              dialogusQuery.where('status', whereIn: ['Published', 'Draft']);
-        } else {
-          dialogusQuery = dialogusQuery.where('status', isEqualTo: 'Published');
-        }
-
-        final dialogusSnapshot = await dialogusQuery.get();
-        // debugPrint('🔵 dialogus_fajlok: ${dialogusSnapshot.docs.length} dokumentum található');
-
-        // Ellenőrizzük, van-e legalább egy dokumentum audioUrl-lel
-        bool hasDialogusFiles = false;
-        for (var doc in dialogusSnapshot.docs) {
-          final data = doc.data();
-          if (data['deletedAt'] != null) continue;
-
-          final audioUrl = data['audioUrl'] as String?;
-          if (audioUrl != null && audioUrl.isNotEmpty) {
-            hasDialogusFiles = true;
-            break; // Elég egy érvényes dokumentum
-          }
-        }
-
-        // debugPrint('🔵 dialogus_fajlok: $validDocsCount érvényes dokumentum (audioUrl-lel)');
-
-        if (hasDialogusFiles) {
-          categoriesSet.add('Dialogus tags');
-          // debugPrint('🔵 "Dialogus tags" kategória hozzáadva');
-        } else {
-          // debugPrint('🔴 "Dialogus tags" kategória NEM lett hozzáadva (nincs érvényes dokumentum)');
-        }
-      } catch (e, stackTrace) {
-        // Ha hiba van a dialogus_fajlok lekérdezésben, csak logoljuk, de nem akadályozzuk meg a kategóriák betöltését
-        debugPrint('🔴 Hiba a dialogus_fajlok kollekció lekérdezésekor: $e');
-        debugPrint('🔴 Stack trace: $stackTrace');
-      }
-
-      // Hozzáadjuk a memoriapalota_allomasok kategóriáit is
-      try {
-        Query<Map<String, dynamic>> mpAllomasQuery = FirebaseConfig.firestore
-            .collection('memoriapalota_allomasok')
-            .where('science', isEqualTo: userScience);
-
-        if (isAdmin) {
-          mpAllomasQuery =
-              mpAllomasQuery.where('status', whereIn: ['Published', 'Draft']);
-        } else {
-          mpAllomasQuery =
-              mpAllomasQuery.where('status', isEqualTo: 'Published');
-        }
-
-        final mpAllomasSnapshot = await mpAllomasQuery.get();
-        debugPrint(
-            '🔵 Memoriapalota_allomasok kategória keresés: ${mpAllomasSnapshot.docs.length} dokumentum');
-
-        for (var doc in mpAllomasSnapshot.docs) {
-          final data = doc.data();
-          if (data['deletedAt'] != null) continue;
-
-          final category = data['category'] as String?;
-          if (category != null && category.isNotEmpty) {
-            categoriesSet.add(category);
-            debugPrint(
-                '🔵 Kategória hozzáadva memoriapalota_allomasok-ból: $category');
-          }
-        }
-      } catch (e) {
-        debugPrint(
-            '🔴 Hiba a memoriapalota_allomasok kategóriák betöltésekor: $e');
-      }
-
-      setState(() {
-        _categories = categoriesSet.toList()..sort();
-      });
     } catch (e) {
-      // Hiba esetén üres lista
+      debugPrint('🔴 Hiba a kategóriák betöltésekor: $e');
       if (mounted) {
         setState(() => _categories = []);
       }
@@ -318,159 +194,33 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Future<void> _loadTags() async {
     try {
-      // Lekérjük a bejelentkezett felhasználót
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() => _tags = []);
-        return;
-      }
-
-      // Admin ellenőrzés
-      bool isAdmin = false;
-      try {
-        final userDoc = await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final userData = userDoc.data() ?? {};
-        final userType = (userData['userType'] as String? ?? '').toLowerCase();
-        final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
-        final isAdminBool = userData['isAdmin'] == true;
-        isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
-      } catch (e) {
-        // Ha hiba van az admin ellenőrzésben, nem adminként kezeljük
-        isAdmin = false;
-      }
-
-      // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
       const userScience = 'Jogász';
 
-      final allTags = <String>{};
+      // Használjuk a MetadataService-t a felesleges olvasások elkerülése végett
+      final metadata = await MetadataService.getMetadata(userScience);
+      final tags = metadata['tags'] ?? [];
 
-      // 1. Betöltjük a címkéket a notes kollekcióból
-      try {
-        // Indexelési problémák/hibák elkerülése végett a status szűrést kliens oldalon végezzük
-        // Így biztosabb, hogy kapunk adatot, ha a science egyezik.
-        final notesQuery = FirebaseConfig.firestore
-            .collection('notes')
-            .where('science', isEqualTo: userScience);
-
-        final notesSnapshot = await notesQuery.get();
-
-        for (final doc in notesSnapshot.docs) {
-          final data = doc.data();
-          if (data['deletedAt'] != null) continue;
-
-          // Kliens oldali status szűrés
-          final status = data['status'] as String?;
-          if (isAdmin) {
-            if (status != 'Published' && status != 'Draft') continue;
-          } else {
-            if (status != 'Published' && status != 'Public') continue;
-          }
-
-          if (data.containsKey('tags') && data['tags'] is List) {
-            final tags = List<String>.from(data['tags']);
-            allTags.addAll(tags);
-          }
-        }
-      } catch (e) {
-        debugPrint('🔴 Hiba a notes kollekció címkéinek betöltésekor: $e');
+      if (mounted) {
+        setState(() {
+          _tags = tags..sort();
+        });
       }
 
-      // 2. Betöltjük a címkéket a memoriapalota_allomasok kollekcióból
-      try {
-        final mpAllomasQuery = FirebaseConfig.firestore
-            .collection('memoriapalota_allomasok')
-            .where('science', isEqualTo: userScience);
-
-        final mpAllomasSnapshot = await mpAllomasQuery.get();
-
-        for (final doc in mpAllomasSnapshot.docs) {
-          final data = doc.data();
-          if (data['deletedAt'] != null) continue;
-
-          // Kliens oldali status szűrés
-          final status = data['status'] as String?;
-          if (isAdmin) {
-            if (status != 'Published' &&
-                status != 'Draft' &&
-                status != 'Public') {
-              continue;
-            }
-          } else {
-            if (status != 'Published' && status != 'Public') {
-              continue;
-            }
-          }
-
-          if (data.containsKey('tags') && data['tags'] is List) {
-            final tags = List<String>.from(data['tags']);
-            allTags.addAll(tags);
-          }
-        }
-        debugPrint(
-            '🔵 Memoriapalota_allomasok címkék betöltve: ${mpAllomasSnapshot.docs.length} dokumentum');
-      } catch (e) {
-        debugPrint(
-            '🔴 Hiba a memoriapalota_allomasok kollekció címkéinek betöltésekor: $e');
-      }
-
-      // 3. Betöltjük a címkéket a jogesetek kollekcióból
-      try {
-        final jogesetekQuery = FirebaseConfig.firestore
-            .collection('jogesetek')
-            .where('science', isEqualTo: userScience);
-
-        final jogesetekSnapshot = await jogesetekQuery.get();
-        for (final doc in jogesetekSnapshot.docs) {
-          final data = doc.data();
-          if (data['deletedAt'] != null) continue;
-
-          // Kliens oldali status szűrés
-          final status = data['status'] as String?;
-          if (isAdmin) {
-            if (status != 'Published' && status != 'Draft') continue;
-          } else {
-            if (status != 'Published') continue;
-          }
-
-          if (data.containsKey('tags') && data['tags'] is List) {
-            final tags = List<String>.from(data['tags']);
-            allTags.addAll(tags);
-          }
-        }
-        debugPrint(
-            '🔵 Jogesetek címkék betöltve: ${jogesetekSnapshot.docs.length} dokumentum');
-      } catch (e) {
-        debugPrint('🔴 Hiba a jogesetek kollekció címkéinek betöltésekor: $e');
-      }
-
-      // Biztonsági háló: ha az URL/aktuális kiválasztott címke nem volt a lekérdezésekben, adjuk hozzá.
+      // Biztonsági háló: ha az URL/aktuális kiválasztott címke nem volt a metaadatokban, adjuk hozzá.
       final forcedTag = (_selectedTag != null && _selectedTag!.isNotEmpty)
           ? _selectedTag
           : (widget.initialTag != null && widget.initialTag!.isNotEmpty)
               ? widget.initialTag
               : null;
-      if (forcedTag != null && !allTags.contains(forcedTag)) {
-        allTags.add(forcedTag);
-        debugPrint('🔵 _loadTags: forced tag added: $forcedTag');
-      }
-
-      if (mounted) {
+      if (forcedTag != null && !_tags.contains(forcedTag)) {
         setState(() {
-          _tags = allTags.toList()..sort();
+          _tags = [..._tags, forcedTag]..sort();
         });
-        debugPrint('🔵 ÖSSZESEN betöltött címkék száma: ${_tags.length}');
-        debugPrint('🔵 Címkék listája: ${_tags.join(", ")}');
       }
     } catch (e) {
-      // Ha jogosultság/lekérdezési hiba, ne akassza meg az oldalt
       debugPrint('🔴 Hiba a címkék betöltésekor: $e');
       if (mounted) {
-        setState(() {
-          _tags = const [];
-        });
+        setState(() => _tags = []);
       }
     }
   }

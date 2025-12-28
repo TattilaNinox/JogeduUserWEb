@@ -1,0 +1,252 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "notes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "category",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "tags",
+                    "arrayConfig": "CONTAINS"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "type",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "memoriapalota_allomasok",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "memoriapalota_allomasok",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "category",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "memoriapalota_allomasok",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "tags",
+                    "arrayConfig": "CONTAINS"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "dialogus_fajlok",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "dialogus_fajlok",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "tags",
+                    "arrayConfig": "CONTAINS"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "jogesetek",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "jogesetek",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "category",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "jogesetek",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "science",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "tags",
+                    "arrayConfig": "CONTAINS"
+                },
+                {
+                    "fieldPath": "title",
+                    "order": "ASCENDING"
+                }
+            ]
+        }
+    ]
+}

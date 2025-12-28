@@ -1,0 +1,119 @@
+# FIRESTORE INDEXEK - ABC SORREND (TITLE)
+
+Másold be ezeket az indexeket a Firebase Console-ra:
+https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore/indexes
+
+---
+
+## INDEX 1
+Collection ID: notes
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending  
+  3. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 2
+Collection ID: notes
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. category - Ascending
+  4. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 3
+Collection ID: notes
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. tags - Array-contains
+  4. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 4
+Collection ID: notes
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. type - Ascending
+  4. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 5
+Collection ID: memoriapalota_allomasok
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 6
+Collection ID: memoriapalota_allomasok
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. category - Ascending
+  4. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 7
+Collection ID: memoriapalota_allomasok
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. tags - Array-contains
+  4. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 8
+Collection ID: dialogus_fajlok
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 9
+Collection ID: dialogus_fajlok
+Fields to index:
+  1. science - Ascending
+  2. status - Ascending
+  3. tags - Array-contains
+  4. title - Ascending
+Query scope: Collection
+
+---
+
+## INDEX 10 ⭐ ÚJ - JOGESETEK
+Collection ID: jogesetek
+Fields to index:
+  1. title - Ascending
+Query scope: Collection
+
+MEGJEGYZÉS: A jogesetek kollekciónak csak 1 egyszerű index kell, 
+mert nincs science/status szűrés, csak ABC rendezés.
+
+---
+
+ÖSSZESEN: 10 index
+VÁRHATÓ IDŐ: 2-5 perc mindegyikhez (párhuzamosan épülnek)
+
+Amikor mind "Enabled" státuszban van, szólj!
+

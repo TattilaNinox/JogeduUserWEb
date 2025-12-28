@@ -143,8 +143,21 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 .where('status', whereIn: const ['Published', 'Public']);
           }
 
-          Query<Map<String, dynamic>> jogesetQuery =
-              FirebaseConfig.firestore.collection('jogesetek');
+          // Jogesetek: Restore science and category filters
+          debugPrint(
+              '🔵 Jogesetek query - science: $science, category: ${widget.category}');
+          Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
+              .collection('jogesetek')
+              .where('science', isEqualTo: science)
+              .where('category', isEqualTo: widget.category);
+
+          if (isAdmin) {
+            jogesetQuery = jogesetQuery.where('status',
+                whereIn: const ['Published', 'Public', 'Draft']);
+          } else {
+            jogesetQuery = jogesetQuery
+                .where('status', whereIn: const ['Published', 'Public']);
+          }
 
           Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
               .collection('memoriapalota_allomasok')
@@ -191,10 +204,19 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                             allDocs.addAll(notesSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
                           }
+                          if (jogesetSnap.hasData) {
+                            debugPrint(
+                                '🔵 Jogesetek betöltve: ${jogesetSnap.data!.docs.length} dokumentum');
+                            allDocs.addAll(jogesetSnap.data!.docs
+                                .where((d) => d.data()['deletedAt'] == null));
+                          }
                           if (allomasSnap.hasData) {
                             allDocs.addAll(allomasSnap.data!.docs
                                 .where((d) => d.data()['deletedAt'] == null));
                           }
+
+                          debugPrint(
+                              '🔵 Összes dokumentum (notes+jogesetek+allomasok): ${allDocs.length}');
 
                           final tagMap = <String,
                               List<
@@ -214,47 +236,8 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                             }
                           }
 
-                          if (jogesetSnap.hasData) {
-                            for (var doc in jogesetSnap.data!.docs) {
-                              if (doc.data()['deletedAt'] != null) {
-                                continue;
-                              }
-                              final jogesetekList =
-                                  doc.data()['jogesetek'] as List? ?? [];
-
-                              final Set<String> targetTags = {};
-                              bool isDirect = false;
-
-                              for (var jogesetData in jogesetekList) {
-                                final jogeset =
-                                    jogesetData as Map<String, dynamic>;
-                                if (jogeset['category'] != widget.category) {
-                                  continue;
-                                }
-                                final status =
-                                    jogeset['status'] as String? ?? 'Draft';
-                                if (!isAdmin &&
-                                    status != 'Published' &&
-                                    status != 'Public') {
-                                  continue;
-                                }
-                                final tags = (jogeset['tags'] as List? ?? [])
-                                    .cast<String>();
-                                if (tags.isNotEmpty) {
-                                  targetTags.add(tags[0]);
-                                } else {
-                                  isDirect = true;
-                                }
-                              }
-
-                              for (var tag in targetTags) {
-                                tagMap.putIfAbsent(tag, () => []).add(doc);
-                              }
-                              if (isDirect) {
-                                directDocs.add(doc);
-                              }
-                            }
-                          }
+                          // Jogesetek: top-level fields are processed in the allDocs loop above.
+                          // Removed redundant nested jogesetek loop.
 
                           if (widget.category == 'Dialogus tags' &&
                               dSnap.hasData) {
@@ -392,12 +375,12 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
     int? jogesetCount;
 
     if (isJogeset) {
-      final list = data['jogesetek'] as List? ?? [];
-      final first = list.isNotEmpty ? list[0] as Map<String, dynamic> : {};
-      title = (data['title'] ?? first['title'] ?? first['cim'] ?? 'Jogeset')
-          .toString();
-      isFree = first['isFree'] == true;
-      jogesetCount = list.length;
+      title = (data['title'] ?? 'Jogeset').toString();
+      isFree = (data['isFree'] == true) || (data['is_free'] == true);
+
+      // Kiszámoljuk a jogesetek számát a tömbből
+      final jogesetekList = data['jogesetek'] as List? ?? [];
+      jogesetCount = jogesetekList.length;
     }
 
     return NoteListTile(
