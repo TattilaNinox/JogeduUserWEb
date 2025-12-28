@@ -431,7 +431,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         : (isDialogus
             ? 'dialogus_fajlok'
             : (data['type'] as String? ?? 'standard'));
-    final isFree = data['isFree'] as bool? ?? false;
+    final isFree = (data['isFree'] == true) ||
+        (data['is_free'] == true) ||
+        (data['isFree'] == 1) ||
+        (data['is_free'] == 1);
     final isLocked = !isFree && !_hasPremiumAccess;
 
     return NoteListTile(

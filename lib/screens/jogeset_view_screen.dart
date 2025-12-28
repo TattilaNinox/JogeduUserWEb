@@ -337,8 +337,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 currentJogeset.title,
                 style: TextStyle(
-                  fontSize:
-                      isMobile ? 10 : 18, // Mobilnézetben 2px-el kisebb (12-2)
+                  fontSize: isMobile
+                      ? 10.0
+                      : 18.0, // Mobilnézetben 2px-el kisebb (12-2)
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -352,7 +353,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               child: Text(
                 '${_currentIndex + 1}/$totalJogesetek',
                 style: TextStyle(
-                  fontSize: isMobile ? 12 : 14,
+                  fontSize: isMobile ? 12.0 : 14.0,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).primaryColor,
                 ),
@@ -367,7 +368,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           icon: Icon(
             Icons.arrow_back_ios,
             color: Theme.of(context).primaryColor,
-            size: isMobile ? 18 : 22,
+            size: isMobile ? 18.0 : 22.0,
           ),
           onPressed: _navigateBack,
         ),
@@ -419,7 +420,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 // Navigációs sidebar (csak asztali nézetben)
                 if (!isMobile)
                   Container(
-                    width: 300,
+                    width: 300.0,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border(
@@ -449,8 +450,8 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
+                  blurRadius: 4.0,
+                  offset: const Offset(0.0, -2.0),
                 ),
               ],
             ),
@@ -554,17 +555,17 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 duration: const Duration(milliseconds: 200),
                 width: double.infinity,
                 padding: EdgeInsets.fromLTRB(
-                  20,
-                  isCollapsed ? 10 : 20,
-                  20,
-                  isCollapsed ? 10 : 0,
+                  20.0,
+                  isCollapsed ? 10.0 : 20.0,
+                  20.0,
+                  isCollapsed ? 10.0 : 0.0,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border(
                     bottom: BorderSide(
                       color: Colors.grey.withValues(alpha: 0.2),
-                      width: isCollapsed ? 1 : 0,
+                      width: isCollapsed ? 1.0 : 0.0,
                     ),
                   ),
                 ),
@@ -574,7 +575,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                     Text(
                       currentJogeset.cim,
                       style: TextStyle(
-                        fontSize: isCollapsed ? 9 : 14,
+                        fontSize: isCollapsed ? 9.0 : 14.0,
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF202122),
                       ),
@@ -587,7 +588,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                         children: [
                           Icon(
                             Icons.swipe,
-                            size: 14,
+                            size: 14.0,
                             color: Colors.grey.shade600,
                           ),
                           const SizedBox(width: 4),
@@ -615,8 +616,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               itemCount: pages.length,
               itemBuilder: (context, index) {
                 return SingleChildScrollView(
-                  key: PageStorageKey(
-                      'jogeset_${_document?.documentId}_${_currentIndex}_$index'),
                   dragStartBehavior: DragStartBehavior.down,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
@@ -650,13 +649,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   /// Asztali nézeti tartalom (eredeti)
   Widget _buildDesktopContent(Jogeset currentJogeset, bool isMobile) {
     return SingleChildScrollView(
-      key: PageStorageKey(
-          'jogeset_desktop_${_document?.documentId}_$_currentIndex'),
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 900),
-        margin: const EdgeInsets.symmetric(horizontal: 0),
+        constraints: const BoxConstraints(maxWidth: 900.0),
+        margin: const EdgeInsets.symmetric(horizontal: 0.0),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -668,7 +665,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             ),
           ],
         ),
-        padding: EdgeInsets.all(isMobile ? 20 : 32),
+        padding: EdgeInsets.all(isMobile ? 20.0 : 32.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -676,9 +673,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             Text(
               currentJogeset.cim,
               style: TextStyle(
-                fontSize: isMobile
-                    ? 16
-                    : 22, // Mobilnézetben tovább csökkentve: 18-2, asztali: 24-2
+                fontSize: isMobile ? 16.0 : 22.0,
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF202122),
               ),
@@ -742,6 +737,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 currentJogeset.eredetiJogszabalySzoveg!.isNotEmpty) ...[
               const SizedBox(height: 24),
               ExpansionTile(
+                initiallyExpanded: false,
                 title: const Text(
                   'Eredeti jogszabály szöveg',
                   style: TextStyle(fontWeight: FontWeight.w600),
@@ -752,7 +748,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                     child: Text(
                       currentJogeset.eredetiJogszabalySzoveg!,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 14.0,
                         fontStyle: FontStyle.italic,
                         color: Color(0xFF555555),
                       ),
@@ -813,11 +809,11 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     required bool isMobile,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: color,
-        border: isMobile ? null : Border.all(color: borderColor, width: 2),
-        borderRadius: BorderRadius.circular(12),
+        border: isMobile ? null : Border.all(color: borderColor, width: 2.0),
+        borderRadius: BorderRadius.circular(12.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -825,7 +821,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 12, // 14-2
+              fontSize: 12.0, // 14-2
               fontWeight: FontWeight.w600,
               color: Color(0xFF202122),
             ),
@@ -836,7 +832,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(10), // 12-2
+                fontSize: FontSize(10.0),
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
@@ -861,7 +857,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         Text(
           title,
           style: TextStyle(
-            fontSize: isMobile ? 12 : 18, // Mobilnézetben 2px-el kisebb (14-2)
+            fontSize: isMobile ? 12.0 : 18.0,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF202122),
           ),
@@ -872,7 +868,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
               '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
           style: {
             "div": Style(
-              fontSize: FontSize(isMobile ? 10.5 : 16), // Mobilnézetben +0.5
+              fontSize: FontSize(isMobile ? 10.5 : 16.0),
               color: const Color(0xFF444444),
               lineHeight: const LineHeight(1.6),
               padding: HtmlPaddings.zero,
@@ -893,10 +889,10 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     required bool isMobile,
   }) {
     return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 20.0),
       decoration: BoxDecoration(
         color: color,
-        border: isMobile ? null : Border.all(color: borderColor, width: 2),
+        border: isMobile ? null : Border.all(color: borderColor, width: 2.0),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -905,8 +901,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
           Text(
             title,
             style: TextStyle(
-              fontSize:
-                  isMobile ? 12 : 18, // Mobilnézetben 2px-el kisebb (14-2)
+              fontSize: isMobile ? 12.0 : 18.0,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF202122),
             ),
@@ -917,7 +912,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
             style: {
               "div": Style(
-                fontSize: FontSize(isMobile ? 10.5 : 16), // Mobilnézetben +0.5
+                fontSize: FontSize(isMobile ? 10.5 : 16.0),
                 color: const Color(0xFF444444),
                 lineHeight: const LineHeight(1.6),
                 padding: HtmlPaddings.zero,
@@ -965,14 +960,14 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
 
               return ListTile(
                 leading: CircleAvatar(
-                  radius: 14,
+                  radius: 14.0,
                   backgroundColor: isSelected
                       ? Theme.of(context).primaryColor
                       : Colors.grey.shade200,
                   child: Text(
                     '${index + 1}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.0,
                       color: isSelected ? Colors.white : Colors.grey.shade700,
                       fontWeight: FontWeight.bold,
                     ),

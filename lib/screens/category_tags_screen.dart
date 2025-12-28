@@ -385,7 +385,10 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                 ? 'jogeset'
                 : (data['type'] as String? ?? 'standard')));
 
-    bool isFree = data['isFree'] as bool? ?? false;
+    bool isFree = (data['isFree'] == true) ||
+        (data['is_free'] == true) ||
+        (data['isFree'] == 1) ||
+        (data['is_free'] == 1);
     int? jogesetCount;
 
     if (isJogeset) {

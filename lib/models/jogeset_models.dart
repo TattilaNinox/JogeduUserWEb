@@ -44,7 +44,7 @@ class Jogeset {
   /// Factory konstruktor Firestore dokumentumból való létrehozáshoz
   factory Jogeset.fromMap(Map<String, dynamic> map) {
     return Jogeset(
-      id: map['id'] as int? ?? 0,
+      id: (map['id'] as num? ?? 0).toInt(),
       title: map['title'] as String? ?? '',
       cim: map['cim'] as String? ?? '',
       tenyek: map['tenyek'] as String? ?? '',
@@ -55,7 +55,10 @@ class Jogeset {
       category: map['category'] as String? ?? '',
       tags: map['tags'] != null ? List<String>.from(map['tags'] as List) : [],
       status: map['status'] as String? ?? 'Draft',
-      isFree: map['isFree'] as bool? ?? false,
+      isFree: (map['isFree'] == true) ||
+          (map['is_free'] == true) ||
+          (map['isFree'] == 1) ||
+          (map['is_free'] == 1),
       generaltDatum: map['generalt_datum'] != null
           ? (map['generalt_datum'] as Timestamp).toDate()
           : DateTime.now(),

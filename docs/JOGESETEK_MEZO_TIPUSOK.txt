@@ -1,0 +1,37 @@
+JOGESETEK KOLLEKCIÓ ADATSTRUKTÚRA ÉS MEZŐTÍPUSOK
+================================================
+
+1. Dokumentum szintű mezők (egy-egy paragrafushoz tartozó gyűjtemény)
+------------------------------------------------------------------
+
+Mezőnév          | Típus            | Leírás
+-----------------|------------------|---------------------------------------
+documentId       | string           | A dokumentum azonosítója (pl. "6_519")
+title            | string           | A megnevezés (pl. "6:519. §")
+jogesetek        | array (object)   | Az egyedi jogeseteket tartalmazó lista
+
+
+2. Egyedi jogeset mezői (a "jogesetek" listán belül)
+---------------------------------------------------
+
+Mezőnév                   | Típus            | Leírás
+--------------------------|------------------|---------------------------------------
+id                        | number (int)     | Azonosító (1, 2, 3...)
+title                     | string           | A jogeset címe
+cim                       | string           | Ugyanaz, mint a title
+tenyek                    | string           | Tényállás leírása
+kerdes                    | string           | Jogi kérdés
+alkalmazando_jogszabaly   | string           | Jogszabály hivatkozás
+megoldas                  | string           | Megoldás/Magyarázat
+komplexitas               | string           | "egyszerű", "közepes", "komplex"
+science                   | string           | Tudomány (pl. "Jogász")
+category                  | string           | Fő kategória (pl. "Polgári jog")
+tags                      | array (string)   | Címkék listája
+status                    | string           | "Draft", "Published", "Archived"
+isFree                    | boolean          | Ingyenes-e
+generalt_datum            | timestamp        | Generálás időpontja
+model                     | string?          | AI modell neve (opcionális)
+eredeti_jogszabaly_szoveg | string?          | Jogszabály szövege (opcionális)
+kulcsszavak               | array (string)   | Kulcsszavak/Fogalmak
+
+Megjegyzés: A rendszer kezeli a régebbi mezőneveket is (kategoria -> category, is_free -> isFree), de a fentiek az aktuális típusok.
