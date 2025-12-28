@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -45,8 +46,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   String? _noteCategory;
   String? _noteTag;
 
-  // Header összecsukott állapota mobilnézetben
-  bool _isHeaderCollapsed = false;
+  // Header összecsukott állapota mobilnézetben (ValueNotifier a teljes rebuild elkerülésére)
+  final ValueNotifier<bool> _isHeaderCollapsedNotifier =
+      ValueNotifier<bool>(false);
 
   @override
   void initState() {
@@ -63,6 +65,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
   @override
   void dispose() {
     _pageController?.dispose();
+    _isHeaderCollapsedNotifier.dispose();
     super.dispose();
   }
 
@@ -184,7 +187,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex++;
       _isMegoldasVisible = false;
-      _isHeaderCollapsed = false;
+      _isHeaderCollapsedNotifier.value = false;
     });
 
     // PageController alaphelyzetbe állítása az új jogesetnél
@@ -200,7 +203,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex--;
       _isMegoldasVisible = false;
-      _isHeaderCollapsed = false;
+      _isHeaderCollapsedNotifier.value = false;
     });
 
     // PageController alaphelyzetbe állítása az új jogesetnél
@@ -218,7 +221,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     setState(() {
       _currentIndex = index;
       _isMegoldasVisible = false;
-      _isHeaderCollapsed = false;
+      _isHeaderCollapsedNotifier.value = false;
     });
 
     // PageController alaphelyzetbe állítása az új jogesetnél
@@ -530,21 +533,12 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         if (notification is ScrollUpdateNotification) {
           // Csak a függőleges görgetést figyeljük a belső tartalomnál (SingleChildScrollView)
           // Mivel a PageView alatt vannak, a depth itt 1 lesz
-          if (notification.metrics.axis == Axis.vertical &&
-              notification.depth == 1) {
+          if (notification.metrics.axis == Axis.vertical) {
             final pixels = notification.metrics.pixels;
-            // Magasabb küszöb az összecsukáshoz (40px)
-            if (pixels > 40 && !_isHeaderCollapsed) {
-              setState(() {
-                _isHeaderCollapsed = true;
-              });
-            }
-            // Késleltetett kinyitás: csak akkor nyílik vissza, ha közel érünk a tetejéhez (20px)
-            // Így görgetés közben nem ugrik be rögtön, csak ha tényleg visszaértünk
-            else if (pixels < 20 && _isHeaderCollapsed) {
-              setState(() {
-                _isHeaderCollapsed = false;
-              });
+            if (pixels > 40 && !_isHeaderCollapsedNotifier.value) {
+              _isHeaderCollapsedNotifier.value = true;
+            } else if (pixels < 20 && _isHeaderCollapsedNotifier.value) {
+              _isHeaderCollapsedNotifier.value = false;
             }
           }
         }
@@ -553,70 +547,77 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
       child: Column(
         children: [
           // Fix fejléc a mobil lapozó fölött (animált összecsukással)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-              20,
-              _isHeaderCollapsed ? 10 : 20,
-              20,
-              _isHeaderCollapsed ? 10 : 0,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.grey.withValues(alpha: 0.2),
-                  width: _isHeaderCollapsed ? 1 : 0,
+          ValueListenableBuilder<bool>(
+            valueListenable: _isHeaderCollapsedNotifier,
+            builder: (context, isCollapsed, _) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: double.infinity,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  isCollapsed ? 10 : 20,
+                  20,
+                  isCollapsed ? 10 : 0,
                 ),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  currentJogeset.cim,
-                  style: TextStyle(
-                    fontSize: _isHeaderCollapsed ? 9 : 14,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF202122),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.grey.withValues(alpha: 0.2),
+                      width: isCollapsed ? 1 : 0,
+                    ),
                   ),
-                  maxLines: _isHeaderCollapsed ? 1 : null,
-                  overflow: _isHeaderCollapsed ? TextOverflow.ellipsis : null,
                 ),
-                if (!_isHeaderCollapsed) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.swipe,
-                        size: 14,
-                        color: Colors.grey.shade600,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      currentJogeset.cim,
+                      style: TextStyle(
+                        fontSize: isCollapsed ? 9 : 14,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF202122),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Lapozz jobbra a következő oldalért',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Colors.grey.shade600,
-                          fontStyle: FontStyle.italic,
-                        ),
+                      maxLines: isCollapsed ? 1 : null,
+                      overflow: isCollapsed ? TextOverflow.ellipsis : null,
+                    ),
+                    if (!isCollapsed) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.swipe,
+                            size: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Lapozz jobbra a következő oldalért',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.grey.shade600,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 8),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
+                  ],
+                ),
+              );
+            },
           ),
           Expanded(
             child: PageView.builder(
               controller: _pageController,
+              dragStartBehavior: DragStartBehavior.down,
               itemCount: pages.length,
               itemBuilder: (context, index) {
                 return SingleChildScrollView(
                   key: PageStorageKey(
                       'jogeset_${_document?.documentId}_${_currentIndex}_$index'),
+                  dragStartBehavior: DragStartBehavior.down,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
                   child: Column(
