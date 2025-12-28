@@ -28,6 +28,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
   List<String> _noteIds = [];
   List<String> _allomasIds = [];
   List<String> _dialogusIds = [];
+  List<String> _jogesetIds = [];
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -66,6 +67,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
         _noteIds = List<String>.from(data['noteIds'] ?? []);
         _allomasIds = List<String>.from(data['allomasIds'] ?? []);
         _dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
+        _jogesetIds = List<String>.from(data['jogesetIds'] ?? []);
       }
     }
 
@@ -77,8 +79,10 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
   Future<void> _saveBundle() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final totalDocs =
-        _noteIds.length + _allomasIds.length + _dialogusIds.length;
+    final totalDocs = _noteIds.length +
+        _allomasIds.length +
+        _dialogusIds.length +
+        _jogesetIds.length;
     if (totalDocs == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -102,6 +106,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
         'noteIds': _noteIds,
         'allomasIds': _allomasIds,
         'dialogusIds': _dialogusIds,
+        'jogesetIds': _jogesetIds,
         'modified': FieldValue.serverTimestamp(),
       };
 
@@ -224,6 +229,8 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
         _allomasIds.remove(id);
       } else if (type == 'dialogus') {
         _dialogusIds.remove(id);
+      } else if (type == 'jogeset') {
+        _jogesetIds.remove(id);
       }
     });
 
@@ -244,6 +251,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
           'noteIds': _noteIds,
           'allomasIds': _allomasIds,
           'dialogusIds': _dialogusIds,
+          'jogesetIds': _jogesetIds,
           'modified': FieldValue.serverTimestamp(),
         });
       } catch (e) {
@@ -393,6 +401,16 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
                 count: _dialogusIds.length,
                 type: 'dialogus',
                 ids: _dialogusIds,
+              ),
+              const SizedBox(height: 12),
+
+              // Jogesetek szekció
+              _buildDocumentSection(
+                title: 'Jogesetek',
+                icon: Icons.gavel,
+                count: _jogesetIds.length,
+                type: 'jogeset',
+                ids: _jogesetIds,
               ),
               const SizedBox(height: 24),
 
@@ -625,8 +643,10 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
       collectionName = 'notes';
     } else if (sectionType == 'allomasok') {
       collectionName = 'memoriapalota_allomasok';
-    } else {
+    } else if (sectionType == 'dialogus') {
       collectionName = 'dialogus_fajlok';
+    } else {
+      collectionName = 'jogesetek';
     }
 
     return FutureBuilder<DocumentSnapshot>(
@@ -642,7 +662,8 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
             title = data['title'] ??
                 data['name'] ??
                 data['utvonalNev'] ??
-                data['cím'] ??
+                data['cim'] ??
+                (sectionType == 'jogeset' ? data['documentId'] : null) ??
                 id;
 
             // Ikon meghatározása típus alapján (csak jegyzetek esetén)
@@ -669,6 +690,8 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
               itemIcon = Icons.train;
             } else if (sectionType == 'dialogus') {
               itemIcon = Icons.mic;
+            } else if (sectionType == 'jogeset') {
+              itemIcon = Icons.gavel;
             }
           }
         }

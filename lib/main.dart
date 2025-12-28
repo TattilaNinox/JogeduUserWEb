@@ -397,6 +397,16 @@ final _router = GoRouter(
         );
       },
     ),
+    GoRoute(
+      path: '/my-bundles/edit/:bundleId/add-jogeset',
+      builder: (context, state) {
+        final bundleId = state.pathParameters['bundleId']!;
+        return DocumentSelectionScreen(
+          bundleId: bundleId,
+          documentType: 'jogeset',
+        );
+      },
+    ),
   ],
 );
 

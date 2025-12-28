@@ -146,6 +146,8 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
               widget.documentType == 'allomasok' ? _selectedIds.toList() : [],
           'dialogusIds':
               widget.documentType == 'dialogus' ? _selectedIds.toList() : [],
+          'jogesetIds':
+              widget.documentType == 'jogeset' ? _selectedIds.toList() : [],
           'createdAt': FieldValue.serverTimestamp(),
           'modified': FieldValue.serverTimestamp(),
         });
@@ -164,6 +166,7 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
         final noteIds = List<String>.from(data['noteIds'] ?? []);
         final allomasIds = List<String>.from(data['allomasIds'] ?? []);
         final dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
+        final jogesetIds = List<String>.from(data['jogesetIds'] ?? []);
 
         // Itt nem hozzáadunk, hanem felülírjuk az adott típust a kijelöltekkel,
         // így az eltávolítás is működni fog a választó képernyőn.
@@ -176,12 +179,16 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
         } else if (widget.documentType == 'dialogus') {
           dialogusIds.clear();
           dialogusIds.addAll(_selectedIds);
+        } else if (widget.documentType == 'jogeset') {
+          jogesetIds.clear();
+          jogesetIds.addAll(_selectedIds);
         }
 
         batch.update(bundleRef, {
           'noteIds': noteIds,
           'allomasIds': allomasIds,
           'dialogusIds': dialogusIds,
+          'jogesetIds': jogesetIds,
           'modified': FieldValue.serverTimestamp(),
         });
       }
@@ -189,9 +196,15 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
       await batch.commit();
 
       if (mounted) {
+        String typeLabel = 'dokumentum';
+        if (widget.documentType == 'notes') typeLabel = 'jegyzet';
+        if (widget.documentType == 'allomasok') typeLabel = 'állomás';
+        if (widget.documentType == 'dialogus') typeLabel = 'dialógus';
+        if (widget.documentType == 'jogeset') typeLabel = 'jogeset';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('${_selectedIds.length} dokumentum hozzáadva!')),
+              content: Text('${_selectedIds.length} $typeLabel hozzáadva!')),
         );
         context.go('/my-bundles/edit/$bundleId');
       }
@@ -309,6 +322,27 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
         final dialogusKey =
             'dialogus|admin=$isAdmin|s=$_selectedScience|st=$_selectedStatus|t=$_selectedTag';
 
+        // 4. JOGESET
+        Query<Map<String, dynamic>>? jogesetQuery;
+        if (widget.documentType == 'jogeset') {
+          jogesetQuery = FirebaseConfig.firestore
+              .collection('jogesetek')
+              .where('science', isEqualTo: _selectedScience);
+
+          if (_selectedStatus != null && _selectedStatus!.isNotEmpty) {
+            jogesetQuery =
+                jogesetQuery.where('status', isEqualTo: _selectedStatus);
+          } else {
+            if (isAdmin) {
+              jogesetQuery = jogesetQuery.where('status',
+                  whereIn: const ['Published', 'Public', 'Draft']);
+            } else {
+              jogesetQuery = jogesetQuery
+                  .where('status', whereIn: const ['Published', 'Public']);
+            }
+          }
+        }
+
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: widget.documentType == 'notes'
               ? _cachedSnapshotsStream(notesKey, notesQuery)
@@ -325,251 +359,291 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
                           ? _cachedSnapshotsStream(dialogusKey, dialogusQuery)
                           : const Stream.empty(),
                   builder: (context, dSnap) {
-                    // Adatok összefésülése és szűrése (NoteCardGrid logika verbatim)
-                    List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs =
-                        [];
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: widget.documentType == 'jogeset' &&
+                              jogesetQuery != null
+                          ? _cachedSnapshotsStream('jogeset', jogesetQuery)
+                          : const Stream.empty(),
+                      builder: (context, jSnap) {
+                        // Adatok összefésülése és szűrése (NoteCardGrid logika verbatim)
+                        List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                            allDocs = [];
 
-                    if (widget.documentType == 'notes' && notesSnap.hasData) {
-                      allDocs.addAll(notesSnap.data!.docs
-                          .where((d) => d.data()['deletedAt'] == null));
-                    } else if (widget.documentType == 'allomasok' &&
-                        mpSnap.hasData) {
-                      allDocs.addAll(mpSnap.data!.docs);
-                    } else if (widget.documentType == 'dialogus' &&
-                        dSnap.hasData) {
-                      allDocs.addAll(dSnap.data!.docs.where((d) {
-                        final audioUrl = d.data()['audioUrl'] as String?;
-                        return audioUrl != null && audioUrl.isNotEmpty;
-                      }));
-                    }
+                        if (widget.documentType == 'notes' &&
+                            notesSnap.hasData) {
+                          allDocs.addAll(notesSnap.data!.docs
+                              .where((d) => d.data()['deletedAt'] == null));
+                        } else if (widget.documentType == 'allomasok' &&
+                            mpSnap.hasData) {
+                          allDocs.addAll(mpSnap.data!.docs);
+                        } else if (widget.documentType == 'dialogus' &&
+                            dSnap.hasData) {
+                          allDocs.addAll(dSnap.data!.docs.where((d) {
+                            final audioUrl = d.data()['audioUrl'] as String?;
+                            return audioUrl != null && audioUrl.isNotEmpty;
+                          }));
+                        } else if (widget.documentType == 'jogeset' &&
+                            jSnap.hasData) {
+                          allDocs.addAll(jSnap.data!.docs);
+                        }
 
-                    // Keresőszöveg szerinti szűrés
-                    final filteredDocs = allDocs.where((d) {
-                      final data = d.data();
-                      final title = (data['title'] ??
-                              data['name'] ??
-                              data['utvonalNev'] ??
-                              data['cim'] ??
-                              '')
-                          .toString()
-                          .toLowerCase();
-                      final category =
-                          (data['category'] ?? '').toString().toLowerCase();
-                      final search = _searchText.toLowerCase();
-                      return title.contains(search) ||
-                          category.contains(search);
-                    }).toList();
+                        // ABC sorrendbe rendezés
+                        allDocs.sort((a, b) {
+                          final dataA = a.data();
+                          final dataB = b.data();
+                          final String titleA = (dataA['title'] ??
+                                  dataA['name'] ??
+                                  dataA['utvonalNev'] ??
+                                  dataA['cim'] ??
+                                  (widget.documentType == 'jogeset'
+                                      ? dataA['documentId']
+                                      : null) ??
+                                  '')
+                              .toString()
+                              .toLowerCase();
+                          final String titleB = (dataB['title'] ??
+                                  dataB['name'] ??
+                                  dataB['utvonalNev'] ??
+                                  dataB['cim'] ??
+                                  (widget.documentType == 'jogeset'
+                                      ? dataB['documentId']
+                                      : null) ??
+                                  '')
+                              .toString()
+                              .toLowerCase();
+                          return titleA.compareTo(titleB);
+                        });
 
-                    // Hierarchikus csoportosítás (NoteCardGrid-hez hasonlóan)
-                    final Map<String,
-                            List<QueryDocumentSnapshot<Map<String, dynamic>>>>
-                        hierarchical = {};
-                    for (var doc in filteredDocs) {
-                      final isDialogus =
-                          doc.reference.path.contains('dialogus_fajlok');
-                      final category = isDialogus
-                          ? 'Dialogus tags'
-                          : (doc.data()['category'] as String? ?? 'Egyéb');
-                      hierarchical.putIfAbsent(category, () => []).add(doc);
-                    }
+                        // Keresőszöveg szerinti szűrés
+                        final filteredDocs = allDocs.where((d) {
+                          final data = d.data();
+                          final title = (data['title'] ??
+                                  data['name'] ??
+                                  data['utvonalNev'] ??
+                                  data['cim'] ??
+                                  '')
+                              .toString()
+                              .toLowerCase();
+                          final category =
+                              (data['category'] ?? '').toString().toLowerCase();
+                          final search = _searchText.toLowerCase();
+                          return title.contains(search) ||
+                              category.contains(search);
+                        }).toList();
 
-                    // Kategóriák és címkék kinyerése a szűrőkhöz (NoteCardGrid nem így csinálja, de mi itt kinyerjük a dinamizmushoz)
-                    final availableCats = hierarchical.keys.toList()..sort();
-                    final Set<String> availableTags = {};
-                    for (var doc in allDocs) {
-                      final tags = doc.data()['tags'] as List<dynamic>?;
-                      if (tags != null) {
-                        availableTags.addAll(tags.cast<String>());
-                      }
-                    }
+                        // Hierarchikus csoportosítás (NoteCardGrid-hez hasonlóan)
+                        final Map<
+                            String,
+                            List<
+                                QueryDocumentSnapshot<
+                                    Map<String, dynamic>>>> hierarchical = {};
+                        for (var doc in filteredDocs) {
+                          final isDialogus =
+                              doc.reference.path.contains('dialogus_fajlok');
+                          final category = isDialogus
+                              ? 'Dialogus tags'
+                              : (doc.data()['category'] as String? ?? 'Egyéb');
+                          hierarchical.putIfAbsent(category, () => []).add(doc);
+                        }
 
-                    return Scaffold(
-                      appBar: AppBar(
-                        title: Text(widget.documentType == 'notes'
-                            ? 'Jegyzetek kiválasztása'
-                            : (widget.documentType == 'allomasok'
-                                ? 'Állomások kiválasztása'
-                                : 'Dialógusok kiválasztása')),
-                        leading: IconButton(
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: () =>
-                              context.go('/my-bundles/edit/${widget.bundleId}'),
-                        ),
-                      ),
-                      body: Column(
-                        children: [
-                          // Szűrők
-                          Container(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                            color: Colors.white,
-                            child: Filters(
-                              categories: availableCats,
-                              sciences: _sciences,
-                              selectedCategory: _selectedCategory,
-                              selectedScience: _selectedScience,
-                              selectedStatus: _selectedStatus,
-                              selectedTag: _selectedTag,
-                              selectedType: _selectedType,
-                              vertical: MediaQuery.of(context).size.width < 600,
-                              showStatus: isAdmin,
-                              showType: widget.documentType == 'notes',
-                              tags: availableTags.toList()..sort(),
-                              onCategoryChanged: (v) =>
-                                  setState(() => _selectedCategory = v),
-                              onScienceChanged: (v) {},
-                              onStatusChanged: (v) =>
-                                  setState(() => _selectedStatus = v),
-                              onTagChanged: (v) =>
-                                  setState(() => _selectedTag = v),
-                              onTypeChanged: (v) =>
-                                  setState(() => _selectedType = v),
-                              onClearFilters: () => setState(() {
-                                _selectedCategory = null;
-                                _selectedStatus = null;
-                                _selectedTag = null;
-                                _selectedType = null;
-                                _searchController.clear();
-                                _searchText = '';
-                              }),
+                        // Kategóriák és típusok kinyerése a szűrőkhöz
+                        final availableCats = hierarchical.keys.toList()
+                          ..sort();
+                        final Set<String> availableTypes = {};
+                        if (widget.documentType == 'notes') {
+                          for (var doc in allDocs) {
+                            final type = doc.data()['type'] as String?;
+                            if (type != null) availableTypes.add(type);
+                          }
+                        } else if (widget.documentType == 'allomasok') {
+                          availableTypes.add('memoriapalota_allomasok');
+                        } else if (widget.documentType == 'dialogus') {
+                          availableTypes.add('dialogus_fajlok');
+                        }
+
+                        return Scaffold(
+                          appBar: AppBar(
+                            title: Text(widget.documentType == 'notes'
+                                ? 'Jegyzetek kiválasztása'
+                                : (widget.documentType == 'allomasok'
+                                    ? 'Állomások kiválasztása'
+                                    : (widget.documentType == 'dialogus'
+                                        ? 'Dialógusok kiválasztása'
+                                        : 'Jogesetek kiválasztása'))),
+                            leading: IconButton(
+                              icon: const Icon(Icons.arrow_back),
+                              onPressed: () => context
+                                  .go('/my-bundles/edit/${widget.bundleId}'),
                             ),
                           ),
-
-                          // Kereső
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: InputDecoration(
-                                hintText: 'Keresés...',
-                                prefixIcon: const Icon(Icons.search),
-                                suffixIcon: _searchText.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.clear),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _searchText = '');
-                                        })
-                                    : null,
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                                filled: true,
-                                fillColor: Colors.grey.shade100,
+                          body: Column(
+                            children: [
+                              // Szűrők
+                              Container(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                color: Colors.white,
+                                child: Filters(
+                                  categories: availableCats,
+                                  sciences: _sciences,
+                                  selectedCategory: _selectedCategory,
+                                  selectedScience: _selectedScience,
+                                  selectedStatus: _selectedStatus,
+                                  selectedTag: _selectedTag,
+                                  selectedType: _selectedType,
+                                  vertical:
+                                      MediaQuery.of(context).size.width < 600,
+                                  showStatus: false, // Elrejtve kérésre
+                                  showType: widget.documentType == 'notes',
+                                  showScience: false, // Elrejtve kérésre
+                                  showTag: false, // Elrejtve kérésre
+                                  availableTypes: availableTypes.toList()
+                                    ..sort(),
+                                  tags: const [], // Nem használjuk
+                                  onCategoryChanged: (v) =>
+                                      setState(() => _selectedCategory = v),
+                                  onScienceChanged: (v) {},
+                                  onStatusChanged: (v) =>
+                                      setState(() => _selectedStatus = v),
+                                  onTagChanged: (v) =>
+                                      setState(() => _selectedTag = v),
+                                  onTypeChanged: (v) =>
+                                      setState(() => _selectedType = v),
+                                  onClearFilters: () => setState(() {
+                                    _selectedCategory = null;
+                                    _selectedStatus = null;
+                                    _selectedTag = null;
+                                    _selectedType = null;
+                                    _searchController.clear();
+                                    _searchText = '';
+                                  }),
+                                ),
                               ),
-                              onChanged: (v) => setState(() => _searchText = v),
-                            ),
-                          ),
 
-                          // Mind kiválasztása vezérlő
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0, vertical: 8.0),
-                            color: Colors.grey.shade50,
-                            child: Row(
-                              children: [
-                                Checkbox(
-                                    value: _selectAll,
-                                    onChanged: (_) =>
-                                        _toggleSelectAll(filteredDocs)),
-                                Text(
-                                    'Mind kiválasztása (${filteredDocs.length})',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          ),
+                              // Kereső ELTÁVOLÍTVA a felhasználó kérésére
 
-                          // Hierarchikus lista (Folders)
-                          Expanded(
-                            child: filteredDocs.isEmpty
-                                ? const Center(child: Text('Nincs találat.'))
-                                : ListView(
-                                    children: hierarchical.entries.map((entry) {
-                                      final category = entry.key;
-                                      final docs = entry.value;
-                                      docs.sort((a, b) {
-                                        final titleA = (a.data()['title'] ??
-                                                a.data()['name'] ??
-                                                a.data()['cim'] ??
-                                                '')
-                                            .toString();
-                                        final titleB = (b.data()['title'] ??
-                                                b.data()['name'] ??
-                                                b.data()['cim'] ??
-                                                '')
-                                            .toString();
-                                        return titleA.compareTo(titleB);
-                                      });
+                              // Mind kiválasztása vezérlő
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16.0, vertical: 8.0),
+                                color: Colors.grey.shade50,
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                        value: _selectAll,
+                                        onChanged: (_) =>
+                                            _toggleSelectAll(filteredDocs)),
+                                    Text(
+                                        'Mind kiválasztása (${filteredDocs.length})',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
 
-                                      return ExpansionTile(
-                                        leading: const Icon(Icons.folder,
-                                            color: Color(0xFF1976D2)),
-                                        title: Text(
-                                            '$category (${docs.length})',
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w600)),
-                                        initiallyExpanded:
-                                            true, // Könnyebb használat érdekében alapból nyitva
-                                        children: docs.map((doc) {
-                                          final data = doc.data();
-                                          final title = (data['title'] ??
-                                                  data['name'] ??
-                                                  data['cim'] ??
-                                                  'Névtelen')
-                                              .toString();
-                                          final isSelected =
-                                              _selectedIds.contains(doc.id);
+                              // Hierarchikus lista (Folders)
+                              Expanded(
+                                child: filteredDocs.isEmpty
+                                    ? const Center(
+                                        child: Text('Nincs találat.'))
+                                    : ListView(
+                                        children:
+                                            hierarchical.entries.map((entry) {
+                                          final category = entry.key;
+                                          final docs = entry.value;
+                                          docs.sort((a, b) {
+                                            final titleA = (a.data()['title'] ??
+                                                    a.data()['name'] ??
+                                                    a.data()['cim'] ??
+                                                    '')
+                                                .toString();
+                                            final titleB = (b.data()['title'] ??
+                                                    b.data()['name'] ??
+                                                    b.data()['cim'] ??
+                                                    '')
+                                                .toString();
+                                            return titleA.compareTo(titleB);
+                                          });
 
-                                          return CheckboxListTile(
-                                            value: isSelected,
-                                            onChanged: (_) =>
-                                                _toggleSelection(doc.id),
-                                            title: Text(title),
-                                            secondary: Icon(_getIcon(data),
-                                                color: Theme.of(context)
-                                                    .primaryColor),
-                                            controlAffinity:
-                                                ListTileControlAffinity.leading,
+                                          return ExpansionTile(
+                                            leading: const Icon(Icons.folder,
+                                                color: Color(0xFF1976D2)),
+                                            title: Text(
+                                                '$category (${docs.length})',
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                            initiallyExpanded:
+                                                true, // Könnyebb használat érdekében alapból nyitva
+                                            children: docs.map((doc) {
+                                              final data = doc.data();
+                                              final title = (data['title'] ??
+                                                      data['name'] ??
+                                                      data['cim'] ??
+                                                      (widget.documentType ==
+                                                              'jogeset'
+                                                          ? data['documentId']
+                                                          : null) ??
+                                                      'Névtelen')
+                                                  .toString();
+                                              final isSelected =
+                                                  _selectedIds.contains(doc.id);
+
+                                              return CheckboxListTile(
+                                                value: isSelected,
+                                                onChanged: (_) =>
+                                                    _toggleSelection(doc.id),
+                                                title: Text(title),
+                                                secondary: Icon(_getIcon(data),
+                                                    color: Theme.of(context)
+                                                        .primaryColor),
+                                                controlAffinity:
+                                                    ListTileControlAffinity
+                                                        .leading,
+                                              );
+                                            }).toList(),
                                           );
                                         }).toList(),
-                                      );
-                                    }).toList(),
-                                  ),
-                          ),
+                                      ),
+                              ),
 
-                          // Akció gomb
-                          Container(
-                            padding: const EdgeInsets.all(16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, -2))
-                              ],
-                            ),
-                            child: SafeArea(
-                              child: SizedBox(
-                                width: double.infinity,
-                                height: 48,
-                                child: ElevatedButton.icon(
-                                  onPressed: _selectedIds.isEmpty
-                                      ? null
-                                      : _addSelectedDocuments,
-                                  icon: const Icon(Icons.check),
-                                  label: Text(
-                                      'Hozzáadás (${_selectedIds.length})'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        Theme.of(context).primaryColor,
-                                    foregroundColor: Colors.white,
+                              // Akció gomb
+                              Container(
+                                padding: const EdgeInsets.all(16.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, -2))
+                                  ],
+                                ),
+                                child: SafeArea(
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _selectedIds.isEmpty
+                                          ? null
+                                          : _addSelectedDocuments,
+                                      icon: const Icon(Icons.check),
+                                      label: Text(
+                                          'Hozzáadás (${_selectedIds.length})'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            Theme.of(context).primaryColor,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     );
                   },
                 );
@@ -597,8 +671,12 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
       }
     } else if (widget.documentType == 'allomasok') {
       return Icons.train;
+    } else if (widget.documentType == 'jogeset') {
+      return Icons.gavel;
+    } else if (widget.documentType == 'dialogus') {
+      return Icons.mic;
     } else {
-      return Icons.chat_bubble_outline;
+      return Icons.description;
     }
   }
 }

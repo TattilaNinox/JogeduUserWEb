@@ -23,8 +23,9 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
   Map<String, dynamic>? _bundleData;
   bool _isLoading = true;
 
-  // Szűréshez szükséges állapot
+  // Szűréshez és rendezéshez szükséges állapot
   Map<String, String> _docTypes = {}; // id -> type
+  Map<String, String> _docTitles = {}; // id -> title
   Set<String> _availableTypes = {};
   String _selectedType = 'all';
 
@@ -50,38 +51,46 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       final noteIds = List<String>.from(data['noteIds'] ?? []);
       final allomasIds = List<String>.from(data['allomasIds'] ?? []);
       final dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
+      final jogesetIds = List<String>.from(data['jogesetIds'] ?? []);
 
       Map<String, String> docTypes = {};
+      Map<String, String> docTitles = {};
       Set<String> availableTypes = {};
 
-      // Előtöltjük a típusokat a szűréshez
-      // Jegyzetek, kvízek, kártyák
-      for (String id in noteIds) {
-        final d =
-            await FirebaseConfig.firestore.collection('notes').doc(id).get();
-        if (d.exists) {
-          final type = d.data()?['type'] as String? ?? 'standard';
-          docTypes[id] = type;
-          availableTypes.add(type);
+      Future<void> processIds(
+          List<String> ids, String collection, String defaultType) async {
+        for (String id in ids) {
+          final d = await FirebaseConfig.firestore
+              .collection(collection)
+              .doc(id)
+              .get();
+          if (d.exists) {
+            final data = d.data()!;
+            final title = (data['title'] ??
+                    data['name'] ??
+                    (collection == 'jogesetek' ? data['documentId'] : null) ??
+                    id)
+                .toString();
+            final type = collection == 'notes'
+                ? (data['type'] as String? ?? 'standard')
+                : defaultType;
+            docTypes[id] = type;
+            docTitles[id] = title;
+            availableTypes.add(type);
+          }
         }
       }
 
-      // Memóriapalota állomások
-      for (String id in allomasIds) {
-        docTypes[id] = 'mp';
-        availableTypes.add('mp');
-      }
-
-      // Dialógusok
-      for (String id in dialogusIds) {
-        docTypes[id] = 'dialogue';
-        availableTypes.add('dialogue');
-      }
+      await processIds(noteIds, 'notes', 'standard');
+      await processIds(allomasIds, 'memoriapalota_allomasok', 'mp');
+      await processIds(dialogusIds, 'dialogus_fajlok', 'dialogue');
+      await processIds(jogesetIds, 'jogesetek', 'jogeset');
 
       if (mounted) {
         setState(() {
           _bundleData = data;
           _docTypes = docTypes;
+          _docTitles = docTitles;
           _availableTypes = availableTypes;
           _isLoading = false;
         });
@@ -120,6 +129,8 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
         List<String>.from(_bundleData!['allomasIds'] ?? []);
     final List<String> allDialogusIds =
         List<String>.from(_bundleData!['dialogusIds'] ?? []);
+    final List<String> allJogesetIds =
+        List<String>.from(_bundleData!['jogesetIds'] ?? []);
 
     // Típusok leképezése magyar névre és ikonra
     final Map<String, Map<String, dynamic>> typeConfig = {
@@ -135,29 +146,47 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
       'dialogue': {'label': 'Dialógus', 'icon': Icons.mic},
     };
 
-    // Lista szűrése
-    final filteredNoteIds = allNoteIds.where((id) {
-      if (_selectedType == 'all') return true;
-      final docType = _docTypes[id];
-      if (_selectedType == 'standard' || _selectedType == 'text') {
-        return docType == 'standard' || docType == 'text';
+    // Összesített és szűrt lista összeállítása
+    final List<Map<String, dynamic>> allItems = [];
+
+    void addFilteredItems(
+        List<String> ids, String collection, Color defaultColor) {
+      for (String id in ids) {
+        final docType = _docTypes[id];
+        if (docType == null) continue; // Nem töltődött be / nem létezik
+
+        bool matches = false;
+        if (_selectedType == 'all') {
+          matches = true;
+        } else if (_selectedType == 'standard' || _selectedType == 'text') {
+          matches = (docType == 'standard' || docType == 'text');
+        } else {
+          matches = (docType == _selectedType);
+        }
+
+        if (matches) {
+          allItems.add({
+            'id': id,
+            'collection': collection,
+            'defaultColor': defaultColor,
+            'title': _docTitles[id] ?? id,
+          });
+        }
       }
-      return docType == _selectedType;
-    }).toList();
+    }
 
-    final filteredAllomasIds = allAllomasIds.where((id) {
-      if (_selectedType == 'all') return true;
-      return _selectedType == 'mp';
-    }).toList();
+    addFilteredItems(allNoteIds, 'notes', Colors.blue.shade700);
+    addFilteredItems(
+        allAllomasIds, 'memoriapalota_allomasok', Colors.orange.shade700);
+    addFilteredItems(allDialogusIds, 'dialogus_fajlok', Colors.green.shade700);
+    addFilteredItems(allJogesetIds, 'jogesetek', const Color(0xFF1E3A8A));
 
-    final filteredDialogusIds = allDialogusIds.where((id) {
-      if (_selectedType == 'all') return true;
-      return _selectedType == 'dialogue';
-    }).toList();
+    // ABC sorrendbe rendezés cím alapján
+    allItems.sort((a, b) => (a['title'] as String)
+        .toLowerCase()
+        .compareTo((b['title'] as String).toLowerCase()));
 
-    final bool isEmpty = filteredNoteIds.isEmpty &&
-        filteredAllomasIds.isEmpty &&
-        filteredDialogusIds.isEmpty;
+    final bool isEmpty = allItems.isEmpty;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
@@ -353,7 +382,7 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               Padding(
                 padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
                 child: Text(
-                  '${typeConfig[_selectedType]?['label'] ?? _selectedType} (${filteredNoteIds.length + filteredAllomasIds.length + filteredDialogusIds.length})',
+                  '${typeConfig[_selectedType]?['label'] ?? _selectedType} (${allItems.length})',
                   style: TextStyle(
                     fontSize: isMobile ? 14 : 15,
                     fontWeight: FontWeight.bold,
@@ -375,26 +404,16 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
               ),
               clipBehavior: Clip.antiAlias,
               child: Column(
-                children: [
-                  ...filteredNoteIds.map((id) => _buildDocumentTile(
-                        id: id,
-                        collection: 'notes',
-                        defaultColor: Colors.blue.shade700,
-                        isMobile: isMobile,
-                      )),
-                  ...filteredAllomasIds.map((id) => _buildDocumentTile(
-                        id: id,
-                        collection: 'memoriapalota_allomasok',
-                        defaultColor: Colors.orange.shade700,
-                        isMobile: isMobile,
-                      )),
-                  ...filteredDialogusIds.map((id) => _buildDocumentTile(
-                        id: id,
-                        collection: 'dialogus_fajlok',
-                        defaultColor: Colors.green.shade700,
-                        isMobile: isMobile,
-                      )),
-                ],
+                children: allItems.map((item) {
+                  return _buildDocumentTile(
+                    id: item['id'],
+                    collection: item['collection'],
+                    defaultColor: item['defaultColor'],
+                    isMobile: isMobile,
+                    cachedTitle:
+                        item['title'], // Átadjuk az előre betöltött címet
+                  );
+                }).toList(),
               ),
             ),
           ],
@@ -439,7 +458,12 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     required String collection,
     required Color defaultColor,
     required bool isMobile,
+    String? cachedTitle,
   }) {
+    // Ha van cache-elt cím, nem kell FutureBuilder az adatokhoz,
+    // hacsak nem kell audioUrl vagy típus-specifikus ikon.
+    // De jelenleg a típus is és cím is pre-loaded a rendezéshez,
+    // kivéve az audioUrl-t a dialógushoz.
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
       builder: (context, snapshot) {
@@ -479,18 +503,29 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           );
         }
 
-        if (snapshot.hasData && snapshot.data!.exists) {
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          final String title = data['title'] ?? data['name'] ?? 'Névtelen';
-          final type = data['type'] as String? ?? 'standard';
+        if (snapshot.hasData && snapshot.data!.exists || cachedTitle != null) {
+          final data = snapshot.data?.data() as Map<String, dynamic>?;
+          String? jogesetDocId;
+          if (collection == 'jogesetek') {
+            jogesetDocId = data?['documentId'] as String?;
+          }
+
+          final String title = cachedTitle ??
+              data?['title'] as String? ??
+              data?['name'] as String? ??
+              jogesetDocId ??
+              'Névtelen';
+          final type = _docTypes[id] ?? data?['type'] as String? ?? 'standard';
           IconData icon = Icons.description;
           String? audioUrl;
 
           if (collection == 'dialogus_fajlok') {
-            audioUrl = data['audioUrl'] as String?;
+            audioUrl = data?['audioUrl'] as String?;
             icon = Icons.mic;
           } else if (collection == 'memoriapalota_allomasok') {
             icon = Icons.directions_bus;
+          } else if (collection == 'jogesetek') {
+            icon = Icons.gavel;
           } else {
             switch (type) {
               case 'deck':

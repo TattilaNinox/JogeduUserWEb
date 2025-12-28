@@ -16,6 +16,7 @@ class BundleCard extends StatelessWidget {
   final int noteCount;
   final int allomasCount;
   final int dialogusCount;
+  final int jogesetCount;
   final Timestamp? createdAt;
 
   const BundleCard({
@@ -26,12 +27,13 @@ class BundleCard extends StatelessWidget {
     required this.noteCount,
     required this.allomasCount,
     required this.dialogusCount,
+    required this.jogesetCount,
     this.createdAt,
   });
 
   @override
   Widget build(BuildContext context) {
-    final totalCount = noteCount + allomasCount + dialogusCount;
+    final totalCount = noteCount + allomasCount + dialogusCount + jogesetCount;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 

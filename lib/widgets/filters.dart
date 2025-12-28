@@ -38,7 +38,16 @@ class Filters extends StatefulWidget {
     this.vertical = false,
     this.showStatus = false,
     this.showType = true,
+    this.showCategory = true,
+    this.showScience = true,
+    this.showTag = true,
+    this.availableTypes,
   });
+
+  final bool showCategory;
+  final bool showScience;
+  final bool showTag;
+  final List<String>? availableTypes;
 
   @override
   State<Filters> createState() => _FiltersState();
@@ -51,15 +60,31 @@ class _FiltersState extends State<Filters> {
   String? _tag;
   String? _type;
 
-  static const _noteTypes = [
-    'text',
-    'interactive',
-    'dynamic_quiz',
-    'dynamic_quiz_dual',
-    'deck',
-    'source',
-    'memoriapalota_allomasok'
-  ];
+  static const Map<String, Map<String, dynamic>> _typeMetaData = {
+    'text': {'label': 'Szöveges', 'icon': Icons.description},
+    'interactive': {'label': 'Interaktív', 'icon': Icons.touch_app},
+    'dynamic_quiz': {'label': 'Kvíz', 'icon': Icons.quiz},
+    'dynamic_quiz_dual': {'label': 'Páros kvíz', 'icon': Icons.quiz},
+    'deck': {'label': 'Tanulókártya', 'icon': Icons.style},
+    'source': {'label': 'Forrás', 'icon': Icons.menu_book},
+    'memoriapalota_allomasok': {'label': 'Memóriapalota', 'icon': Icons.train},
+    'jogeset': {'label': 'Jogeset', 'icon': Icons.gavel},
+    'dialogus_fajlok': {'label': 'Dialógus', 'icon': Icons.chat_bubble_outline},
+  };
+
+  List<String> get _noteTypes =>
+      widget.availableTypes ??
+      [
+        'text',
+        'interactive',
+        'dynamic_quiz',
+        'dynamic_quiz_dual',
+        'deck',
+        'source',
+        'memoriapalota_allomasok',
+        'jogeset',
+        'dialogus_fajlok'
+      ];
 
   @override
   void initState() {
@@ -140,39 +165,45 @@ class _FiltersState extends State<Filters> {
       ));
     }
 
-    add(_buildDropdown<String>(
-      hint: 'Kategória',
-      value: _category,
-      items: widget.categories,
-      onChanged: (v) {
-        setState(() => _category = v);
-        widget.onCategoryChanged(v);
-      },
-      isExpanded: widget.vertical,
-    ));
+    if (widget.showCategory) {
+      add(_buildDropdown<String>(
+        hint: 'Kategória',
+        value: _category,
+        items: widget.categories,
+        onChanged: (v) {
+          setState(() => _category = v);
+          widget.onCategoryChanged(v);
+        },
+        isExpanded: widget.vertical,
+      ));
+    }
 
     // Tudomány szűrő - jelenleg csak "Jogász" elérhető
-    add(_buildDropdown<String>(
-      hint: 'Tudomány',
-      value: _science,
-      items: widget.sciences,
-      onChanged: (v) {
-        setState(() => _science = v);
-        widget.onScienceChanged(v);
-      },
-      isExpanded: widget.vertical,
-    ));
+    if (widget.showScience) {
+      add(_buildDropdown<String>(
+        hint: 'Tudomány',
+        value: _science,
+        items: widget.sciences,
+        onChanged: (v) {
+          setState(() => _science = v);
+          widget.onScienceChanged(v);
+        },
+        isExpanded: widget.vertical,
+      ));
+    }
 
-    add(_buildDropdown<String>(
-      hint: 'Címke',
-      value: _tag,
-      items: widget.tags,
-      onChanged: (v) {
-        setState(() => _tag = v);
-        widget.onTagChanged(v);
-      },
-      isExpanded: widget.vertical,
-    ));
+    if (widget.showTag) {
+      add(_buildDropdown<String>(
+        hint: 'Címke',
+        value: _tag,
+        items: widget.tags,
+        onChanged: (v) {
+          setState(() => _tag = v);
+          widget.onTagChanged(v);
+        },
+        isExpanded: widget.vertical,
+      ));
+    }
 
     add(TextButton(
       onPressed: () {
@@ -272,16 +303,38 @@ class _FiltersState extends State<Filters> {
         borderRadius: BorderRadius.circular(8),
         selectedItemBuilder: (BuildContext context) {
           return items.map<Widget>((T item) {
+            String label = item.toString();
+            IconData? icon;
+
+            if (hint == 'Típus' && item is String) {
+              final meta = _typeMetaData[item];
+              if (meta != null) {
+                label = meta['label'] as String;
+                icon = meta['icon'] as IconData;
+              }
+            }
+
             return Align(
               alignment: AlignmentDirectional.centerStart,
-              child: Text(
-                item.toString(),
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF111827),
-                  fontWeight: FontWeight.w500,
-                ),
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: const Color(0xFF1E3A8A)),
+                    const SizedBox(width: 8),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF111827),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             );
           }).toList();
@@ -292,13 +345,35 @@ class _FiltersState extends State<Filters> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
-                    child: Text(
-                      e.toString(),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF111827),
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        if (hint == 'Típus' && e is String) ...[
+                          Icon(
+                            _typeMetaData[e]?['icon'] as IconData? ??
+                                Icons.description,
+                            size: 18,
+                            color: const Color(0xFF6B7280),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _typeMetaData[e]?['label'] as String? ??
+                                e.toString(),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF111827),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ] else
+                          Text(
+                            e.toString(),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF111827),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
                     ),
                   ),
                 ))

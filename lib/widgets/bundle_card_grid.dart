@@ -122,6 +122,7 @@ class BundleCardGrid extends StatelessWidget {
             final noteIds = (data['noteIds'] as List<dynamic>?) ?? [];
             final allomasIds = (data['allomasIds'] as List<dynamic>?) ?? [];
             final dialogusIds = (data['dialogusIds'] as List<dynamic>?) ?? [];
+            final jogesetIds = (data['jogesetIds'] as List<dynamic>?) ?? [];
             final createdAt =
                 (data['createdAt'] ?? data['created']) as Timestamp?;
 
@@ -132,6 +133,7 @@ class BundleCardGrid extends StatelessWidget {
               noteCount: noteIds.length,
               allomasCount: allomasIds.length,
               dialogusCount: dialogusIds.length,
+              jogesetCount: jogesetIds.length,
               createdAt: createdAt,
             );
           },

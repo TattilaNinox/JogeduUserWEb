@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -989,8 +987,9 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
                 ),
                 onTap: () {
                   _jumpToJogeset(index);
-                  if (isMobile)
+                  if (isMobile) {
                     Navigator.pop(context); // Mobilnál bezárjuk a sheet-et
+                  }
                 },
                 selected: isSelected,
                 tileColor:
