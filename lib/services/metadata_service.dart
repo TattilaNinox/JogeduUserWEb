@@ -17,17 +17,46 @@ class MetadataService {
           .doc(docId)
           .get();
 
-      if (!doc.exists) {
-        return {
-          'categories': [],
-          'tags': [],
-        };
+      if (doc.exists) {
+        final data = doc.data() ?? {};
+        final categories = List<String>.from(data['categories'] ?? []);
+        final tags = List<String>.from(data['tags'] ?? []);
+
+        if (categories.isNotEmpty) {
+          return {
+            'categories': categories,
+            'tags': tags,
+          };
+        }
       }
 
-      final data = doc.data() ?? {};
+      // Fallback: ha nincs metadata, olvassuk ki a kollekciókból
+      // Ez lassabb, de garantáltan működik
+      final categoriesSnapshot = await FirebaseConfig.firestore
+          .collection('categories')
+          .where('science', isEqualTo: science)
+          .get();
+
+      final tagsSnapshot = await FirebaseConfig.firestore
+          .collection('tags') // Feltételezve, hogy van tags kollekció
+          .get();
+
+      final categories = categoriesSnapshot.docs
+          .map((d) => d.data()['name'] as String? ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final tags = tagsSnapshot.docs
+          .map((d) => d.data()['name'] as String? ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      // Opcionális: frissíthetjük a metadata-t a jövőre nézve
+      // if (categories.isNotEmpty) updateMetadata(science, categories, tags);
+
       return {
-        'categories': List<String>.from(data['categories'] ?? []),
-        'tags': List<String>.from(data['tags'] ?? []),
+        'categories': categories,
+        'tags': tags,
       };
     } catch (e) {
       return {

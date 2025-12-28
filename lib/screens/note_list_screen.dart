@@ -171,6 +171,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
         setState(() {
           _categories = categories..sort();
         });
+        debugPrint('🟢 Kategóriák betöltve: ${_categories.length} db');
+      } else {
+        debugPrint('🔴 Mounted check failed in _loadCategories');
       }
     } catch (e) {
       debugPrint('🔴 Hiba a kategóriák betöltésekor: $e');
@@ -204,6 +207,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
         setState(() {
           _tags = tags..sort();
         });
+        debugPrint('🟢 Címkék betöltve: ${_tags.length} db');
+      } else {
+        debugPrint('🔴 Mounted check failed in _loadTags');
       }
 
       // Biztonsági háló: ha az URL/aktuális kiválasztott címke nem volt a metaadatokban, adjuk hozzá.

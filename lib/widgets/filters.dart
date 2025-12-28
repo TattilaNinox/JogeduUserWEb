@@ -274,10 +274,13 @@ class _FiltersState extends State<Filters> {
       child: DropdownButtonFormField<T>(
         key: ValueKey('${hint}_${items.length}_${items.join(",")}'),
         initialValue: effectiveValue,
+        onChanged: items.isEmpty ? null : onChanged, // Disable if empty
         decoration: InputDecoration(
           labelText: hint,
           filled: true,
-          fillColor: Colors.white,
+          fillColor: items.isEmpty
+              ? Colors.grey.shade100
+              : Colors.white, // Visual feedback
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
@@ -286,15 +289,19 @@ class _FiltersState extends State<Filters> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            borderSide: BorderSide(
+                color: items.isEmpty
+                    ? Colors.grey.shade300
+                    : const Color(0xFFE5E7EB)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.5),
           ),
-          labelStyle: const TextStyle(
+          labelStyle: TextStyle(
             fontSize: 13,
-            color: Color(0xFF6B7280),
+            color:
+                items.isEmpty ? Colors.grey.shade400 : const Color(0xFF6B7280),
           ),
         ),
         isExpanded: true,
@@ -378,7 +385,6 @@ class _FiltersState extends State<Filters> {
                   ),
                 ))
             .toList(),
-        onChanged: onChanged,
         style: const TextStyle(
           fontSize: 13,
           color: Color(0xFF111827),
