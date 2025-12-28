@@ -8,9 +8,8 @@ class MetadataService {
   /// Lekéri a kategóriákat és címkéket egyetlen dokumentumból.
   /// Ha a dokumentum nem létezik, üres listákkal tér vissza.
   static Future<Map<String, List<String>>> getMetadata(String science) async {
+    // 1. Próbálkozás: Metadata dokumentum olvasása (Gyorsítótár)
     try {
-      // Megjegyzés: A 'science' paraméter alapján keressük a megfelelő dokumentumot.
-      // Példa: metadata/jogasz
       final docId = science.toLowerCase().replaceAll('á', 'a');
       print('🔍 MetadataService: Keresés docId=$docId (science=$science)');
       final doc = await FirebaseConfig.firestore
@@ -31,17 +30,22 @@ class MetadataService {
             'categories': categories,
             'tags': tags,
           };
-        } else {
-          print(
-              '⚠️ MetadataService: Doc exists but categories empty -> Fallback');
         }
       } else {
         print(
-            '⚠️ MetadataService: Metadata doc ($docId) NOT found -> Fallback');
+            '⚠️ MetadataService: Metadata doc ($docId) NOT found. Proceeding to fallback.');
       }
+    } catch (e) {
+      // Permission denied vagy más hiba -> Folytatjuk a fallback-kel
+      print(
+          '⚠️ MetadataService: Optimalizált olvasás sikertelen ($e). Folytatás fallback stratégiával.');
+    }
 
-      // Fallback: ha nincs metadata, olvassuk ki a kollekciókból
-      print('🔄 MetadataService: Fallback indul...');
+    // 2. Próbálkozás: Fallback - közvetlen kollekció olvasás
+    try {
+      print(
+          '🔄 MetadataService: Fallback indul (Categories & Tags kollekciók)...');
+
       final categoriesSnapshot = await FirebaseConfig.firestore
           .collection('categories')
           .where('science', isEqualTo: science)
@@ -50,9 +54,8 @@ class MetadataService {
       print(
           '🔄 MetadataService: Fallback cats query result: ${categoriesSnapshot.docs.length} docs');
 
-      final tagsSnapshot = await FirebaseConfig.firestore
-          .collection('tags') // Feltételezve, hogy van tags kollekció
-          .get();
+      final tagsSnapshot =
+          await FirebaseConfig.firestore.collection('tags').get();
 
       print(
           '🔄 MetadataService: Fallback tags query result: ${tagsSnapshot.docs.length} docs');
@@ -67,8 +70,6 @@ class MetadataService {
           .where((s) => s.isNotEmpty)
           .toList();
 
-      // Opcionális: frissíthetjük a metadata-t a jövőre nézve
-      // if (categories.isNotEmpty) updateMetadata(science, categories, tags);
       print(
           '✅ MetadataService: Final Fallback Lists -> Cats: ${categories.length}, Tags: ${tags.length}');
 
@@ -77,7 +78,7 @@ class MetadataService {
         'tags': tags,
       };
     } catch (e) {
-      print('🔴 MetadataService CRITICAL ERROR: $e');
+      print('🔴 MetadataService CRITICAL FALLBACK ERROR: $e');
       return {
         'categories': [],
         'tags': [],
