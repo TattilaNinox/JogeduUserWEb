@@ -87,12 +87,12 @@ function getSimplePayErrorMessage(errorCodes) {
   if (!errorCodes || !Array.isArray(errorCodes) || errorCodes.length === 0) {
     return 'Ismeretlen hiba t├Ârt├ęnt a fizet├ęs sor├ín';
   }
-  
+
   const messages = errorCodes.map(code => {
     const msg = SIMPLEPAY_ERROR_MESSAGES[code.toString()];
     return msg ? `${code}: ${msg}` : `${code}: Ismeretlen hibak├│d`;
   });
-  
+
   return messages.join('; ');
 }
 
@@ -149,7 +149,7 @@ exports.requestDeviceChange = onCall(async (request) => {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 15 * 60 * 1000; // 15 perc
-  
+
   const snap = await db.collection('users').where('email', '==', email).limit(1).get();
   if (snap.empty) {
     throw new Error('not-found: Nem tal├ílhat├│ felhaszn├íl├│ ezzel az email c├şmmel.');
@@ -208,16 +208,16 @@ exports.verifyAndChangeDevice = onCall(async (request) => {
     // A Firebase Auth UID-t haszn├íljuk a dokumentum ID-k├ęnt
     const userData = userDoc.data();
     const firebaseAuthUid = userData.firebaseAuthUid || userDoc.id;
-    
+
     console.log(`Found user with email ${email}, Firestore ID: ${userDoc.id}, Firebase Auth UID: ${firebaseAuthUid}`);
-    
+
     // Email c├şm valid├íl├ísa - ha a 6 jegy┼▒ k├│d helyes, az email is hiteles├ştett
     await admin.auth().updateUser(firebaseAuthUid, { emailVerified: true });
     console.log(`Email verified for user ${firebaseAuthUid}`);
-    
+
     // A Firebase Auth UID-val friss├ştj├╝k a dokumentumot
     const targetDoc = db.collection('users').doc(firebaseAuthUid);
-    
+
     // El┼Ĺsz├Âr friss├ştj├╝k a fingerprint-et
     await targetDoc.set({
       authorizedDeviceFingerprint: newFingerprint,
@@ -225,15 +225,15 @@ exports.verifyAndChangeDevice = onCall(async (request) => {
       deviceChange: admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-    
+
     console.log(`Device changed for user ${firebaseAuthUid}, new fingerprint: ${newFingerprint}`);
-    
+
     // Majd invalid├íljuk a tokeneket - Firebase Auth user ID-t haszn├ílunk
     try {
       // A Firestore user dokumentumban keress├╝k a Firebase Auth UID-t
       const userData = userDoc.data();
       const firebaseAuthUid = userData.firebaseAuthUid || userDoc.id; // Fallback a Firestore ID-re
-      
+
       console.log(`Attempting to revoke tokens for Firebase Auth UID: ${firebaseAuthUid}`);
       await admin.auth().revokeRefreshTokens(firebaseAuthUid);
       console.log(`Refresh tokens revoked for user ${firebaseAuthUid}`);
@@ -241,7 +241,7 @@ exports.verifyAndChangeDevice = onCall(async (request) => {
       console.error('Failed to revoke refresh tokens:', revokeError);
       // Folytatjuk, m├ęg ha a token invalid├íl├ís sikertelen is
     }
-    
+
     return { ok: true };
   } catch (error) {
     console.error('Error in verifyAndChangeDevice:', error);
@@ -282,7 +282,7 @@ exports.verifyAndChangeDevice = onCall(async (request) => {
 /**
  * Webes fizet├ęs ind├şt├ísa SimplePay v2 API-val
  */
-exports.initiateWebPayment = onCall({ 
+exports.initiateWebPayment = onCall({
   secrets: ['SIMPLEPAY_MERCHANT_ID', 'SIMPLEPAY_SECRET_KEY', 'NEXTAUTH_URL', 'SIMPLEPAY_ENV']
 }, async (request) => {
   try {
@@ -309,32 +309,32 @@ exports.initiateWebPayment = onCall({
     }
 
     const userData = userDoc.data();
-    
+
     // Admin ellenőrzés - admin számára 5 forint az ár
     const isAdmin = (userData.isAdmin === true) || (userData.email === 'tattila.ninox@gmail.com');
     const finalPrice = isAdmin ? 5 : plan.price;
-    
-    console.log('[initiateWebPayment] Admin check:', { 
-      userId, 
-      isAdmin, 
-      originalPrice: plan.price, 
-      finalPrice 
+
+    console.log('[initiateWebPayment] Admin check:', {
+      userId,
+      isAdmin,
+      originalPrice: plan.price,
+      finalPrice
     });
-    
+
     // SZERVER OLDALI ELLEN┼ÉRZ├ëS: Adattov├íbb├şt├ísi nyilatkozat elfogad├ísa
     if (!userData.dataTransferConsentLastAcceptedDate) {
       console.log('[initiateWebPayment] HIBA: Adattov├íbb├şt├ísi nyilatkozat nincs elfogadva', { userId });
       throw new HttpsError(
-        'failed-precondition', 
+        'failed-precondition',
         'Az adattov├íbb├şt├ísi nyilatkozat elfogad├ísa sz├╝ks├ęges a fizet├ęs ind├şt├ís├íhoz. K├ęrj├╝k, fogadja el a nyilatkozatot ├ęs pr├│b├ílja ├║jra.'
       );
     }
-    
+
     console.log('[initiateWebPayment] Adattov├íbb├şt├ísi nyilatkozat elfogadva:', {
       userId,
       acceptedDate: userData.dataTransferConsentLastAcceptedDate
     });
-    
+
     const email = userData.email;
     const name = userData.firstName && userData.lastName ? `${userData.firstName} ${userData.lastName}`.trim() : userData.displayName;
 
@@ -356,7 +356,7 @@ exports.initiateWebPayment = onCall({
     const timeout = new Date(Date.now() + 30 * 60 * 1000)
       .toISOString()
       .replace(/\.\d{3}Z$/, 'Z');
-    
+
     const simplePayRequest = {
       salt: crypto.randomBytes(16).toString('hex'),
       merchant: SIMPLEPAY_CONFIG.merchantId.trim(),
@@ -383,13 +383,13 @@ exports.initiateWebPayment = onCall({
         price: finalPrice,
       }],
     };
-    
+
     // Ellen┼Ĺrizz├╝k, hogy a JSON form├íz├ís helyes-e
     const payloadKeys = Object.keys(simplePayRequest);
     if (!payloadKeys.includes('items') || !Array.isArray(simplePayRequest.items) || simplePayRequest.items.length === 0) {
       throw new HttpsError('invalid-argument', 'Az items t├Âmb hib├ísan form├ízott vagy hi├ínyzik');
     }
-    
+
     // Ellen┼Ĺrizz├╝k, hogy minden sz├╝ks├ęges kulcs megvan-e
     const requiredKeys = ['salt', 'merchant', 'orderRef', 'customerEmail', 'language', 'currency', 'timeout', 'methods', 'urls', 'items'];
     const missingKeys = requiredKeys.filter(key => !payloadKeys.includes(key));
@@ -424,7 +424,7 @@ exports.initiateWebPayment = onCall({
     const paymentData = await response.json();
     if (!paymentData?.paymentUrl) {
       const errorCodes = paymentData?.errorCodes;
-      
+
       // R├ęszletes log a 5321-es hibak├│dhoz
       if (Array.isArray(errorCodes) && errorCodes.includes('5321')) {
         console.error('=================================================================');
@@ -436,7 +436,7 @@ exports.initiateWebPayment = onCall({
         console.error('Gener├ílt al├í├şr├ís:', signature);
         console.error('=================================================================');
       }
-      
+
       // Audit log - sikertelen fizet├ęs ind├şt├ís
       await db.collection('payment_audit_logs').add({
         userId,
@@ -452,9 +452,9 @@ exports.initiateWebPayment = onCall({
           errorMessage: getSimplePayErrorMessage(errorCodes),
         },
       });
-      
+
       console.error('[initiateWebPayment] SimplePay start returned logical error', { orderRef, errorCodes, rawResponse: paymentData, payload: simplePayRequest });
-      
+
       // R├ęszletes hiba├╝zenet visszaad├ísa
       const detailedError = getSimplePayErrorMessage(errorCodes);
       throw new HttpsError('failed-precondition', `SimplePay hiba: ${detailedError}`);
@@ -629,14 +629,14 @@ exports.updatePaymentStatusFromCallback = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Bejelentkez├ęs sz├╝ks├ęges');
   }
-  
+
   const userId = request.auth.uid;
   const { orderRef, callbackStatus } = request.data || {};
-  
+
   if (!orderRef || !callbackStatus) {
     throw new HttpsError('invalid-argument', 'orderRef ├ęs callbackStatus sz├╝ks├ęges');
   }
-  
+
   // Callback status Ôćĺ Firestore status mapping
   const statusMap = {
     'success': 'COMPLETED',
@@ -644,55 +644,55 @@ exports.updatePaymentStatusFromCallback = onCall(async (request) => {
     'timeout': 'TIMEOUT',
     'cancelled': 'CANCELLED',
   };
-  
+
   const firestoreStatus = statusMap[callbackStatus] || 'INITIATED';
-  
+
   try {
     // 2. Payment dokumentum lek├ęr├ęse
     const paymentDoc = await db.collection('web_payments').doc(orderRef).get();
-    
+
     if (!paymentDoc.exists) {
       throw new HttpsError('not-found', 'Fizet├ęs nem tal├ílhat├│');
     }
-    
+
     const paymentData = paymentDoc.data();
-    
+
     // 3. User ID valid├íci├│ - CSAK a saj├ít fizet├ęs├ęt friss├ştheti!
     if (paymentData.userId !== userId) {
-      console.warn('[updatePaymentStatusFromCallback] UNAUTHORIZED attempt', { 
-        userId, 
-        orderRef, 
-        paymentUserId: paymentData.userId 
+      console.warn('[updatePaymentStatusFromCallback] UNAUTHORIZED attempt', {
+        userId,
+        orderRef,
+        paymentUserId: paymentData.userId
       });
       throw new HttpsError('permission-denied', 'Nincs jogosults├íg ehhez a fizet├ęshez');
     }
-    
+
     // 4. St├ítusz v├ędelem - Ne ├şrjuk fel├╝l, ha m├ír v├ęgleges
     // (Az IPN webhook tov├íbbra is fel├╝l├şrhat, mert az admin jogokkal fut)
     const finalStatuses = ['COMPLETED', 'FAILED'];
     if (finalStatuses.includes(paymentData.status)) {
-      console.log('[updatePaymentStatusFromCallback] Already in final status', { 
-        orderRef, 
+      console.log('[updatePaymentStatusFromCallback] Already in final status', {
+        orderRef,
         currentStatus: paymentData.status,
         attemptedStatus: firestoreStatus
       });
       // Visszaadjuk a jelenlegi st├ítuszt, de nem friss├ştj├╝k
       return { success: false, status: paymentData.status, message: 'M├ír v├ęgleges st├ítuszban van' };
     }
-    
+
     // 5. Friss├şt├ęs v├ęgrehajt├ísa
     await db.collection('web_payments').doc(orderRef).update({
       status: firestoreStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
-    console.log('[updatePaymentStatusFromCallback] Updated successfully', { 
+
+    console.log('[updatePaymentStatusFromCallback] Updated successfully', {
       userId,
-      orderRef, 
-      callbackStatus, 
-      firestoreStatus 
+      orderRef,
+      callbackStatus,
+      firestoreStatus
     });
-    
+
     return { success: true, status: firestoreStatus };
   } catch (error) {
     // Ha m├ír HttpsError, akkor ├ítdobjuk
@@ -708,61 +708,61 @@ exports.updatePaymentStatusFromCallback = onCall(async (request) => {
 /**
  * SimplePay webhook feldolgoz├ís
  */
-exports.processWebPaymentWebhook = onCall({ secrets: ['SIMPLEPAY_SECRET_KEY','NEXTAUTH_URL','SIMPLEPAY_ENV'] }, async (request) => {
+exports.processWebPaymentWebhook = onCall({ secrets: ['SIMPLEPAY_SECRET_KEY', 'NEXTAUTH_URL', 'SIMPLEPAY_ENV'] }, async (request) => {
   try {
     const SIMPLEPAY_CONFIG = getSimplePayConfig();
     const webhookData = request.data || {};
     console.debug('[processWebPaymentWebhook] input status/orderRef', { status: webhookData?.status, orderRef: webhookData?.orderRef });
-    
+
     // Webhook adatok valid├íl├ísa
     const { orderRef, transactionId, orderId, status, total, items } = webhookData;
-    
+
     if (!orderRef || !transactionId || !status) {
       throw new HttpsError('invalid-argument', 'Hi├ínyz├│ webhook adatok');
     }
-    
+
     // Csak sikeres fizet├ęseket dolgozunk fel
     if (status !== 'SUCCESS') {
       console.log('Payment not successful, ignoring webhook:', status);
       return { success: true };
     }
-    
+
     // Felhaszn├íl├│ azonos├şt├ísa az orderRef-b┼Ĺl
     // Form├ítum: WEB_userId_timestamp_random
     const orderRefParts = orderRef.split('_');
     if (orderRefParts.length < 3 || orderRefParts[0] !== 'WEB') {
       throw new HttpsError('invalid-argument', '├ërv├ęnytelen orderRef form├ítum');
     }
-    
+
     const userId = orderRefParts[1];
-    
+
     // Fizet├ęsi rekord friss├şt├ęse
     const paymentRef = db.collection('web_payments').doc(orderRef);
     const paymentDoc = await paymentRef.get();
-    
+
     if (!paymentDoc.exists) {
       throw new HttpsError('not-found', 'Fizet├ęsi rekord nem tal├ílhat├│');
     }
-    
+
     const paymentData = paymentDoc.data();
     const rawPlanId = paymentData.planId;
     const canonicalPlanId = CANONICAL_PLAN_ID[rawPlanId] || rawPlanId;
     const plan = PAYMENT_PLANS[canonicalPlanId];
-    
+
     if (!plan) {
       throw new HttpsError('failed-precondition', '├ërv├ęnytelen csomag');
     }
-    
+
     // El┼Ĺfizet├ęs aktiv├íl├ísa
     const now = new Date();
     const expiryDate = new Date(now.getTime() + (plan.subscriptionDays * 24 * 60 * 60 * 1000));
-    
+
     const subscriptionData = {
       // Kompatibilit├ísi mez┼Ĺk (a mobilalkalmaz├ís ezeket haszn├ílja)
       isSubscriptionActive: true,
       subscriptionStatus: 'premium',
       subscriptionEndDate: admin.firestore.Timestamp.fromDate(expiryDate),
-      
+
       // R├ęszletes adatok
       subscription: {
         status: 'ACTIVE',
@@ -773,23 +773,23 @@ exports.processWebPaymentWebhook = onCall({ secrets: ['SIMPLEPAY_SECRET_KEY','NE
         lastUpdateTime: now.toISOString(),
         source: 'otp_simplepay',
       },
-      
+
       // Meta adatok
       lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      
+
       // Pr├│baid┼Ĺszak lez├ír├ísa az els┼Ĺ fizet├ęskor
       freeTrialEndDate: admin.firestore.Timestamp.fromDate(now),
     };
-    
+
     // Felhaszn├íl├│i dokumentum friss├şt├ęse
     await db.collection('users').doc(userId).set(subscriptionData, { merge: true });
-    
+
     // ├Üj el┼Ĺfizet├ęs eset├ęn t├Âr├Âlj├╝k a lastReminder mez┼Ĺket, hogy ├║jra k├╝ldhess├╝nk emailt
     await db.collection('users').doc(userId).update({
       lastReminder: admin.firestore.FieldValue.delete(),
     });
-    
+
     // Fizet├ęsi rekord friss├şt├ęse
     await paymentRef.update({
       status: 'COMPLETED',
@@ -799,9 +799,9 @@ exports.processWebPaymentWebhook = onCall({ secrets: ['SIMPLEPAY_SECRET_KEY','NE
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     console.log('[processWebPaymentWebhook] updated payment to COMPLETED', { userId, orderRef });
-    
+
     return { success: true };
-    
+
   } catch (error) {
     console.error('[processWebPaymentWebhook] error', { message: error?.message, stack: error?.stack });
     if (error instanceof HttpsError || error?.code) {
@@ -814,8 +814,8 @@ exports.processWebPaymentWebhook = onCall({ secrets: ['SIMPLEPAY_SECRET_KEY','NE
 /**
  * HTTP webhook endpoint SimplePay sz├ím├íra
  */
-exports.simplepayWebhook = onRequest({ 
-  secrets: ['SIMPLEPAY_SECRET_KEY','NEXTAUTH_URL','SIMPLEPAY_ENV'],
+exports.simplepayWebhook = onRequest({
+  secrets: ['SIMPLEPAY_SECRET_KEY', 'NEXTAUTH_URL', 'SIMPLEPAY_ENV'],
   region: 'europe-west1',
 }, async (req, res) => {
   try {
@@ -824,17 +824,17 @@ exports.simplepayWebhook = onRequest({
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.set('Access-Control-Allow-Headers', 'Content-Type, Signature, x-simplepay-signature, x-signature');
-    
+
     if (req.method === 'OPTIONS') {
       res.status(200).send('');
       return;
     }
-    
+
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
     }
-    
+
     const body = req.body;
     const headerSignature = (
       req.headers['signature'] ||
@@ -883,7 +883,7 @@ exports.simplepayWebhook = onRequest({
       res.status(401).send('Invalid signature');
       return;
     }
-    
+
     const incomingStatus = (body?.status || '').toString().toUpperCase();
     console.log('[simplepayWebhook] received', {
       status: incomingStatus,
@@ -892,7 +892,7 @@ exports.simplepayWebhook = onRequest({
         signatureMasked: maskValue(headerSignature),
       },
     });
-    
+
     // Csak sikeres fizet├ęseket dolgozunk fel ÔÇô a SimplePay itt 'FINISHED' st├ítuszt k├╝ld,
     // ami a tranzakci├│ sikeres lez├ír├ís├ít jelenti. Kezelj├╝k SUCCESS-k├ęnt.
     if (incomingStatus !== 'SUCCESS' && incomingStatus !== 'FINISHED') {
@@ -900,9 +900,9 @@ exports.simplepayWebhook = onRequest({
       res.status(200).send('OK');
       return;
     }
-    
+
     const { orderRef, transactionId, orderId, total, items } = body;
-    
+
     // Felhaszn├íl├│ azonos├şt├ísa az orderRef-b┼Ĺl
     const orderRefParts = orderRef.split('_');
     if (orderRefParts.length < 3 || orderRefParts[0] !== 'WEB') {
@@ -910,34 +910,34 @@ exports.simplepayWebhook = onRequest({
       res.status(400).send('Invalid order reference');
       return;
     }
-    
+
     const userId = orderRefParts[1];
-    
+
     // Fizet├ęsi rekord lek├ęr├ęse
     const paymentRef = db.collection('web_payments').doc(orderRef);
     const paymentDoc = await paymentRef.get();
-    
+
     if (!paymentDoc.exists) {
       console.error('[simplepayWebhook] Payment record not found', { orderRef });
       res.status(404).send('Payment record not found');
       return;
     }
-    
+
     const paymentData = paymentDoc.data();
     const rawPlanId = paymentData.planId;
     const canonicalPlanId = CANONICAL_PLAN_ID[rawPlanId] || rawPlanId;
     const plan = PAYMENT_PLANS[canonicalPlanId];
-    
+
     if (!plan) {
       console.error('[simplepayWebhook] Invalid plan', { planId });
       res.status(400).send('Invalid plan');
       return;
     }
-    
+
     // El┼Ĺfizet├ęs aktiv├íl├ísa
     const now = new Date();
     const expiryDate = new Date(now.getTime() + (plan.subscriptionDays * 24 * 60 * 60 * 1000));
-    
+
     const subscriptionData = {
       isSubscriptionActive: true,
       subscriptionStatus: 'premium',
@@ -956,15 +956,15 @@ exports.simplepayWebhook = onRequest({
       // Pr├│baid┼Ĺszak lez├ír├ísa az els┼Ĺ fizet├ęskor
       freeTrialEndDate: admin.firestore.Timestamp.fromDate(now),
     };
-    
+
     // Felhaszn├íl├│i dokumentum friss├şt├ęse
     await db.collection('users').doc(userId).set(subscriptionData, { merge: true });
-    
+
     // ├Üj el┼Ĺfizet├ęs eset├ęn t├Âr├Âlj├╝k a lastReminder mez┼Ĺket, hogy ├║jra k├╝ldhess├╝nk emailt
     await db.collection('users').doc(userId).update({
       lastReminder: admin.firestore.FieldValue.delete(),
     });
-    
+
     // Fizet├ęsi rekord friss├şt├ęse
     await paymentRef.update({
       status: 'COMPLETED',
@@ -973,7 +973,7 @@ exports.simplepayWebhook = onRequest({
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
+
     // Audit log - webhook feldolgoz├ís
     await db.collection('payment_audit_logs').add({
       userId,
@@ -990,9 +990,9 @@ exports.simplepayWebhook = onRequest({
         signatureValid: true,
       },
     });
-    
+
     console.log('[simplepayWebhook] updated payment to COMPLETED', { userId, orderRef });
-    
+
     // IPN CONFIRM - SimplePay v2.1 k├Âvetelm├ęny (9.6.2 ├ęs 3.14)
     // A v├ílasznak tartalmaznia kell az ├ľSSZES fogadott IPN adatot + receiveDate
     const confirmResponse = {
@@ -1000,22 +1000,22 @@ exports.simplepayWebhook = onRequest({
       receiveDate: new Date().toISOString(),
     };
     const confirmBody = JSON.stringify(confirmResponse);
-    
+
     // DEBUG: Log a teljes IPN confirm v├ílaszt
     console.log('[simplepayWebhook] IPN CONFIRM REQUEST BODY:', JSON.stringify(body, null, 2));
     console.log('[simplepayWebhook] IPN CONFIRM RESPONSE BODY:', confirmBody);
-    
+
     const confirmSignature = crypto
       .createHmac('sha384', SIMPLEPAY_CONFIG.secretKey.trim())
       .update(confirmBody)
       .digest('base64');
-    
+
     console.log('[simplepayWebhook] IPN CONFIRM SIGNATURE:', confirmSignature.substring(0, 20) + '...');
-    
+
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('Signature', confirmSignature);
     res.status(200).send(confirmBody);
-    
+
   } catch (error) {
     console.error('[simplepayWebhook] error', { message: error?.message, stack: error?.stack });
     res.status(500).send('Internal server error');
@@ -1029,7 +1029,7 @@ exports.simplepayWebhook = onRequest({
  */
 exports.onWebPaymentWrite = onDocumentWritten({
   document: 'web_payments/{orderRef}',
-  secrets: ['SIMPLEPAY_MERCHANT_ID','SIMPLEPAY_SECRET_KEY','SIMPLEPAY_ENV'],
+  secrets: ['SIMPLEPAY_MERCHANT_ID', 'SIMPLEPAY_SECRET_KEY', 'SIMPLEPAY_ENV'],
 }, async (event) => {
   try {
     const SIMPLEPAY_CONFIG = getSimplePayConfig();
@@ -1255,7 +1255,7 @@ exports.reconcileWebPaymentsScheduled = onSchedule({
 // El┼Ĺfizet├ęsi eml├ękeztet┼Ĺ email k├╝ld├ęse
 exports.sendSubscriptionReminder = onCall(async (request) => {
   const { userId, reminderType, daysLeft } = request.data || {};
-  
+
   if (!userId || !reminderType) {
     throw new Error('invalid-argument: userId ├ęs reminderType sz├╝ks├ęges');
   }
@@ -1270,7 +1270,7 @@ exports.sendSubscriptionReminder = onCall(async (request) => {
     const userData = userDoc.data();
     const email = userData.email;
     const name = userData.name || userData.displayName || 'Felhaszn├íl├│';
-    
+
     if (!email) {
       throw new Error('invalid-argument: Felhaszn├íl├│ email c├şme nem tal├ílhat├│');
     }
@@ -1278,14 +1278,14 @@ exports.sendSubscriptionReminder = onCall(async (request) => {
     // Duplik├ítum v├ędelem - ellen┼Ĺrizz├╝k, hogy m├ír k├╝ldt├╝nk-e ilyen t├şpus├║ emailt
     const lastReminder = userData.lastReminder || {};
     const reminderKey = reminderType === 'expiry_warning' ? 'expiry_warning' : 'expired';
-    
+
     if (lastReminder[reminderKey]) {
       console.log(`Skipping ${reminderType} email for ${userId} - already sent on ${lastReminder[reminderKey].toDate().toISOString()}`);
       return { success: true, message: 'Email m├ír elk├╝ldve (duplik├ítum v├ędelem)', skipped: true };
     }
 
     let subject, text, html;
-    
+
     if (reminderType === 'expiry_warning') {
       // Lej├írat el┼Ĺtti figyelmeztet├ęs
       subject = `El┼Ĺfizet├ęsed hamarosan lej├ír - ${daysLeft} nap h├ítra`;
@@ -1310,22 +1310,22 @@ exports.sendSubscriptionReminder = onCall(async (request) => {
         html: html,
       });
       console.log(`Subscription reminder email sent to ${email}, type: ${reminderType}`);
-      
+
       // Friss├şts├╝k a lastReminder mez┼Ĺt, hogy ne k├╝ldj├╝nk duplik├ít emailt
       await db.collection('users').doc(userId).set({
         lastReminder: {
           [reminderKey]: admin.firestore.FieldValue.serverTimestamp(),
         }
       }, { merge: true });
-      
+
       console.log(`Updated lastReminder.${reminderKey} for user ${userId}`);
     } catch (mailErr) {
       console.error('Email sending failed:', mailErr);
       throw new Error(`internal: Email k├╝ld├ęse sikertelen: ${mailErr.message}`);
     }
-    
+
     return { success: true, message: 'Email sikeresen elk├╝ldve' };
-    
+
   } catch (error) {
     console.error('Subscription reminder email error:', error);
     throw new Error(`internal: Email k├╝ld├ęse sikertelen: ${error.message}`);
@@ -1337,7 +1337,7 @@ exports.checkSubscriptionExpiry = onCall(async (request) => {
   try {
     const now = new Date();
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    
+
     // Akt├şv el┼Ĺfizet├ęsek lek├ęr├ęse, amelyek 1-3 nap m├║lva lej├írnak
     const expiringSoon = await db.collection('users')
       .where('isSubscriptionActive', '==', true)
@@ -1345,15 +1345,15 @@ exports.checkSubscriptionExpiry = onCall(async (request) => {
       .where('subscriptionEndDate', '>=', now)
       .where('subscriptionEndDate', '<=', threeDaysFromNow)
       .get();
-    
+
     let emailsSent = 0;
-    
+
     // Lej├írat el┼Ĺtti eml├ękeztet┼Ĺk
     for (const doc of expiringSoon.docs) {
       const userData = doc.data();
       const endDate = userData.subscriptionEndDate.toDate();
       const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-      
+
       if (daysLeft <= 3 && daysLeft > 0) {
         try {
           await transport.sendMail({
@@ -1369,10 +1369,10 @@ exports.checkSubscriptionExpiry = onCall(async (request) => {
         }
       }
     }
-    
+
     console.log(`Subscription expiry check completed. ${emailsSent} emails sent.`);
     return { success: true, emailsSent };
-    
+
   } catch (error) {
     console.error('Subscription expiry check error:', error);
     throw new Error(`internal: Eml├ękeztet┼Ĺ ellen┼Ĺrz├ęs sikertelen: ${error.message}`);
@@ -1474,14 +1474,14 @@ exports.checkSubscriptionExpiryScheduled = onSchedule({
   timeoutSeconds: 540, // 9 perc (elegend┼Ĺ id┼Ĺt hagyunk az emaileknek)
 }, async (event) => {
   console.log('Scheduled subscription expiry check started at:', new Date().toISOString());
-  
+
   try {
     const now = new Date();
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    
+
     let emailsSent = 0;
     let emailsSkipped = 0;
-    
+
     // 1. LEJ├üRAT EL┼ÉTTI EML├ëKEZTET┼ÉK (1-3 nap m├║lva lej├ír├│ el┼Ĺfizet├ęsek)
     const expiringSoon = await db.collection('users')
       .where('isSubscriptionActive', '==', true)
@@ -1489,24 +1489,24 @@ exports.checkSubscriptionExpiryScheduled = onSchedule({
       .where('subscriptionEndDate', '>=', admin.firestore.Timestamp.fromDate(now))
       .where('subscriptionEndDate', '<=', admin.firestore.Timestamp.fromDate(threeDaysFromNow))
       .get();
-    
+
     console.log(`Found ${expiringSoon.size} users with subscriptions expiring in 1-3 days`);
-    
+
     for (const doc of expiringSoon.docs) {
       const userData = doc.data();
       const endDate = userData.subscriptionEndDate.toDate();
       const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-      
+
       if (daysLeft <= 3 && daysLeft > 0) {
         // Ellen┼Ĺrizz├╝k a lastReminder mez┼Ĺt
         const lastReminder = userData.lastReminder || {};
-        
+
         if (lastReminder.expiry_warning) {
           console.log(`Skipping expiry_warning for ${doc.id} - already sent on ${lastReminder.expiry_warning.toDate().toISOString()}`);
           emailsSkipped++;
           continue;
         }
-        
+
         // Email k├╝ld├ęse
         try {
           await transport.sendMail({
@@ -1516,14 +1516,14 @@ exports.checkSubscriptionExpiryScheduled = onSchedule({
             text: `Kedves ${userData.name || 'Felhaszn├íl├│'}!\n\nEl┼Ĺfizet├ęsed ${daysLeft} nap m├║lva lej├ír. Ne maradj le a pr├ęmium funkci├│kr├│l!\n\n├Üj├ştsd meg el┼Ĺfizet├ęsedet: https://lomedu-user-web.web.app/subscription\n\n├ťdv├Âzlettel,\nA Lomedu csapat`,
             html: `<p>Kedves ${userData.name || 'Felhaszn├íl├│'}!</p><p>El┼Ĺfizet├ęsed <strong>${daysLeft} nap m├║lva lej├ír</strong>. Ne maradj le a pr├ęmium funkci├│kr├│l!</p><p><a href="https://lomedu-user-web.web.app/subscription">├Üj├ştsd meg el┼Ĺfizet├ęsedet</a></p><p>├ťdv├Âzlettel,<br>A Lomedu csapat</p>`,
           });
-          
+
           // Friss├şts├╝k a lastReminder mez┼Ĺt
           await db.collection('users').doc(doc.id).set({
             lastReminder: {
               expiry_warning: admin.firestore.FieldValue.serverTimestamp(),
             }
           }, { merge: true });
-          
+
           emailsSent++;
           console.log(`Sent expiry_warning to ${userData.email} (${daysLeft} days left)`);
         } catch (emailError) {
@@ -1531,29 +1531,29 @@ exports.checkSubscriptionExpiryScheduled = onSchedule({
         }
       }
     }
-    
+
     // 2. LEJ├üRT EL┼ÉFIZET├ëSEK ├ëRTES├ŹT├ëSE
     // Keres├╝nk minden felhaszn├íl├│t, aki premium el┼Ĺfizet├ęssel rendelkezik ├ęs lej├írt
     const expired = await db.collection('users')
       .where('subscriptionStatus', '==', 'premium')
       .where('subscriptionEndDate', '<', admin.firestore.Timestamp.fromDate(now))
       .get();
-    
+
     console.log(`Found ${expired.size} users with expired subscriptions`);
-    
+
     for (const doc of expired.docs) {
       const userData = doc.data();
       console.log(`Processing expired user ${doc.id}: email=${userData.email}, isActive=${userData.isSubscriptionActive}, endDate=${userData.subscriptionEndDate?.toDate()?.toISOString()}`);
-      
+
       // Ellen┼Ĺrizz├╝k a lastReminder mez┼Ĺt
       const lastReminder = userData.lastReminder || {};
-      
+
       if (lastReminder.expired) {
         console.log(`Skipping expired notification for ${doc.id} - already sent on ${lastReminder.expired.toDate().toISOString()}`);
         emailsSkipped++;
         continue;
       }
-      
+
       // Email k├╝ld├ęse
       try {
         await transport.sendMail({
@@ -1563,23 +1563,23 @@ exports.checkSubscriptionExpiryScheduled = onSchedule({
           text: `Kedves ${userData.name || 'Felhaszn├íl├│'}!\n\nEl┼Ĺfizet├ęsed lej├írt. ├Üj├ştsd meg most, hogy ne maradj le a pr├ęmium funkci├│kr├│l!\n\n├Üj├ştsd meg el┼Ĺfizet├ęsedet: https://lomedu-user-web.web.app/subscription\n\n├ťdv├Âzlettel,\nA Lomedu csapat`,
           html: `<p>Kedves ${userData.name || 'Felhaszn├íl├│'}!</p><p>El┼Ĺfizet├ęsed <strong>lej├írt</strong>. ├Üj├ştsd meg most, hogy ne maradj le a pr├ęmium funkci├│kr├│l!</p><p><a href="https://lomedu-user-web.web.app/subscription">├Üj├ştsd meg el┼Ĺfizet├ęsedet</a></p><p>├ťdv├Âzlettel,<br>A Lomedu csapat</p>`,
         });
-        
+
         // Friss├şts├╝k a lastReminder mez┼Ĺt
         await db.collection('users').doc(doc.id).set({
           lastReminder: {
             expired: admin.firestore.FieldValue.serverTimestamp(),
           }
         }, { merge: true });
-        
+
         emailsSent++;
         console.log(`Sent expired notification to ${userData.email}`);
       } catch (emailError) {
         console.error(`Failed to send expired notification to ${userData.email}:`, emailError);
       }
     }
-    
+
     console.log(`Scheduled subscription expiry check completed. ${emailsSent} emails sent, ${emailsSkipped} skipped (duplicates).`);
-    
+
   } catch (error) {
     console.error('Scheduled subscription expiry check error:', error);
     throw error;
@@ -1595,43 +1595,43 @@ exports.checkTrialExpiryScheduled = onSchedule({
   timeoutSeconds: 540,
 }, async (event) => {
   console.log('Scheduled trial expiry check started at:', new Date().toISOString());
-  
+
   try {
     const now = new Date();
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    
+
     let emailsSent = 0;
     let emailsSkipped = 0;
-    
+
     // 1. PRÓBAIDŐ LEJÁRAT ELŐTTI EMLÉKEZTETŐK (3 nap múlva lejáró próbaidő)
     // Keressük azokat a felhasználókat, akiknek:
     // - Nincs aktív előfizetésük (isSubscriptionActive == false)
     // - A próbaidő 3 nap múlva jár le (freeTrialEndDate)
     // - Még nem kaptak értesítést
-    
+
     const trialExpiringSoon = await db.collection('users')
       .where('isSubscriptionActive', '==', false) // Csak ha nincs aktív előfizetés
       .where('freeTrialEndDate', '>=', admin.firestore.Timestamp.fromDate(now))
       .where('freeTrialEndDate', '<=', admin.firestore.Timestamp.fromDate(threeDaysFromNow))
       .get();
-      
+
     console.log(`Found ${trialExpiringSoon.size} users with trials expiring in 1-3 days`);
-    
+
     for (const doc of trialExpiringSoon.docs) {
       const userData = doc.data();
       const endDate = userData.freeTrialEndDate.toDate();
       const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-      
+
       if (daysLeft <= 3 && daysLeft > 0) {
         // Ellenőrizzük a lastReminder mezőt
         const lastReminder = userData.lastReminder || {};
-        
+
         if (lastReminder.trial_expiry_warning) {
           console.log(`Skipping trial_expiry_warning for ${doc.id} - already sent on ${lastReminder.trial_expiry_warning.toDate().toISOString()}`);
           emailsSkipped++;
           continue;
         }
-        
+
         // Email küldése
         try {
           await transport.sendMail({
@@ -1641,14 +1641,14 @@ exports.checkTrialExpiryScheduled = onSchedule({
             text: `Kedves ${userData.name || 'Felhasználó'}!\n\nPróbaidőd ${daysLeft} nap múlva lejár. Ne maradj le a prémium funkciókról!\n\nFizess elő most: https://lomedu-user-web.web.app/subscription\n\nÜdvözlettel,\nA Lomedu csapat`,
             html: `<p>Kedves ${userData.name || 'Felhasználó'}!</p><p>Próbaidőd <strong>${daysLeft} nap múlva lejár</strong>. Ne maradj le a prémium funkciókról!</p><p><a href="https://lomedu-user-web.web.app/subscription">Fizess elő most</a></p><p>Üdvözlettel,<br>A Lomedu csapat</p>`,
           });
-          
+
           // Frissítsük a lastReminder mezőt
           await db.collection('users').doc(doc.id).set({
             lastReminder: {
               trial_expiry_warning: admin.firestore.FieldValue.serverTimestamp(),
             }
           }, { merge: true });
-          
+
           emailsSent++;
           console.log(`Sent trial_expiry_warning to ${userData.email} (${daysLeft} days left)`);
         } catch (emailError) {
@@ -1656,32 +1656,32 @@ exports.checkTrialExpiryScheduled = onSchedule({
         }
       }
     }
-    
+
     // 2. LEJÁRT PRÓBAIDŐ ÉRTESÍTÉS (Ma járt le)
     // Keressük azokat, akiknek a próbaideje a közelmúltban járt le (pl. elmúlt 24 órában)
     // és még nem kaptak értesítést.
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
+
     const trialExpired = await db.collection('users')
       .where('isSubscriptionActive', '==', false)
       .where('freeTrialEndDate', '<', admin.firestore.Timestamp.fromDate(now))
       .where('freeTrialEndDate', '>', admin.firestore.Timestamp.fromDate(oneDayAgo)) // Csak a frissen lejártakat nézzük
       .get();
-      
+
     console.log(`Found ${trialExpired.size} users with recently expired trials`);
-    
+
     for (const doc of trialExpired.docs) {
       const userData = doc.data();
-      
+
       // Ellenőrizzük a lastReminder mezőt
       const lastReminder = userData.lastReminder || {};
-      
+
       if (lastReminder.trial_expired) {
         console.log(`Skipping trial_expired for ${doc.id} - already sent`);
         emailsSkipped++;
         continue;
       }
-      
+
       // Email küldése
       try {
         await transport.sendMail({
@@ -1691,26 +1691,27 @@ exports.checkTrialExpiryScheduled = onSchedule({
           text: `Kedves ${userData.name || 'Felhasználó'}!\n\nPróbaidőd lejárt. Fizess elő most, hogy továbbra is elérd a prémium funkciókat!\n\nElőfizetés: https://lomedu-user-web.web.app/subscription\n\nÜdvözlettel,\nA Lomedu csapat`,
           html: `<p>Kedves ${userData.name || 'Felhasználó'}!</p><p>Próbaidőd <strong>lejárt</strong>. Fizess elő most, hogy továbbra is elérd a prémium funkciókat!</p><p><a href="https://lomedu-user-web.web.app/subscription">Előfizetés indítása</a></p><p>Üdvözlettel,<br>A Lomedu csapat</p>`,
         });
-        
+
         // Frissítsük a lastReminder mezőt
         await db.collection('users').doc(doc.id).set({
           lastReminder: {
             trial_expired: admin.firestore.FieldValue.serverTimestamp(),
           }
         }, { merge: true });
-        
+
         emailsSent++;
         console.log(`Sent trial_expired notification to ${userData.email}`);
       } catch (emailError) {
         console.error(`Failed to send trial_expired notification to ${userData.email}:`, emailError);
       }
     }
-    
+
     console.log(`Scheduled trial expiry check completed. ${emailsSent} emails sent, ${emailsSkipped} skipped.`);
-    
+
   } catch (error) {
     console.error('Scheduled trial expiry check error:', error);
     throw error;
   }
 });
+
 

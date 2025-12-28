@@ -8,13 +8,19 @@ class MetadataService {
   /// Lekéri a kategóriákat és címkéket egyetlen dokumentumból.
   /// Ha a dokumentum nem létezik, üres listákkal tér vissza.
   static Future<Map<String, List<String>>> getMetadata(String science) async {
-    // 1. Próbálkozás: Metadata dokumentum olvasása (Gyorsítótár)
+    // 1. Próbálkozás: Active Metadata dokumentum olvasása (Cloud Function által generált)
+    // Ez a skálázható megoldás (egyetlen olvasás)
     try {
-      final docId = science.toLowerCase().replaceAll('á', 'a');
-      print('🔍 MetadataService: Keresés docId=$docId (science=$science)');
+      // Konstans 'jogasz_active', vagy dinamikusan: '${science.toLowerCase()}_active'
+      // Mivel a Cloud Function a 'jogasz_active' ID-t használja:
+      final activeDocId =
+          '${science.toLowerCase().replaceAll('á', 'a')}_active';
+
+      print(
+          '🔍 MetadataService: Skálázható keresés docId=$activeDocId (science=$science)');
       final doc = await FirebaseConfig.firestore
           .collection('metadata')
-          .doc(docId)
+          .doc(activeDocId)
           .get();
 
       if (doc.exists) {
@@ -23,9 +29,9 @@ class MetadataService {
         final tags = List<String>.from(data['tags'] ?? []);
 
         print(
-            '🔍 MetadataService: Doc found. Cats: ${categories.length}, Tags: ${tags.length}');
+            '✅ MetadataService: Active Doc found (Cloud Function). Cats: ${categories.length}, Tags: ${tags.length}');
 
-        if (categories.isNotEmpty) {
+        if (categories.isNotEmpty || tags.isNotEmpty) {
           return {
             'categories': categories,
             'tags': tags,
@@ -33,12 +39,11 @@ class MetadataService {
         }
       } else {
         print(
-            '⚠️ MetadataService: Metadata doc ($docId) NOT found. Proceeding to fallback.');
+            '⚠️ MetadataService: Active Metadata doc ($activeDocId) NOT found yet. Proceeding to fallback.');
       }
     } catch (e) {
-      // Permission denied vagy más hiba -> Folytatjuk a fallback-kel
       print(
-          '⚠️ MetadataService: Optimalizált olvasás sikertelen ($e). Folytatás fallback stratégiával.');
+          '⚠️ MetadataService: Aktív metadata olvasás hiba ($e). Folytatás fallback stratégiával.');
     }
 
     // 2. Próbálkozás: Fallback - közvetlen kollekció olvasás
