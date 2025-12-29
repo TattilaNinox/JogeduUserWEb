@@ -35,7 +35,9 @@ class SessionGuard extends ChangeNotifier {
     _initialized = true;
 
     _authSubscription = _auth.authStateChanges().listen((user) async {
-      debugPrint('[SessionGuard] authStateChanges -> user=${user?.uid}');
+      if (kDebugMode) {
+        debugPrint('[SessionGuard] authStateChanges -> user=${user?.uid}');
+      }
 
       // Alapértelmezett állapotok
       if (user == null) {
@@ -49,7 +51,9 @@ class SessionGuard extends ChangeNotifier {
         await _cancelUserDocSubscription();
 
         if (changed) {
-          debugPrint('[SessionGuard] user == null -> loggedOut, loading');
+          if (kDebugMode) {
+            debugPrint('[SessionGuard] user == null -> loggedOut, loading');
+          }
           notifyListeners();
         }
         return;
@@ -65,14 +69,18 @@ class SessionGuard extends ChangeNotifier {
       _termsAccepted = true; // Optimista kezdet
 
       if (changed) {
-        debugPrint('[SessionGuard] loggedIn -> start device check');
+        if (kDebugMode) {
+          debugPrint('[SessionGuard] loggedIn -> start device check');
+        }
         notifyListeners();
       }
 
       try {
         // Aktuális fingerprint előkészítése (cache-elve is elég)
         _currentFingerprint = await DeviceFingerprint.getCurrentFingerprint();
-        debugPrint('[SessionGuard] currentFingerprint=$_currentFingerprint');
+        if (kDebugMode) {
+          debugPrint('[SessionGuard] currentFingerprint=$_currentFingerprint');
+        }
 
         // Felhasználói dokumentum figyelése
         await _cancelUserDocSubscription();
@@ -81,7 +89,9 @@ class SessionGuard extends ChangeNotifier {
             .doc(user.uid)
             .snapshots()
             .listen(_onUserDocChanged, onError: (error, _) {
-          debugPrint('[SessionGuard] user doc listen error: $error');
+          if (kDebugMode) {
+            debugPrint('[SessionGuard] user doc listen error: $error');
+          }
           // Hiba esetén ne rúgjuk ki a felhasználót, csak jelezzük, hogy loading
           if (_deviceAccess != DeviceAccess.loading) {
             _deviceAccess = DeviceAccess.loading;
@@ -91,7 +101,9 @@ class SessionGuard extends ChangeNotifier {
       } catch (_) {
         if (_deviceAccess != DeviceAccess.loading) {
           _deviceAccess = DeviceAccess.loading;
-          debugPrint('[SessionGuard] exception during init, set loading');
+          if (kDebugMode) {
+            debugPrint('[SessionGuard] exception during init, set loading');
+          }
           notifyListeners();
         }
       }
@@ -109,7 +121,9 @@ class SessionGuard extends ChangeNotifier {
       if (_deviceAccess != DeviceAccess.loading || _termsAccepted != true) {
         _deviceAccess = DeviceAccess.loading;
         _termsAccepted = true;
-        debugPrint('[SessionGuard] user doc null -> loading');
+        if (kDebugMode) {
+          debugPrint('[SessionGuard] user doc null -> loading');
+        }
         notifyListeners();
       }
       return;
@@ -126,7 +140,9 @@ class SessionGuard extends ChangeNotifier {
     if (isAdmin) {
       if (_deviceAccess != DeviceAccess.allowed || termsChanged) {
         _deviceAccess = DeviceAccess.allowed;
-        debugPrint('[SessionGuard] admin user -> allowed');
+        if (kDebugMode) {
+          debugPrint('[SessionGuard] admin user -> allowed');
+        }
         notifyListeners();
       }
       return;
@@ -137,8 +153,10 @@ class SessionGuard extends ChangeNotifier {
     if (email == 'lomeduteszt@gmail.com') {
       if (_deviceAccess != DeviceAccess.allowed || termsChanged) {
         _deviceAccess = DeviceAccess.allowed;
-        debugPrint(
-            '[SessionGuard] test account (lomeduteszt@gmail.com) -> allowed');
+        if (kDebugMode) {
+          debugPrint(
+              '[SessionGuard] test account (lomeduteszt@gmail.com) -> allowed');
+        }
         notifyListeners();
       }
       return;
@@ -151,7 +169,9 @@ class SessionGuard extends ChangeNotifier {
     if (allowedFingerprint == null || allowedFingerprint.isEmpty) {
       if (_deviceAccess != DeviceAccess.denied || termsChanged) {
         _deviceAccess = DeviceAccess.denied;
-        debugPrint('[SessionGuard] missing allowed fingerprint -> denied');
+        if (kDebugMode) {
+          debugPrint('[SessionGuard] missing allowed fingerprint -> denied');
+        }
         notifyListeners();
       }
       return;
@@ -160,7 +180,9 @@ class SessionGuard extends ChangeNotifier {
     if (_currentFingerprint == null) {
       if (_deviceAccess != DeviceAccess.loading || termsChanged) {
         _deviceAccess = DeviceAccess.loading;
-        debugPrint('[SessionGuard] currentFingerprint is null -> loading');
+        if (kDebugMode) {
+          debugPrint('[SessionGuard] currentFingerprint is null -> loading');
+        }
         notifyListeners();
       }
       return;
@@ -170,8 +192,10 @@ class SessionGuard extends ChangeNotifier {
     final newDeviceAccess = equal ? DeviceAccess.allowed : DeviceAccess.denied;
     if (_deviceAccess != newDeviceAccess || termsChanged) {
       _deviceAccess = newDeviceAccess;
-      debugPrint(
-          '[SessionGuard] compare allowed=$allowedFingerprint vs current=$_currentFingerprint -> ${_deviceAccess.name}');
+      if (kDebugMode) {
+        debugPrint(
+            '[SessionGuard] compare allowed=$allowedFingerprint vs current=$_currentFingerprint -> ${_deviceAccess.name}');
+      }
       notifyListeners();
     }
   }

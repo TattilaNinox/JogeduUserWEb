@@ -125,25 +125,19 @@ class LoginScreenState extends State<LoginScreen>
   /// A bejelentkezési folyamatot kezelő aszinkron metódus.
   Future<void> _signIn() async {
     try {
-      debugPrint('=== BEJELENTKEZÉS KEZDETE ===');
-      debugPrint('Email: ${_emailController.text.trim()}');
-      debugPrint('Password length: ${_passwordController.text.trim().length}');
+      if (kDebugMode) {
+        debugPrint('=== BEJELENTKEZÉS KEZDETE ===');
+        debugPrint('Firebase Auth bejelentkezés megkezdése...');
+      }
 
-      setState(() {
-        _errorMessage = null;
-        _isLoading = true;
-      });
-
-      // Megpróbál bejelentkezni a Firebase Authentication szolgáltatással,
-      // az e-mail és jelszó mezők aktuális értékét használva.
-      // A `.trim()` metódus eltávolítja a felesleges szóközöket a szöveg elejéről és végéről.
-      debugPrint('Firebase Auth bejelentkezés megkezdése...');
       final userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      debugPrint('Firebase Auth bejelentkezés sikeres!');
+      if (kDebugMode) {
+        debugPrint('Firebase Auth bejelentkezés sikeres!');
+      }
 
       // Sikeres bejelentkezés után a router automatikusan átirányít
       if (userCredential.user != null && mounted) {

@@ -14,21 +14,27 @@ class DeviceFingerprint {
       final stored = prefs.getString(key);
 
       if (stored != null && stored.isNotEmpty) {
-        debugPrint('DeviceFingerprint: Using stored fingerprint: $stored');
+        if (kDebugMode) {
+          debugPrint('DeviceFingerprint: Using stored fingerprint: $stored');
+        }
         return stored; // VISSZAADNI a mentett értéket!
       }
 
       // Új fingerprint generálása - böngésző jellemzők alapján
       final fingerprint = await _generateStableWebFingerprint();
       await prefs.setString(key, fingerprint);
-      debugPrint(
-          'DeviceFingerprint: Generated new stable fingerprint: $fingerprint');
+      if (kDebugMode) {
+        debugPrint(
+            'DeviceFingerprint: Generated new stable fingerprint: $fingerprint');
+      }
       return fingerprint;
     } catch (e) {
       // Hiba esetén is új generálás
       final fingerprint = await _generateStableWebFingerprint();
-      debugPrint(
-          'DeviceFingerprint: Generated fallback fingerprint: $fingerprint (error: $e)');
+      if (kDebugMode) {
+        debugPrint(
+            'DeviceFingerprint: Generated fallback fingerprint: $fingerprint (error: $e)');
+      }
       return fingerprint;
     }
   }
@@ -44,11 +50,16 @@ class DeviceFingerprint {
       final hc = web.hardwareConcurrency?.toString() ?? '';
       final raw = '$ua|$vendor|$platform|$hc';
       final hash = _simpleHash(raw);
-      debugPrint('DeviceFingerprint: web raw="$raw" -> hash=$hash');
+      if (kDebugMode) {
+        debugPrint('DeviceFingerprint: web raw="$raw" -> hash=$hash');
+      }
       return 'web_$hash';
     } catch (e) {
       // Fallback stabil értékre, ha webBrowserInfo nem elérhető
-      debugPrint('DeviceFingerprint: webBrowserInfo error: $e, using fallback');
+      if (kDebugMode) {
+        debugPrint(
+            'DeviceFingerprint: webBrowserInfo error: $e, using fallback');
+      }
       return 'web_${_simpleHash('flutter_web_fallback')}';
     }
   }
@@ -97,9 +108,13 @@ class DeviceFingerprint {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('device_fingerprint');
-        debugPrint('DeviceFingerprint: Cleared stored fingerprint');
+        if (kDebugMode) {
+          debugPrint('DeviceFingerprint: Cleared stored fingerprint');
+        }
       } catch (e) {
-        debugPrint('DeviceFingerprint: Failed to clear fingerprint: $e');
+        if (kDebugMode) {
+          debugPrint('DeviceFingerprint: Failed to clear fingerprint: $e');
+        }
       }
     }
   }
