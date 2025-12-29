@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/firebase_config.dart';
+import 'package:flutter/foundation.dart';
 
 /// Jegyzetek metaadatait (kategóriák, címkék) kezelő szerviz.
 /// Az audit alapján egyetlen 'metadata' dokumentumból olvashatóak ki az adatok,
@@ -16,8 +17,10 @@ class MetadataService {
       final activeDocId =
           '${science.toLowerCase().replaceAll('á', 'a')}_active';
 
-      print(
-          '🔍 MetadataService: Skálázható keresés docId=$activeDocId (science=$science)');
+      if (kDebugMode) {
+        debugPrint(
+            '🔍 MetadataService: Skálázható keresés docId=$activeDocId (science=$science)');
+      }
       final doc = await FirebaseConfig.firestore
           .collection('metadata')
           .doc(activeDocId)
@@ -28,8 +31,10 @@ class MetadataService {
         final categories = List<String>.from(data['categories'] ?? []);
         final tags = List<String>.from(data['tags'] ?? []);
 
-        print(
-            '✅ MetadataService: Active Doc found (Cloud Function). Cats: ${categories.length}, Tags: ${tags.length}');
+        if (kDebugMode) {
+          debugPrint(
+              '✅ MetadataService: Active Doc found (Cloud Function). Cats: ${categories.length}, Tags: ${tags.length}');
+        }
 
         if (categories.isNotEmpty || tags.isNotEmpty) {
           return {
@@ -38,32 +43,42 @@ class MetadataService {
           };
         }
       } else {
-        print(
-            '⚠️ MetadataService: Active Metadata doc ($activeDocId) NOT found yet. Proceeding to fallback.');
+        if (kDebugMode) {
+          debugPrint(
+              '⚠️ MetadataService: Active Metadata doc ($activeDocId) NOT found yet. Proceeding to fallback.');
+        }
       }
     } catch (e) {
-      print(
-          '⚠️ MetadataService: Aktív metadata olvasás hiba ($e). Folytatás fallback stratégiával.');
+      if (kDebugMode) {
+        debugPrint(
+            '⚠️ MetadataService: Aktív metadata olvasás hiba ($e). Folytatás fallback stratégiával.');
+      }
     }
 
     // 2. Próbálkozás: Fallback - közvetlen kollekció olvasás
     try {
-      print(
-          '🔄 MetadataService: Fallback indul (Categories & Tags kollekciók)...');
+      if (kDebugMode) {
+        debugPrint(
+            '🔄 MetadataService: Fallback indul (Categories & Tags kollekciók)...');
+      }
 
       final categoriesSnapshot = await FirebaseConfig.firestore
           .collection('categories')
           .where('science', isEqualTo: science)
           .get();
 
-      print(
-          '🔄 MetadataService: Fallback cats query result: ${categoriesSnapshot.docs.length} docs');
+      if (kDebugMode) {
+        debugPrint(
+            '🔄 MetadataService: Fallback cats query result: ${categoriesSnapshot.docs.length} docs');
+      }
 
       final tagsSnapshot =
           await FirebaseConfig.firestore.collection('tags').get();
 
-      print(
-          '🔄 MetadataService: Fallback tags query result: ${tagsSnapshot.docs.length} docs');
+      if (kDebugMode) {
+        debugPrint(
+            '🔄 MetadataService: Fallback tags query result: ${tagsSnapshot.docs.length} docs');
+      }
 
       final categories = categoriesSnapshot.docs
           .map((d) => d.data()['name'] as String? ?? '')
@@ -75,8 +90,10 @@ class MetadataService {
           .where((s) => s.isNotEmpty)
           .toList();
 
-      print(
-          '✅ MetadataService: Master Lists loaded -> Cats: ${categories.length}, Tags: ${tags.length}');
+      if (kDebugMode) {
+        debugPrint(
+            '✅ MetadataService: Master Lists loaded -> Cats: ${categories.length}, Tags: ${tags.length}');
+      }
 
       // 3. Lépés: Validálás - Csak olyanokat tartsunk meg, amihez van is jegyzet
       // Párhuzamosan futtatjuk a két szűrést
@@ -96,15 +113,19 @@ class MetadataService {
       final activeCategories = results[0];
       final activeTags = results[1];
 
-      print(
-          '✅ MetadataService: Active Filtered Lists -> Cats: ${activeCategories.length}, Tags: ${activeTags.length}');
+      if (kDebugMode) {
+        debugPrint(
+            '✅ MetadataService: Active Filtered Lists -> Cats: ${activeCategories.length}, Tags: ${activeTags.length}');
+      }
 
       return {
         'categories': activeCategories,
         'tags': activeTags,
       };
     } catch (e) {
-      print('🔴 MetadataService CRITICAL FALLBACK ERROR: $e');
+      if (kDebugMode) {
+        debugPrint('🔴 MetadataService CRITICAL FALLBACK ERROR: $e');
+      }
       return {
         'categories': [],
         'tags': [],
@@ -180,8 +201,10 @@ class MetadataService {
     }
 
     if (isArray && items.length > 50) {
-      print(
-          '⚠️ MetadataService: Tag list truncated for implementation performance (${items.length} -> 50 checked)');
+      if (kDebugMode) {
+        debugPrint(
+            '⚠️ MetadataService: Tag list truncated for implementation performance (${items.length} -> 50 checked)');
+      }
     }
 
     return activeItems.toList()..sort();

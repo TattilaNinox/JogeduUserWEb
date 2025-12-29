@@ -78,9 +78,6 @@ class SessionGuard extends ChangeNotifier {
       try {
         // Aktuális fingerprint előkészítése (cache-elve is elég)
         _currentFingerprint = await DeviceFingerprint.getCurrentFingerprint();
-        if (kDebugMode) {
-          debugPrint('[SessionGuard] currentFingerprint=$_currentFingerprint');
-        }
 
         // Felhasználói dokumentum figyelése
         await _cancelUserDocSubscription();
@@ -180,9 +177,6 @@ class SessionGuard extends ChangeNotifier {
     if (_currentFingerprint == null) {
       if (_deviceAccess != DeviceAccess.loading || termsChanged) {
         _deviceAccess = DeviceAccess.loading;
-        if (kDebugMode) {
-          debugPrint('[SessionGuard] currentFingerprint is null -> loading');
-        }
         notifyListeners();
       }
       return;
@@ -192,10 +186,6 @@ class SessionGuard extends ChangeNotifier {
     final newDeviceAccess = equal ? DeviceAccess.allowed : DeviceAccess.denied;
     if (_deviceAccess != newDeviceAccess || termsChanged) {
       _deviceAccess = newDeviceAccess;
-      if (kDebugMode) {
-        debugPrint(
-            '[SessionGuard] compare allowed=$allowedFingerprint vs current=$_currentFingerprint -> ${_deviceAccess.name}');
-      }
       notifyListeners();
     }
   }

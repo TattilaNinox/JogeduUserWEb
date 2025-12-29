@@ -81,8 +81,10 @@ final _router = GoRouter(
     // SimplePay callback check - KORÁBBAN, mielőtt az auth check fut
     final paymentParam = qp['payment'] ?? baseQp['payment'];
     if (paymentParam != null) {
-      debugPrint(
-          '[Router] SimplePay payment callback detected: payment=$paymentParam');
+      if (kDebugMode) {
+        debugPrint(
+            '[Router] SimplePay payment callback detected: payment=$paymentParam');
+      }
 
       // Payment callback esetén MINDIG engedélyezzük az account oldalt,
       // még akkor is, ha nincs currentUser (mert lehet, hogy még betöltődik)

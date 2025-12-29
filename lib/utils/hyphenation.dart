@@ -12,9 +12,13 @@ Future<void> initHyphenatorHu() async {
   if (_hyphenatorHu != null) return;
   try {
     _hyphenatorHu = await Hyphenator.loadAsync(Language.language_hu);
-    debugPrint('🟢 [initHyphenatorHu] Hyphenator initialized successfully');
+    if (kDebugMode) {
+      debugPrint('🟢 [initHyphenatorHu] Hyphenator initialized successfully');
+    }
   } catch (e) {
-    debugPrint('🔴 [initHyphenatorHu] Failed to initialize hyphenator: $e');
+    if (kDebugMode) {
+      debugPrint('🔴 [initHyphenatorHu] Failed to initialize hyphenator: $e');
+    }
   }
 }
 
@@ -76,7 +80,9 @@ Future<String> hyphenateHtmlHu(String htmlString) async {
     return await compute(
         _hyphenationWorker, HyphenationJob(htmlString, Language.language_hu));
   } catch (e) {
-    debugPrint('🔴 [hyphenateHtmlHu] Background hyphenation failed: $e');
+    if (kDebugMode) {
+      debugPrint('🔴 [hyphenateHtmlHu] Background hyphenation failed: $e');
+    }
     return htmlString;
   }
 }

@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -98,13 +98,17 @@ class _NoteCardGridState extends State<NoteCardGrid> {
           if (isAdmin) {
             // Admin esetén Published és Draft jegyzeteket mutatunk
             query = query.where('status', whereIn: ['Published', 'Draft']);
-            debugPrint(
-                '[NoteCardGrid] Admin query - showing Published and Draft notes');
+            if (kDebugMode) {
+              debugPrint(
+                  '[NoteCardGrid] Admin query - showing Published and Draft notes');
+            }
           } else {
             // Nem admin csak Published jegyzeteket lát
             query = query.where('status', isEqualTo: 'Published');
-            debugPrint(
-                '[NoteCardGrid] Non-admin query - showing only Published notes');
+            if (kDebugMode) {
+              debugPrint(
+                  '[NoteCardGrid] Non-admin query - showing only Published notes');
+            }
           }
         }
         if (widget.selectedCategory != null &&
@@ -123,8 +127,10 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         query = query.orderBy('title').limit(queryLimit);
 
         // Debug: lekérdezés paraméterek
-        debugPrint(
-            '[NoteCardGrid] Query params - science: $userScience, status: ${isAdmin ? "Published/Draft" : "Published"}, type: ${widget.selectedType ?? "all"}');
+        if (kDebugMode) {
+          debugPrint(
+              '[NoteCardGrid] Query params - science: $userScience, status: ${isAdmin ? "Published/Draft" : "Published"}, type: ${widget.selectedType ?? "all"}');
+        }
 
         // Ha nincs típus szűrő, vagy ha a típus szűrő "memoriapalota_allomasok", betöltjük a fő útvonal dokumentumokat
         final shouldLoadAllomasok = widget.selectedType == null ||
@@ -290,22 +296,26 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
             // Debug: találatok száma
             final docs = snapshot.docs;
-            debugPrint('[NoteCardGrid] Found ${docs.length} notes');
+            if (kDebugMode) {
+              debugPrint('[NoteCardGrid] Found ${docs.length} notes');
+            }
             // Debug: típusok listája
             final types = docs
                 .map((d) => d.data()['type'] as String? ?? 'unknown')
                 .toSet();
-            debugPrint('[NoteCardGrid] Note types found: $types');
+            if (kDebugMode) {
+              debugPrint('[NoteCardGrid] Note types found: $types');
+            }
 
-            if (allomasSnapshot != null) {
+            if (allomasSnapshot != null && kDebugMode) {
               debugPrint(
                   '[NoteCardGrid] Found ${allomasSnapshot.docs.length} allomasok');
             }
-            if (dialogusSnapshot != null) {
+            if (dialogusSnapshot != null && kDebugMode) {
               debugPrint(
                   '[NoteCardGrid] Found ${dialogusSnapshot.docs.length} dialogus_fajlok');
             }
-            if (jogesetSnapshot != null) {
+            if (jogesetSnapshot != null && kDebugMode) {
               debugPrint(
                   '🔵 [NoteCardGrid] Found ${jogesetSnapshot.docs.length} jogesetek in collection');
             }
@@ -585,7 +595,14 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                               )
                             : Text(
                                 'Minden jegyzet betöltve ($totalCount jegyzet)',
-                                style: const TextStyle(color: Colors.grey),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: MediaQuery.of(context).size.width <
+                                          600
+                                      ? 12
+                                      : null, // Mobil nézetben 2px-el kisebb (alap 14px -> 12px)
+                                ),
                               ),
                   ),
                 ),
