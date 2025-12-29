@@ -44,6 +44,7 @@ dependencies:
   shared_preferences: ^2.5.3
   flutter_svg: ^2.2.3
   intl: ^0.20.2
+  hyphenatorx: ^1.5.11
 
   device_info_plus: ^9.1.2
   package_info_plus: ^9.0.0
@@ -70,3 +71,4 @@ flutter:
     - assets/images/education_background.svg
     - assets/images/student_studying.svg
     - assets/postal_codes.json
+    - assets/hyphenation/

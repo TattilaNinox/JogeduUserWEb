@@ -7,6 +7,7 @@ import 'dart:ui_web' as ui_web;
 import '../widgets/audio_preview_player.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
+import '../utils/hyphenation.dart'; // Hyphenation import
 
 /// Felhasználói (csak olvasás) nézet szöveges jegyzetekhez.
 ///
@@ -61,8 +62,10 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
     }
 
     if (htmlContent != null && htmlContent.isNotEmpty) {
+      debugPrint('🟢 [_loadNote] Calling hyphenateHtmlHu');
+      final hyphenatedHtml = await hyphenateHtmlHu(htmlContent);
       debugPrint('🟢 [_loadNote] Calling _setupIframe');
-      _setupIframe(htmlContent);
+      _setupIframe(hyphenatedHtml);
     } else {
       debugPrint('🔴 [_loadNote] No HTML content - NOT calling _setupIframe');
     }
@@ -116,6 +119,9 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
             padding: 16px !important;
             margin: 0 !important;
             text-align: justify !important;
+            hyphens: auto !important;
+            -webkit-hyphens: auto !important;
+            -ms-hyphens: auto !important;
             overflow-wrap: break-word !important;
             word-break: break-word !important;
             letter-spacing: 0.3px !important;
@@ -123,6 +129,9 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           p, div, span, li, td, th {
             color: #202122 !important;
             text-align: justify !important;
+            hyphens: auto !important;
+            -webkit-hyphens: auto !important;
+            -ms-hyphens: auto !important;
             overflow-wrap: break-word !important;
             word-break: break-word !important;
             letter-spacing: 0.3px !important;

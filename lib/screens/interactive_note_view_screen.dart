@@ -7,6 +7,7 @@ import 'dart:async';
 // no extra JS interop needed
 import '../widgets/audio_preview_player.dart';
 import 'quiz_page.dart';
+import '../utils/hyphenation.dart'; // Hyphenation import
 
 class InteractiveNoteViewScreen extends StatefulWidget {
   final String noteId;
@@ -78,6 +79,14 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
           -moz-user-select: none !important;
           -ms-user-select: none !important;
           user-select: none !important;
+          text-align: justify !important;
+          hyphens: auto !important;
+          -webkit-hyphens: auto !important;
+        }
+        p, div, span, li, td, th {
+          text-align: justify !important;
+          hyphens: auto !important;
+          -webkit-hyphens: auto !important;
         }
         input, textarea, [contenteditable="true"] {
           -webkit-user-select: text !important;
@@ -199,13 +208,16 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
     }
 
     if (htmlContentToLoad != null && htmlContentToLoad.isNotEmpty) {
-      // Új iframe-et hozunk létre az új tartalommal
-      _setupIframe(htmlContentToLoad);
-
-      setState(() {
-        _noteSnapshot = snapshot;
-        _hasContent = true;
-      });
+      // Apply hyphenation before loading into iframe
+      () async {
+        final hyphenatedHtml = await hyphenateHtmlHu(htmlContentToLoad!);
+        if (!mounted) return;
+        _setupIframe(hyphenatedHtml);
+        setState(() {
+          _noteSnapshot = snapshot;
+          _hasContent = true;
+        });
+      }();
     } else {
       setState(() {
         _noteSnapshot = snapshot;
