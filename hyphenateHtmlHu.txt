@@ -1,0 +1,34 @@
+Future<String> hyphenateHtmlHu(String htmlString) async {
+  if (htmlString.isEmpty) return htmlString;
+
+  // RAPID EXIT: If the content is already hyphenated (contains soft hyphens), skip processing.
+  // 0xAD is the soft hyphen character. \u0026shy; is the HTML entity.
+  if (htmlString.contains('\\u00AD') || htmlString.contains('\u0026shy;')) {
+    // Already hyphenated, return as is.
+    return htmlString;
+  }
+
+  if (_hyphenatorHu == null) {
+    // Ensure initialization is started
+    initHyphenatorHu();
+  }
+
+  // Optimization: For very short strings, don't context switch to isolate
+  if (htmlString.length < 500) {
+    if (_hyphenatorHu != null) {
+      final document = html_parser.parseFragment(htmlString);
+      _processNodeRecursive(_hyphenatorHu!, document);
+      return document.outerHtml;
+    }
+    return htmlString;
+  }
+
+  // Heavy lifting in background
+  try {
+    return await compute(
+        _hyphenationWorker, HyphenationJob(htmlString, Language.language_hu));
+  } catch (e) {
+    debugPrint('🔴 [hyphenateHtmlHu] Background hyphenation failed: $e');
+    return htmlString;
+  }
+}

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'core/firebase_config.dart';
@@ -39,6 +40,7 @@ import 'screens/user_bundle_edit_screen.dart';
 import 'screens/user_bundle_view_screen.dart';
 import 'screens/document_selection_screen.dart';
 import 'services/version_check_service.dart';
+import 'utils/hyphenation.dart'; // Hyphenation import
 
 /// Az alkalmazás fő belépési pontja.
 void main() async {
@@ -55,6 +57,9 @@ void main() async {
   await FirebaseConfig.initialize();
   // Initialize intl date formatting for Hungarian locale
   await initializeDateFormatting('hu', null);
+
+  // Pre-initialize hyphenator in background
+  unawaited(initHyphenatorHu());
 
   // Elindítja az alkalmazást a gyökér widget (`MyApp`) megadásával.
   runApp(const MyApp());

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
 import 'dart:ui_web' as ui_web;
 import 'dart:async';
+import 'dart:js_interop';
 // no extra JS interop needed
 import '../widgets/audio_preview_player.dart';
 import 'quiz_page.dart';
@@ -144,8 +145,9 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
             '<!DOCTYPE html><html lang="hu"><head><meta charset="utf-8"><style>$noCopyCss</style>$noCopyJs</head><body>$protectedHtml</body></html>';
       }
 
-      iframeElement.src =
-          'data:text/html;charset=utf-8,${Uri.encodeComponent(protectedHtml)}';
+      final blob = web.Blob(
+          [protectedHtml.toJS].toJS, web.BlobPropertyBag(type: 'text/html'));
+      iframeElement.src = web.URL.createObjectURL(blob);
     }
 
     // Platform view regisztrálása
@@ -195,29 +197,47 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
       return;
     }
 
-    String? htmlContentToLoad;
     final data = snapshot.data() as Map<String, dynamic>?;
-    if (data != null) {
-      final pages = data['pages'] as List<dynamic>? ?? [];
-      if (pages.isNotEmpty) {
-        final htmlContent = pages.first as String? ?? '';
-        if (htmlContent.isNotEmpty) {
-          htmlContentToLoad = htmlContent;
-        }
-      }
+    // Tartalom kezelése
+    // Ellenőrizzük a 'processed_pages' mezőt (pre-hyphenated content)
+    final processedPages = data?['processed_pages'] as List<dynamic>? ?? [];
+    final pages = data?['pages'] as List<dynamic>? ?? [];
+    String htmlContent = '';
+    bool isPreProcessed = false;
+    const int pageIndex =
+        0; // Assuming we always display the first page for now
+
+    if (processedPages.isNotEmpty &&
+        processedPages.length > pageIndex &&
+        (processedPages[pageIndex] as String?)?.isNotEmpty == true) {
+      htmlContent = processedPages[pageIndex] as String;
+      isPreProcessed = true;
+    } else if (pages.isNotEmpty && pages.length > pageIndex) {
+      htmlContent = pages[pageIndex] as String? ?? '';
     }
 
-    if (htmlContentToLoad != null && htmlContentToLoad.isNotEmpty) {
-      // Apply hyphenation before loading into iframe
-      () async {
-        final hyphenatedHtml = await hyphenateHtmlHu(htmlContentToLoad!);
-        if (!mounted) return;
-        _setupIframe(hyphenatedHtml);
+    if (htmlContent.isNotEmpty) {
+      _hasContent = true;
+
+      if (!isPreProcessed) {
+        // Aszinkron hyphenation hívás, ha nincs előre feldolgozva
+        () async {
+          final hyphenated = await hyphenateHtmlHu(htmlContent);
+          if (mounted) {
+            _setupIframe(hyphenated);
+            setState(() {
+              _noteSnapshot = snapshot;
+            });
+          }
+        }();
+      } else {
+        // Ha előre feldolgozott, azonnal mehet az iframe-be
+        _setupIframe(htmlContent);
         setState(() {
           _noteSnapshot = snapshot;
           _hasContent = true;
         });
-      }();
+      }
     } else {
       setState(() {
         _noteSnapshot = snapshot;

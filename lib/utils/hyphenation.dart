@@ -1,18 +1,16 @@
 import 'package:hyphenatorx/hyphenatorx.dart';
-import 'package:hyphenatorx/languages/languageconfig.dart'; // Correct import for Language enum
+import 'package:hyphenatorx/languages/languageconfig.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
 import 'package:flutter/foundation.dart';
 
-/// Global hyphenator instance for Hungarian.
+/// Global hyphenator instance for Hungarian (Main Isolate).
 Hyphenator? _hyphenatorHu;
 
 /// Initializes the Hungarian hyphenator.
 Future<void> initHyphenatorHu() async {
   if (_hyphenatorHu != null) return;
-
   try {
-    // Load using the correct enum and loadAsync method
     _hyphenatorHu = await Hyphenator.loadAsync(Language.language_hu);
     debugPrint('🟢 [initHyphenatorHu] Hyphenator initialized successfully');
   } catch (e) {
@@ -20,30 +18,70 @@ Future<void> initHyphenatorHu() async {
   }
 }
 
-/// Robust Hungarian hyphenation for HTML strings using hyphenatorx.
+/// Helper class for background processing
+class HyphenationJob {
+  final String html;
+  final Language language;
+
+  HyphenationJob(this.html, this.language);
+}
+
+/// Statics for the worker isolate (separate memory space)
+Hyphenator? _workerHyphenator;
+
+/// Worker function that runs in a separate isolate (compute).
+/// It must be a top-level function or a static method.
+Future<String> _hyphenationWorker(HyphenationJob job) async {
+  try {
+    // Cache the hyphenator within the isolate to avoid repeated JSON loading
+    _workerHyphenator ??= await Hyphenator.loadAsync(job.language);
+
+    final document = html_parser.parseFragment(job.html);
+    _processNodeRecursive(_workerHyphenator!, document);
+    return document.outerHtml;
+  } catch (e) {
+    return job.html;
+  }
+}
+
+/// Robust Hungarian hyphenation for HTML strings.
+/// Moves work to background isolate for long strings to keep UI responsive.
 Future<String> hyphenateHtmlHu(String htmlString) async {
   if (htmlString.isEmpty) return htmlString;
 
-  if (_hyphenatorHu == null) {
-    await initHyphenatorHu();
-  }
-
-  if (_hyphenatorHu == null) {
-    debugPrint('⚠️ [hyphenateHtmlHu] Hyphenator not available');
+  // RAPID EXIT: If the content is already hyphenated (contains soft hyphens), skip processing.
+  // 0xAD is the soft hyphen character. &shy; is the HTML entity.
+  if (htmlString.contains('\u00AD') || htmlString.contains('&shy;')) {
+    // Already hyphenated, return as is.
     return htmlString;
   }
 
+  if (_hyphenatorHu == null) {
+    // Ensure initialization is started
+    initHyphenatorHu();
+  }
+
+  // Optimization: For very short strings, don't context switch to isolate
+  if (htmlString.length < 500) {
+    if (_hyphenatorHu != null) {
+      final document = html_parser.parseFragment(htmlString);
+      _processNodeRecursive(_hyphenatorHu!, document);
+      return document.outerHtml;
+    }
+    return htmlString;
+  }
+
+  // Heavy lifting in background
   try {
-    final document = html_parser.parseFragment(htmlString);
-    _processNode(_hyphenatorHu!, document);
-    return document.outerHtml;
+    return await compute(
+        _hyphenationWorker, HyphenationJob(htmlString, Language.language_hu));
   } catch (e) {
-    debugPrint('🔴 [hyphenateHtmlHu] Error: $e');
+    debugPrint('🔴 [hyphenateHtmlHu] Background hyphenation failed: $e');
     return htmlString;
   }
 }
 
-void _processNode(Hyphenator hyphenator, dom.Node node) {
+void _processNodeRecursive(Hyphenator hyphenator, dom.Node node) {
   if (node is dom.Element) {
     final tag = node.localName?.toLowerCase();
     if (tag == 'code' || tag == 'pre' || tag == 'script' || tag == 'style') {
@@ -57,15 +95,14 @@ void _processNode(Hyphenator hyphenator, dom.Node node) {
       final text = child.text;
       if (text != null && text.trim().isNotEmpty) {
         try {
-          // Use hyphenateText for potentially multiple words in a text node
           final hyphenatedText = hyphenator.hyphenateText(text);
           child.text = hyphenatedText;
         } catch (e) {
-          debugPrint('⚠️ [hyphenateHtmlHu] Hyphenation failed for segment');
+          // Silent fail for specific segments
         }
       }
     } else {
-      _processNode(hyphenator, child);
+      _processNodeRecursive(hyphenator, child);
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
 import 'dart:ui_web' as ui_web;
+import 'dart:js_interop';
 
 import '../widgets/audio_preview_player.dart';
 import '../widgets/breadcrumb_navigation.dart';
@@ -50,22 +51,43 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
 
     final data = snapshot.data();
     String? htmlContent;
+    bool isPreProcessed = false;
+
     if (data != null) {
+      final processedPages = data['processed_pages'] as List<dynamic>? ?? [];
       final pages = data['pages'] as List<dynamic>? ?? [];
-      debugPrint('🔵 [_loadNote] Pages count: ${pages.length}');
-      if (pages.isNotEmpty) {
+
+      debugPrint(
+          '🔵 [_loadNote] Pages count: ${pages.length}, Processed count: ${processedPages.length}');
+
+      if (processedPages.isNotEmpty &&
+          processedPages.length > _currentPageIndex &&
+          (processedPages[_currentPageIndex] as String?)?.isNotEmpty == true) {
+        htmlContent = processedPages[_currentPageIndex] as String;
+        isPreProcessed = true;
+        debugPrint('🔵 [_loadNote] Loaded content from processed_pages');
+      } else if (pages.isNotEmpty) {
         htmlContent = pages[_currentPageIndex] as String? ?? '';
+        debugPrint('🔵 [_loadNote] Loaded content from pages (raw)');
+      }
+
+      if (htmlContent != null) {
         debugPrint('🔵 [_loadNote] HTML content length: ${htmlContent.length}');
-        debugPrint(
-            '🔵 [_loadNote] HTML preview (first 1000 chars): ${htmlContent.length > 1000 ? htmlContent.substring(0, 1000) : htmlContent}');
       }
     }
 
     if (htmlContent != null && htmlContent.isNotEmpty) {
-      debugPrint('🟢 [_loadNote] Calling hyphenateHtmlHu');
-      final hyphenatedHtml = await hyphenateHtmlHu(htmlContent);
+      String contentToRender = htmlContent;
+
+      if (!isPreProcessed) {
+        debugPrint('🟢 [_loadNote] Calling hyphenateHtmlHu');
+        contentToRender = await hyphenateHtmlHu(htmlContent);
+      } else {
+        debugPrint('🟢 [_loadNote] Skipping hyphenation (pre-processed)');
+      }
+
       debugPrint('🟢 [_loadNote] Calling _setupIframe');
-      _setupIframe(hyphenatedHtml);
+      _setupIframe(contentToRender);
     } else {
       debugPrint('🔴 [_loadNote] No HTML content - NOT calling _setupIframe');
     }
@@ -393,6 +415,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
         styledHtmlContent = cssStyle + htmlWithLang;
       } else {
         // Ha már van style tag, hozzáadjuk a body stílust és az html lang attribútumot
+        debugPrint('🟢 [_setupIframe] Modifying existing style/lang settings');
 
         String htmlWithLang = htmlContent;
         // Hozzáadjuk a lang attribútumot az html taghez
@@ -414,7 +437,7 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
         // Hozzáadjuk a body stílust és lang attribútumot
         htmlWithLang = htmlWithLang.replaceAll(
           RegExp(r'<body[^>]*>', caseSensitive: false),
-          '<body lang="hu" style="color: #202122 !important; background-color: #ffffff !important; font-family: Verdana, sans-serif !important; font-size: 13px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important; text-align: justify !important; overflow-wrap: break-word !important; word-break: break-word !important; letter-spacing: 0.3px !important;">',
+          '<body lang="hu" style="color: #202122 !important; background-color: #ffffff !important; font-family: Verdana, sans-serif !important; font-size: 13px !important; line-height: 1.6 !important; padding: 16px !important; margin: 0 !important; text-align: justify !important; hyphens: auto !important; -webkit-hyphens: auto !important; -ms-hyphens: auto !important; overflow-wrap: break-word !important; word-break: break-word !important; letter-spacing: 0.3px !important;">',
         );
 
         // Hozzáadjuk a hiányzó CSS stílusokat a meglévő style tag után
@@ -603,20 +626,12 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
         }
       }
 
-      iframeElement.src =
-          'data:text/html;charset=utf-8,${Uri.encodeComponent(styledHtmlContent)}';
+      final blob = web.Blob([styledHtmlContent.toJS].toJS,
+          web.BlobPropertyBag(type: 'text/html'));
+      iframeElement.src = web.URL.createObjectURL(blob);
 
-      // #region agent log - HTML tartalom konzolba írása
-      debugPrint('=== HTML CONTENT DEBUG ===');
-      debugPrint('HTML Length: ${htmlContent.length}');
-      debugPrint('HTML Preview (first 3000 chars):');
-      final preview = htmlContent.length > 3000
-          ? htmlContent.substring(0, 3000)
-          : htmlContent;
-      debugPrint(preview);
-      debugPrint('=== Checking for key elements ===');
-      debugPrint(
-          'Contains "kulcsszo": ${htmlContent.toLowerCase().contains('kulcsszo')}');
+      // Eltávolítottuk a nehéz debugPrint hívásokat
+      debugPrint('🟢 [_setupIframe] Iframe content set via Blob URL');
       debugPrint(
           'Contains "jogszabaly": ${htmlContent.toLowerCase().contains('jogszabaly')}');
       debugPrint(
