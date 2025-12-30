@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
 import '../widgets/note_list_tile.dart';
+import '../utils/string_utils.dart';
 
 /// Drill-down navigációs képernyő a címkék hierarchikus böngészéséhez.
 ///
@@ -302,21 +303,12 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
       if (!_matchesPath(tags)) continue;
 
-      final isJogeset = doc.reference.path.contains('jogesetek');
-
       if (tags.length > _currentDepth) {
         final nextTag = tags[_currentDepth];
         _addToHierarchy(
             hierarchy, nextTag, doc, tags.length > _currentDepth + 1);
       } else {
-        if (isJogeset) {
-          hierarchy
-              .putIfAbsent('_directJogeset',
-                  () => <QueryDocumentSnapshot<Map<String, dynamic>>>[])
-              .add(doc);
-        } else {
-          direct.add(doc);
-        }
+        direct.add(doc);
       }
     }
 
@@ -377,16 +369,44 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   List<Widget> _buildHierarchyWidgets(Map<String, dynamic> hierarchy) {
     final widgets = <Widget>[];
 
-    // Jegyzetek
+    // Jegyzetek és jogesetek rendezése ABC sorrendben (természetes rendezés)
     if (hierarchy.containsKey('_direct')) {
-      for (var doc in hierarchy['_direct']) {
-        widgets.add(_buildNoteWidget(doc));
-      }
-    }
-    // Jogesetek
-    if (hierarchy.containsKey('_directJogeset')) {
-      for (var doc in hierarchy['_directJogeset']) {
-        widgets.add(_buildJogesetWidget(doc));
+      final List<QueryDocumentSnapshot<Map<String, dynamic>>> directDocs =
+          List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
+              hierarchy['_direct']);
+
+      directDocs.sort((a, b) {
+        final dataA = a.data();
+        final dataB = b.data();
+        final isMPA = a.reference.path.contains('memoriapalota_allomasok');
+        final isMPB = b.reference.path.contains('memoriapalota_allomasok');
+        final isDialogusA = a.reference.path.contains('dialogus_fajlok');
+        final isDialogusB = b.reference.path.contains('dialogus_fajlok');
+        final isJogesetA = a.reference.path.contains('jogesetek');
+        final isJogesetB = b.reference.path.contains('jogesetek');
+
+        final titleA = (isJogesetA
+                ? (dataA['title'] ?? a.id).toString()
+                : (isMPA || isDialogusA
+                    ? (dataA['title'] ?? dataA['cim'] ?? 'Névtelen')
+                    : (dataA['title'] ?? dataA['name'] ?? 'Névtelen')))
+            .toString();
+        final titleB = (isJogesetB
+                ? (dataB['title'] ?? b.id).toString()
+                : (isMPB || isDialogusB
+                    ? (dataB['title'] ?? dataB['cim'] ?? 'Névtelen')
+                    : (dataB['title'] ?? dataB['name'] ?? 'Névtelen')))
+            .toString();
+        return StringUtils.naturalCompare(titleA, titleB);
+      });
+
+      for (var doc in directDocs) {
+        final isJogeset = doc.reference.path.contains('jogesetek');
+        if (isJogeset) {
+          widgets.add(_buildJogesetWidget(doc));
+        } else {
+          widgets.add(_buildNoteWidget(doc));
+        }
       }
     }
 
@@ -394,7 +414,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     final folders = hierarchy.entries
         .where((e) => !e.key.startsWith('_'))
         .toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+      ..sort((a, b) => StringUtils.naturalCompare(a.key, b.key));
 
     for (var entry in folders) {
       widgets.add(_buildFolderWidget(entry.key, entry.value));

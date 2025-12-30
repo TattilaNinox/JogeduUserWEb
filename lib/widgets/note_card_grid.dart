@@ -7,6 +7,7 @@ import '../core/firebase_config.dart';
 import '../services/auth_service.dart';
 import '../screens/category_tags_screen.dart';
 import '../screens/tag_drill_down_screen.dart';
+import '../utils/string_utils.dart';
 
 class NoteCardGrid extends StatefulWidget {
   final String searchText;
@@ -525,31 +526,25 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                 ? 'jogeset'
                                 : (b.data()['type'] as String? ?? '')));
 
-                    // 'source' típus mindig a lista végére kerüljön
                     final bool isSourceA = typeA == 'source';
                     final bool isSourceB = typeB == 'source';
                     if (isSourceA != isSourceB) {
                       return isSourceA ? 1 : -1;
                     }
 
-                    final typeCompare = typeA.compareTo(typeB);
-                    if (typeCompare != 0) {
-                      return typeCompare;
-                    }
-
-                    final titleA = isJogesetA
+                    final titleA = (isJogesetA
                         ? (a.data()['title'] ?? a.id).toString()
                         : (isAllomasA || isDialogusA
                             ? (a.data()['title'] ?? a.data()['cim'] ?? '')
                                 .toString()
-                            : (a.data()['title'] as String? ?? ''));
-                    final titleB = isJogesetB
+                            : (a.data()['title'] as String? ?? '')));
+                    final titleB = (isJogesetB
                         ? (b.data()['title'] ?? b.id).toString()
                         : (isAllomasB || isDialogusB
                             ? (b.data()['title'] ?? b.data()['cim'] ?? '')
                                 .toString()
-                            : (b.data()['title'] as String? ?? ''));
-                    return titleA.compareTo(titleB);
+                            : (b.data()['title'] as String? ?? '')));
+                    return StringUtils.naturalCompare(titleA, titleB);
                   });
                 } else if (value is Map<String, dynamic>) {
                   sortDocs(value);
@@ -565,7 +560,8 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
               children: [
                 ...(hierarchical.entries.toList()
-                      ..sort((a, b) => a.key.compareTo(b.key)))
+                      ..sort(
+                          (a, b) => StringUtils.naturalCompare(a.key, b.key)))
                     .map((categoryEntry) {
                   return _CategorySection(
                     key: ValueKey('category_${categoryEntry.key}'),

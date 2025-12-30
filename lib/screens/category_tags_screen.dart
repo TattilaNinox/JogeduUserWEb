@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
 import '../widgets/note_list_tile.dart';
+import '../utils/string_utils.dart';
 import 'tag_drill_down_screen.dart';
 
 /// Kategória címkék képernyő - megjeleníti egy kategória 0-s indexű címkéit és a címke nélküli elemeket.
@@ -271,7 +272,34 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                                 child: Text('Nincs megjeleníthető tartalom.'));
                           }
 
-                          final sortedTags = tagMap.keys.toList()..sort();
+                          // ABC sorrendbe rendezés a kategória alatt (közvetlen elemek)
+                          directDocs.sort((a, b) {
+                            final dataA = a.data();
+                            final dataB = b.data();
+                            final isJogesetA =
+                                a.reference.path.contains('jogesetek');
+                            final isJogesetB =
+                                b.reference.path.contains('jogesetek');
+
+                            final titleA = (isJogesetA
+                                    ? (dataA['title'] ?? a.id)
+                                    : (dataA['title'] ??
+                                        dataA['name'] ??
+                                        dataA['cim'] ??
+                                        'Névtelen'))
+                                .toString();
+                            final titleB = (isJogesetB
+                                    ? (dataB['title'] ?? b.id)
+                                    : (dataB['title'] ??
+                                        dataB['name'] ??
+                                        dataB['cim'] ??
+                                        'Névtelen'))
+                                .toString();
+                            return StringUtils.naturalCompare(titleA, titleB);
+                          });
+
+                          final sortedTags = tagMap.keys.toList()
+                            ..sort((a, b) => StringUtils.naturalCompare(a, b));
 
                           return ListView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
