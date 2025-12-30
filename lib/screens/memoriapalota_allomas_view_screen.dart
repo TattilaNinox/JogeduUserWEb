@@ -19,6 +19,7 @@ import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
 import '../widgets/mini_audio_player.dart';
 import '../services/version_check_service.dart';
+import '../utils/hyphenation.dart'; // Hyphenation import
 
 // Top-level függvény a compute-hoz - gyorsított, egyszerűsített verzió
 Future<Uint8List?> _compressImageInIsolate(Uint8List imageBytes) async {
@@ -742,10 +743,10 @@ class _MemoriapalotaAllomasViewScreenState
 </html>
 ''';
 
-    // FONTOS: Az iframe src-jét data URI formátumban kell beállítani!
-    // FONTOS: A HTML tartalmat MINDIG Uri.encodeComponent()-tel kell kódolni!
-    iframeElement.src =
-        'data:text/html;charset=utf-8,${Uri.encodeComponent(fullHtml)}';
+    // FONTOS: Az iframe src-jét Blob URL formátumban állítjuk be a gyorsabb betöltésért
+    final blob =
+        web.Blob([fullHtml.toJS].toJS, web.BlobPropertyBag(type: 'text/html'));
+    iframeElement.src = web.URL.createObjectURL(blob);
 
     // FONTOS: Platform view regisztrálása MINDIG az iframe src beállítása UTÁN!
     // ignore: undefined_prefixed_name
@@ -819,8 +820,25 @@ class _MemoriapalotaAllomasViewScreenState
     final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
     final nextAudioUrl = hasAudio ? audioUrl.trim() : null;
 
-    // Új iframe-et hozunk létre az új tartalommal (teljes HTML dokumentummal)
-    _setupIframe(cim, kulcsszo, tartalom, sorszam: sorszam);
+    // Ellenőrizzük a 'processed_tartalom' mezőt
+    final processedTartalom = data['processed_tartalom'] as String? ?? '';
+
+    // Tartalom meghatározása: ha van feldolgozott, azt használjuk
+    String contentToRender = tartalom;
+    bool isPreProcessed = false;
+
+    if (processedTartalom.isNotEmpty) {
+      contentToRender = processedTartalom;
+      isPreProcessed = true;
+    }
+
+    // Ha nincs előre feldolgozva, akkor most választjuk el
+    if (!isPreProcessed && contentToRender.isNotEmpty) {
+      contentToRender = await hyphenateHtmlHu(contentToRender);
+    }
+
+    // Új iframe-et hozunk létre az új tartalommal
+    _setupIframe(cim, kulcsszo, contentToRender, sorszam: sorszam);
 
     // Betöltjük a felhasználó képét az aktuális állomáshoz és megvárjuk
     await _loadUserImage();
