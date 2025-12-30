@@ -13,10 +13,15 @@ echo   (Nem írja felül az éles verziót!)
 echo ========================================
 echo.
 
-REM Channel név beállítása
+REM Channel név és Site Target beállítása
 set CHANNEL_NAME=%1
 if "%CHANNEL_NAME%"=="" (
     set CHANNEL_NAME=preview
+)
+
+set SITE_TARGET=%2
+if "%SITE_TARGET%"=="" (
+    set SITE_TARGET=jogedu
 )
 
 REM Build mappa ellenőrzése
@@ -45,12 +50,12 @@ if exist build\web\version.json (
 echo.
 
 REM Firebase deploy to preview channel
-echo [2/2] Deploying to Firebase Hosting Preview Channel: %CHANNEL_NAME%...
+echo [2/2] Deploying target [%SITE_TARGET%] to Firebase Hosting Preview Channel: %CHANNEL_NAME%...
 echo [NOTE] This will NOT overwrite the production version!
 echo.
 
 REM Deploy és output mentése temp fájlba
-call firebase hosting:channel:deploy %CHANNEL_NAME% --expires 30d > temp_deploy_output.txt 2>&1
+call firebase hosting:channel:deploy %CHANNEL_NAME% --only %SITE_TARGET% --expires 30d > temp_deploy_output.txt 2>&1
 set DEPLOY_EXIT_CODE=%errorlevel%
 
 REM Output megjelenítése
