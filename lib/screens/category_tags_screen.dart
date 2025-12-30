@@ -272,40 +272,58 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                                 child: Text('Nincs megjeleníthető tartalom.'));
                           }
 
-                          // ABC sorrendbe rendezés a kategória alatt (közvetlen elemek)
-                          directDocs.sort((a, b) {
-                            final dataA = a.data();
-                            final dataB = b.data();
-                            final isJogesetA =
-                                a.reference.path.contains('jogesetek');
-                            final isJogesetB =
-                                b.reference.path.contains('jogesetek');
+                          // Egységes lista létrehozása a tag-ekből és a közvetlen dokumentumokból
+                          final sortedTags = tagMap.keys.toList();
+                          final List<dynamic> unifiedList = [
+                            ...sortedTags,
+                            ...directDocs,
+                          ];
 
-                            final titleA = (isJogesetA
-                                    ? (dataA['title'] ?? a.id)
-                                    : (dataA['title'] ??
-                                        dataA['name'] ??
-                                        dataA['cim'] ??
-                                        'Névtelen'))
-                                .toString();
-                            final titleB = (isJogesetB
-                                    ? (dataB['title'] ?? b.id)
-                                    : (dataB['title'] ??
-                                        dataB['name'] ??
-                                        dataB['cim'] ??
-                                        'Névtelen'))
-                                .toString();
+                          unifiedList.sort((a, b) {
+                            String titleA;
+                            if (a is String) {
+                              titleA = a;
+                            } else {
+                              final dataA = (a as QueryDocumentSnapshot<
+                                      Map<String, dynamic>>)
+                                  .data();
+                              final isJogesetA =
+                                  a.reference.path.contains('jogesetek');
+                              titleA = (isJogesetA
+                                      ? (dataA['title'] ?? a.id)
+                                      : (dataA['title'] ??
+                                          dataA['name'] ??
+                                          dataA['cim'] ??
+                                          'Névtelen'))
+                                  .toString();
+                            }
+
+                            String titleB;
+                            if (b is String) {
+                              titleB = b;
+                            } else {
+                              final dataB = (b as QueryDocumentSnapshot<
+                                      Map<String, dynamic>>)
+                                  .data();
+                              final isJogesetB =
+                                  b.reference.path.contains('jogesetek');
+                              titleB = (isJogesetB
+                                      ? (dataB['title'] ?? b.id)
+                                      : (dataB['title'] ??
+                                          dataB['name'] ??
+                                          dataB['cim'] ??
+                                          'Névtelen'))
+                                  .toString();
+                            }
+
                             return StringUtils.naturalCompare(titleA, titleB);
                           });
 
-                          final sortedTags = tagMap.keys.toList()
-                            ..sort((a, b) => StringUtils.naturalCompare(a, b));
-
                           return ListView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: [
-                              ...sortedTags.map((tag) {
-                                final docs = tagMap[tag]!;
+                            children: unifiedList.map((item) {
+                              if (item is String) {
+                                final docs = tagMap[item]!;
                                 final hasDeepTags = docs.any((doc) {
                                   if (doc.reference.path
                                       .contains('jogesetek')) {
@@ -319,21 +337,13 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                                       1;
                                 });
                                 return _buildTagCard(
-                                    tag, docs.length, hasDeepTags);
-                              }),
-                              if (directDocs.isNotEmpty) ...[
-                                const Padding(
-                                  padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-                                  child: Text('Egyéb jegyzetek',
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.grey)),
-                                ),
-                                ...directDocs.map((doc) =>
-                                    _buildDirectNoteWidget(doc, isAdmin)),
-                              ],
-                            ],
+                                    item, docs.length, hasDeepTags);
+                              } else {
+                                final doc = item as QueryDocumentSnapshot<
+                                    Map<String, dynamic>>;
+                                return _buildDirectNoteWidget(doc, isAdmin);
+                              }
+                            }).toList(),
                           );
                         },
                       );

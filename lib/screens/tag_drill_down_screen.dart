@@ -367,60 +367,69 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   }
 
   List<Widget> _buildHierarchyWidgets(Map<String, dynamic> hierarchy) {
-    final widgets = <Widget>[];
+    // Egységes lista létrehozása a mappákból és a közvetlen dokumentumokból
+    final List<dynamic> unifiedList = [];
 
-    // Jegyzetek és jogesetek rendezése ABC sorrendben (természetes rendezés)
     if (hierarchy.containsKey('_direct')) {
-      final List<QueryDocumentSnapshot<Map<String, dynamic>>> directDocs =
-          List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
-              hierarchy['_direct']);
+      unifiedList.addAll(hierarchy['_direct']);
+    }
 
-      directDocs.sort((a, b) {
-        final dataA = a.data();
-        final dataB = b.data();
-        final isMPA = a.reference.path.contains('memoriapalota_allomasok');
-        final isMPB = b.reference.path.contains('memoriapalota_allomasok');
-        final isDialogusA = a.reference.path.contains('dialogus_fajlok');
-        final isDialogusB = b.reference.path.contains('dialogus_fajlok');
-        final isJogesetA = a.reference.path.contains('jogesetek');
-        final isJogesetB = b.reference.path.contains('jogesetek');
+    final folders =
+        hierarchy.entries.where((e) => !e.key.startsWith('_')).toList();
+    unifiedList.addAll(folders);
 
-        final titleA = (isJogesetA
-                ? (dataA['title'] ?? a.id).toString()
+    unifiedList.sort((a, b) {
+      String titleA;
+      if (a is MapEntry<String, dynamic>) {
+        titleA = a.key;
+      } else {
+        final docA = a as QueryDocumentSnapshot<Map<String, dynamic>>;
+        final dataA = docA.data();
+        final isJogesetA = docA.reference.path.contains('jogesetek');
+        final isMPA = docA.reference.path.contains('memoriapalota_allomasok');
+        final isDialogusA = docA.reference.path.contains('dialogus_fajlok');
+
+        titleA = (isJogesetA
+                ? (dataA['title'] ?? docA.id)
                 : (isMPA || isDialogusA
                     ? (dataA['title'] ?? dataA['cim'] ?? 'Névtelen')
                     : (dataA['title'] ?? dataA['name'] ?? 'Névtelen')))
             .toString();
-        final titleB = (isJogesetB
-                ? (dataB['title'] ?? b.id).toString()
+      }
+
+      String titleB;
+      if (b is MapEntry<String, dynamic>) {
+        titleB = b.key;
+      } else {
+        final docB = b as QueryDocumentSnapshot<Map<String, dynamic>>;
+        final dataB = docB.data();
+        final isJogesetB = docB.reference.path.contains('jogesetek');
+        final isMPB = docB.reference.path.contains('memoriapalota_allomasok');
+        final isDialogusB = docB.reference.path.contains('dialogus_fajlok');
+
+        titleB = (isJogesetB
+                ? (dataB['title'] ?? docB.id)
                 : (isMPB || isDialogusB
                     ? (dataB['title'] ?? dataB['cim'] ?? 'Névtelen')
                     : (dataB['title'] ?? dataB['name'] ?? 'Névtelen')))
             .toString();
-        return StringUtils.naturalCompare(titleA, titleB);
-      });
+      }
 
-      for (var doc in directDocs) {
-        final isJogeset = doc.reference.path.contains('jogesetek');
-        if (isJogeset) {
-          widgets.add(_buildJogesetWidget(doc));
+      return StringUtils.naturalCompare(titleA, titleB);
+    });
+
+    return unifiedList.map((item) {
+      if (item is MapEntry<String, dynamic>) {
+        return _buildFolderWidget(item.key, item.value);
+      } else {
+        final doc = item as QueryDocumentSnapshot<Map<String, dynamic>>;
+        if (doc.reference.path.contains('jogesetek')) {
+          return _buildJogesetWidget(doc);
         } else {
-          widgets.add(_buildNoteWidget(doc));
+          return _buildNoteWidget(doc);
         }
       }
-    }
-
-    // Mappák
-    final folders = hierarchy.entries
-        .where((e) => !e.key.startsWith('_'))
-        .toList()
-      ..sort((a, b) => StringUtils.naturalCompare(a.key, b.key));
-
-    for (var entry in folders) {
-      widgets.add(_buildFolderWidget(entry.key, entry.value));
-    }
-
-    return widgets;
+    }).toList();
   }
 
   Widget _buildNoteWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
