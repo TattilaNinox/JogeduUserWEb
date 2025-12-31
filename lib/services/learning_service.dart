@@ -11,7 +11,7 @@ class LearningService {
   // Cache a deck esedékes kártyáinak indexeire
   static final Map<String, List<int>> _dueCardsCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
-  static const Duration _cacheValidity = Duration(minutes: 5);
+  static const Duration _cacheValidity = Duration(minutes: 15);
 
   /// Egy kártya tanulási adatainak frissítése értékelés alapján
   static Future<void> updateUserLearningData(

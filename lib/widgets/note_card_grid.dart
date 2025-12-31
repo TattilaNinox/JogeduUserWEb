@@ -556,8 +556,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               sortDocs(tags);
             });
 
-            final bool skipCategoryWrapper = hierarchical.length == 1 &&
-                widget.selectedCategory != null &&
+            final bool skipCategoryWrapper = widget.selectedCategory != null &&
                 widget.selectedCategory!.isNotEmpty &&
                 hierarchical.containsKey(widget.selectedCategory);
 
