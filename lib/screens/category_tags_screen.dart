@@ -24,6 +24,8 @@ class CategoryTagsScreen extends StatefulWidget {
 
 class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   bool _hasPremiumAccess = false;
+  int _currentLimit = 25; // Alapértelmezett limit
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -57,6 +59,17 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
     } catch (e) {
       debugPrint('Error checking premium access: $e');
     }
+  }
+
+  void _loadMore() {
+    if (_isLoadingMore) return;
+    setState(() {
+      _currentLimit += 50;
+      _isLoadingMore = true;
+    });
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _isLoadingMore = false);
+    });
   }
 
   void _navigateToTagDrillDown(BuildContext context, String tag) {
@@ -134,7 +147,9 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
               .collection('notes')
               .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category);
+              .where('category', isEqualTo: widget.category)
+              .orderBy('title')
+              .limit(_currentLimit + 1);
 
           if (isAdmin) {
             notesQuery = notesQuery.where('status',
@@ -150,7 +165,9 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
               .collection('jogesetek')
               .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category);
+              .where('category', isEqualTo: widget.category)
+              .orderBy(FieldPath.documentId)
+              .limit(_currentLimit + 1);
 
           if (isAdmin) {
             jogesetQuery = jogesetQuery.where('status',
@@ -163,7 +180,9 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
               .collection('memoriapalota_allomasok')
               .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category);
+              .where('category', isEqualTo: widget.category)
+              .orderBy('title')
+              .limit(_currentLimit + 1);
 
           if (isAdmin) {
             allomasQuery = allomasQuery.where('status',
@@ -252,10 +271,6 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                               if (!isAdmin && status != 'Published') {
                                 continue;
                               }
-                              final audioUrl = data['audioUrl'] as String?;
-                              if (audioUrl == null || audioUrl.isEmpty) {
-                                continue;
-                              }
                               tagMap
                                   .putIfAbsent(
                                       data['category'] ?? 'Egyéb', () => [])
@@ -319,31 +334,68 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                             return StringUtils.naturalCompare(titleA, titleB);
                           });
 
+                          final bool hasMore =
+                              unifiedList.length > _currentLimit;
+                          final displayedItems = hasMore
+                              ? unifiedList.take(_currentLimit).toList()
+                              : unifiedList;
+
                           return ListView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: unifiedList.map((item) {
-                              if (item is String) {
-                                final docs = tagMap[item]!;
-                                final hasDeepTags = docs.any((doc) {
-                                  if (doc.reference.path
-                                      .contains('jogesetek')) {
-                                    final list =
-                                        doc.data()['jogesetek'] as List? ?? [];
-                                    return list.any(
-                                        (j) => (j['tags'] as List).length > 1);
-                                  }
-                                  return (doc.data()['tags'] as List? ?? [])
-                                          .length >
-                                      1;
-                                });
-                                return _buildTagCard(
-                                    item, docs.length, hasDeepTags);
-                              } else {
-                                final doc = item as QueryDocumentSnapshot<
-                                    Map<String, dynamic>>;
-                                return _buildDirectNoteWidget(doc, isAdmin);
-                              }
-                            }).toList(),
+                            children: [
+                              ...displayedItems.map((item) {
+                                if (item is String) {
+                                  final docs = tagMap[item]!;
+                                  final hasDeepTags = docs.any((doc) {
+                                    if (doc.reference.path
+                                        .contains('jogesetek')) {
+                                      final list =
+                                          doc.data()['jogesetek'] as List? ??
+                                              [];
+                                      return list.any((j) =>
+                                          (j['tags'] as List).length > 1);
+                                    }
+                                    return (doc.data()['tags'] as List? ?? [])
+                                            .length >
+                                        1;
+                                  });
+                                  return _buildTagCard(
+                                      item, docs.length, hasDeepTags);
+                                } else {
+                                  final doc = item as QueryDocumentSnapshot<
+                                      Map<String, dynamic>>;
+                                  return _buildDirectNoteWidget(doc, isAdmin);
+                                }
+                              }).toList(),
+                              Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Center(
+                                  child: _isLoadingMore
+                                      ? const CircularProgressIndicator()
+                                      : hasMore
+                                          ? ElevatedButton.icon(
+                                              onPressed: _loadMore,
+                                              icon:
+                                                  const Icon(Icons.expand_more),
+                                              label: Text(
+                                                'További dokumentumok betöltése',
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 32,
+                                                        vertical: 16),
+                                              ),
+                                            )
+                                          : Text(
+                                              'Minden dokumentum betöltve (${allDocs.length} dokumentum)',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                  color: Colors.grey),
+                                            ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       );

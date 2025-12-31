@@ -9,6 +9,7 @@ import '../widgets/sidebar.dart';
 import '../widgets/header.dart';
 import '../widgets/filters.dart';
 import '../widgets/note_card_grid.dart';
+import 'category_tags_screen.dart';
 
 /// A jegyzetek listáját megjelenítő főképernyő.
 ///
@@ -168,8 +169,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
       final categories = metadata['categories'] ?? [];
 
       if (mounted) {
+        final List<String> finalCategories = List<String>.from(categories);
+        // Biztosítjuk, hogy a virtual "Dialogus tags" kategória látható legyen
+        if (!finalCategories.contains('Dialogus tags')) {
+          finalCategories.add('Dialogus tags');
+        }
+
         setState(() {
-          _categories = categories..sort();
+          _categories = finalCategories..sort();
         });
         debugPrint('🟢 Kategóriák betöltve: ${_categories.length} db');
       } else {
@@ -529,15 +536,17 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   ),
                 ),
               Expanded(
-                child: _cachedGrid ??
-                    NoteCardGrid(
-                      searchText: _searchText,
-                      selectedStatus: _selectedStatus,
-                      selectedCategory: _selectedCategory,
-                      selectedScience: _selectedScience,
-                      selectedTag: _selectedTag,
-                      selectedType: _selectedType,
-                    ),
+                child: _hasActiveFilters
+                    ? (_cachedGrid ??
+                        NoteCardGrid(
+                          searchText: _searchText,
+                          selectedStatus: _selectedStatus,
+                          selectedCategory: _selectedCategory,
+                          selectedScience: _selectedScience,
+                          selectedTag: _selectedTag,
+                          selectedType: _selectedType,
+                        ))
+                    : _buildMapMode(),
               ),
             ],
           ),
@@ -714,6 +723,69 @@ class _NoteListScreenState extends State<NoteListScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMapMode() {
+    if (_categories.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // A "Dialogus tags" kategóriát mindig a végére tesszük, ha létezik
+    final sortedCategories = List<String>.from(_categories);
+    if (sortedCategories.contains('Dialogus tags')) {
+      sortedCategories.remove('Dialogus tags');
+      sortedCategories.add('Dialogus tags');
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: sortedCategories.length,
+      itemBuilder: (context, index) {
+        return _buildMapFolder(sortedCategories[index]);
+      },
+    );
+  }
+
+  Widget _buildMapFolder(String category) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CategoryTagsScreen(category: category),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              const Icon(Icons.folder_outlined,
+                  color: Color(0xFF1976D2), size: 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  category,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF202122)),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

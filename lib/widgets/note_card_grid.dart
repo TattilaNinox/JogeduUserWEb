@@ -7,6 +7,7 @@ import '../core/firebase_config.dart';
 import '../services/auth_service.dart';
 import '../screens/category_tags_screen.dart';
 import '../screens/tag_drill_down_screen.dart';
+import '../widgets/note_list_tile.dart';
 import '../utils/string_utils.dart';
 
 class NoteCardGrid extends StatefulWidget {
@@ -84,7 +85,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
         // Keresés állapotának meghatározása
         final bool isSearching = widget.searchText.trim().isNotEmpty;
-        final int queryLimit = isSearching ? 1000 : _currentLimit;
+        final int queryLimit = isSearching ? 1000 : _currentLimit + 1;
 
         // FREEMIUM MODEL: Minden jegyzet látszik, de a zártak nem nyithatók meg
         // Nem szűrünk isFree alapján, hogy a prémium jegyzetek is látszódjanak
@@ -353,14 +354,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               final dialogusDocs = dialogusSnapshot.docs.where((d) {
                 final data = d.data();
 
-                // Audio URL ellenőrzése
-                final audioUrl = data['audioUrl'] as String?;
-                if (audioUrl == null ||
-                    audioUrl.isEmpty ||
-                    audioUrl.trim().isEmpty) {
-                  return false;
-                }
-
                 // Szűrés cím alapján (title vagy cim mező)
                 final title = (data['title'] ?? data['cim'] ?? '').toString();
                 return title
@@ -407,9 +400,16 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
             final docsResult = filteredDocs;
 
-            final totalCount = docsResult.length;
-            // Ha keresünk, nincs több betöltendő (mindent lekértünk a limitig)
-            final hasMore = !isSearching && docsResult.length >= _currentLimit;
+            // Hibajavítás: A hasMore akkor igaz, ha több találatunk van, mint a jelenlegi limit
+            final bool hasMore =
+                !isSearching && docsResult.length > _currentLimit;
+
+            // Hibajavítás: Csak a limitnek megfelelő mennyiségű elemet mutatunk
+            final displayedDocs = isSearching
+                ? docsResult
+                : docsResult.take(_currentLimit).toList();
+
+            final totalCount = displayedDocs.length;
 
             if (docsResult.isEmpty) {
               return const Center(child: Text('Nincs találat.'));
@@ -420,7 +420,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             // Map<category, Map<firstTag, Map<secondTag, Map<thirdTag, ...>>>>
             final Map<String, Map<String, dynamic>> hierarchical = {};
 
-            for (var d in docsResult) {
+            for (var d in displayedDocs) {
               // Ha dialogus_fajlok dokumentum, akkor a kategória mindig "Dialogus tags"
               // Ez biztosítja, hogy külön mappába kerüljenek
               final isDialogusFajl =
@@ -556,22 +556,34 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               sortDocs(tags);
             });
 
+            final bool skipCategoryWrapper = hierarchical.length == 1 &&
+                widget.selectedCategory != null &&
+                widget.selectedCategory!.isNotEmpty &&
+                hierarchical.containsKey(widget.selectedCategory);
+
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
               children: [
-                ...(hierarchical.entries.toList()
-                      ..sort(
-                          (a, b) => StringUtils.naturalCompare(a.key, b.key)))
-                    .map((categoryEntry) {
-                  return _CategorySection(
-                    key: ValueKey('category_${categoryEntry.key}'),
-                    category: categoryEntry.key,
-                    tagHierarchy: categoryEntry.value,
-                    selectedCategory: widget.selectedCategory,
-                    selectedTag: widget.selectedTag,
-                    hasPremiumAccess: hasPremiumAccess,
-                  );
-                }),
+                if (skipCategoryWrapper)
+                  // Közvetlenül a szint elemeit jelenítjük meg, kategória fejléc/mappa nélkül
+                  ..._buildHierarchyItems(
+                      context, hierarchical[widget.selectedCategory!]!,
+                      category: widget.selectedCategory!,
+                      hasPremiumAccess: hasPremiumAccess)
+                else
+                  ...(hierarchical.entries.toList()
+                        ..sort(
+                            (a, b) => StringUtils.naturalCompare(a.key, b.key)))
+                      .map((categoryEntry) {
+                    return _CategorySection(
+                      key: ValueKey('category_${categoryEntry.key}'),
+                      category: categoryEntry.key,
+                      tagHierarchy: categoryEntry.value,
+                      selectedCategory: widget.selectedCategory,
+                      selectedTag: widget.selectedTag,
+                      hasPremiumAccess: hasPremiumAccess,
+                    );
+                  }),
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Center(
@@ -582,7 +594,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                 onPressed: _loadMore,
                                 icon: const Icon(Icons.expand_more),
                                 label: Text(
-                                  'További jegyzetek betöltése ($totalCount jegyzet betöltve)',
+                                  'További dokumentumok betöltése',
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
@@ -590,7 +602,7 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                                 ),
                               )
                             : Text(
-                                'Minden jegyzet betöltve ($totalCount jegyzet)',
+                                'Minden dokumentum betöltve ($totalCount dokumentum)',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.grey,
@@ -608,6 +620,138 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         );
       },
     );
+  }
+
+  List<Widget> _buildHierarchyItems(
+    BuildContext context,
+    Map<String, dynamic> hierarchy, {
+    required String category,
+    required bool hasPremiumAccess,
+  }) {
+    final List<dynamic> unifiedList = [];
+    if (hierarchy.containsKey('Nincs címke')) {
+      unifiedList.addAll(hierarchy['Nincs címke']);
+    }
+
+    final tags =
+        hierarchy.entries.where((e) => e.key != 'Nincs címke').toList();
+    unifiedList.addAll(tags);
+
+    unifiedList.sort((a, b) {
+      String titleA;
+      if (a is MapEntry<String, dynamic>) {
+        titleA = a.key;
+      } else {
+        final docA = a as QueryDocumentSnapshot<Map<String, dynamic>>;
+        titleA = (docA.reference.path.contains('jogesetek')
+                ? (docA.data()['title'] ?? docA.id)
+                : (docA.data()['title'] ?? docA.data()['cim'] ?? 'Névtelen'))
+            .toString();
+      }
+      String titleB;
+      if (b is MapEntry<String, dynamic>) {
+        titleB = b.key;
+      } else {
+        final docB = b as QueryDocumentSnapshot<Map<String, dynamic>>;
+        titleB = (docB.reference.path.contains('jogesetek')
+                ? (docB.data()['title'] ?? docB.id)
+                : (docB.data()['title'] ?? docB.data()['cim'] ?? 'Névtelen'))
+            .toString();
+      }
+      return StringUtils.naturalCompare(titleA, titleB);
+    });
+
+    return unifiedList.map((item) {
+      if (item is MapEntry<String, dynamic>) {
+        final tag = item.key;
+        final data = item.value;
+        final count = data is List
+            ? data.length
+            : (data is Map ? (data['docs'] as List? ?? []).length : 0);
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: Colors.grey.shade200)),
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TagDrillDownScreen(
+                    category: category,
+                    tagPath: [tag],
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(item.value is Map ? Icons.folder : Icons.label,
+                      color: const Color(0xFF3366CC)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Text(tag,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w500))),
+                  Text('$count',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        );
+      } else {
+        final doc = item as QueryDocumentSnapshot<Map<String, dynamic>>;
+        final data = doc.data();
+        final isMP = doc.reference.path.contains('memoriapalota_allomasok');
+        final isDialogus = doc.reference.path.contains('dialogus_fajlok');
+        final isJogeset = doc.reference.path.contains('jogesetek');
+
+        String title =
+            (data['title'] ?? data['name'] ?? data['cim'] ?? 'Névtelen')
+                .toString();
+        String type = isMP
+            ? 'memoriapalota_allomasok'
+            : (isDialogus
+                ? 'dialogus_fajlok'
+                : (isJogeset ? 'jogeset' : (data['type'] as String? ?? '')));
+
+        bool isFree = (data['isFree'] == true) ||
+            (data['is_free'] == true) ||
+            (data['isFree'] == 1) ||
+            (data['is_free'] == 1);
+        int? jogesetCount;
+        if (isJogeset) {
+          title = (data['title'] ?? 'Jogeset').toString();
+          final jogesetekList = data['jogesetek'] as List? ?? [];
+          jogesetCount = jogesetekList.length;
+        }
+
+        return NoteListTile(
+          id: doc.id,
+          title: title,
+          type: type,
+          hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
+          hasAudio: (data['audioUrl'] ?? '').toString().isNotEmpty,
+          audioUrl: (data['audioUrl'] ?? '').toString(),
+          hasVideo: (data['videoUrl'] ?? '').toString().isNotEmpty,
+          deckCount: type == 'deck'
+              ? (data['flashcards'] as List? ?? []).length
+              : null,
+          isLocked: !isFree && !hasPremiumAccess,
+          jogesetCount: jogesetCount,
+          category: category,
+          customFromUrl: '/notes',
+        );
+      }
+    }).toList();
   }
 }
 

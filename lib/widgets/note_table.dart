@@ -125,7 +125,7 @@ class _NoteTableState extends State<NoteTable> {
                 child: Text('Hiba történt az adatok betöltésekor.'));
           }
           if (!snapshot.hasData) {
-            return const Center(child: Text('Nincsenek jegyzetek.'));
+            return const Center(child: Text('Nincsenek dokumentumok.'));
           }
           final notes = snapshot.data!.docs
               .where((d) => !(d.data()['deletedAt'] != null))
@@ -690,7 +690,7 @@ class _NoteTableState extends State<NoteTable> {
       _showSnackBar(
           context,
           !currentFree
-              ? 'A jegyzet mostantól ingyenes!'
+              ? 'A dokumentum mostantól ingyenes!'
               : 'Ingyenes státusz kikapcsolva');
     } catch (e) {
       _showSnackBar(context, 'Hiba a státusz frissítésekor: $e');
@@ -706,7 +706,7 @@ class _NoteTableState extends State<NoteTable> {
         title: const Text('Megerősítés',
             style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)),
         content: const Text(
-            'Biztosan törlöd ezt a jegyzetet és minden hozzá tartozó fájlt?',
+            'Biztosan törlöd ezt a dokumentumot és minden hozzá tartozó fájlt?',
             style: TextStyle(fontFamily: 'Inter')),
         actions: [
           TextButton(
@@ -731,7 +731,8 @@ class _NoteTableState extends State<NoteTable> {
                 if (!context.mounted) return;
 
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Jegyzet véglegesen törölve')),
+                  const SnackBar(
+                      content: Text('Dokumentum véglegesen törölve')),
                 );
               } catch (e) {
                 if (!context.mounted) return;

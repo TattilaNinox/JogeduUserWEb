@@ -27,6 +27,8 @@ class TagDrillDownScreen extends StatefulWidget {
 
 class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   bool _hasPremiumAccess = false;
+  int _currentLimit = 25;
+  bool _isLoadingMore = false;
   final ScrollController _breadcrumbScrollController = ScrollController();
 
   @override
@@ -79,6 +81,17 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     } catch (e) {
       debugPrint('Error checking premium access: $e');
     }
+  }
+
+  void _loadMore() {
+    if (_isLoadingMore) return;
+    setState(() {
+      _currentLimit += 50;
+      _isLoadingMore = true;
+    });
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _isLoadingMore = false);
+    });
   }
 
   int get _currentDepth => widget.tagPath.length;
@@ -176,7 +189,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
               .collection('notes')
               .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category);
+              .where('category', isEqualTo: widget.category)
+              .orderBy('title')
+              .limit(_currentLimit + 1);
 
           if (isAdmin) {
             notesQuery = notesQuery.where('status',
@@ -190,7 +205,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
               .collection('jogesetek')
               .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category);
+              .where('category', isEqualTo: widget.category)
+              .orderBy(FieldPath.documentId)
+              .limit(_currentLimit + 1);
 
           if (isAdmin) {
             jogesetQuery = jogesetQuery.where('status',
@@ -203,7 +220,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
               .collection('memoriapalota_allomasok')
               .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category);
+              .where('category', isEqualTo: widget.category)
+              .orderBy('title')
+              .limit(_currentLimit + 1);
 
           if (isAdmin) {
             allomasQuery = allomasQuery.where('status',
@@ -259,9 +278,23 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                               _buildHierarchy(allDocs, jogesetSnap.data?.docs,
                                   dSnap.data?.docs, isAdmin);
 
-                          final widgets = _buildHierarchyWidgets(hierarchy);
+                          final List<dynamic> unifiedList =
+                              _getUnifiedList(hierarchy);
 
-                          if (widgets.isEmpty) {
+                          // Kiszámoljuk az összes dokumentumot ezen a szinten (és alatta)
+                          int totalMatchingCount = 0;
+                          if (hierarchy.containsKey('_direct')) {
+                            totalMatchingCount +=
+                                (hierarchy['_direct'] as List).length;
+                          }
+                          hierarchy.forEach((key, value) {
+                            if (!key.startsWith('_')) {
+                              totalMatchingCount +=
+                                  (value['docs'] as List).length;
+                            }
+                          });
+
+                          if (unifiedList.isEmpty) {
                             if (!notesSnap.hasData && !allomasSnap.hasData) {
                               return const Center(
                                   child: CircularProgressIndicator());
@@ -271,9 +304,61 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                                     'Nincs megjeleníthető tartalom ezen a szinten.'));
                           }
 
+                          final bool hasMore =
+                              unifiedList.length > _currentLimit;
+                          final displayedItems = hasMore
+                              ? unifiedList.take(_currentLimit).toList()
+                              : unifiedList;
+
+                          final List<Widget> widgetsList = [];
+                          for (var item in displayedItems) {
+                            if (item is MapEntry<String, dynamic>) {
+                              widgetsList.add(
+                                  _buildFolderWidget(item.key, item.value));
+                            } else {
+                              final doc = item as QueryDocumentSnapshot<
+                                  Map<String, dynamic>>;
+                              if (doc.reference.path.contains('jogesetek')) {
+                                widgetsList.add(_buildJogesetWidget(doc));
+                              } else {
+                                widgetsList.add(_buildNoteWidget(doc));
+                              }
+                            }
+                          }
+
                           return ListView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: widgets,
+                            children: [
+                              ...widgetsList,
+                              Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Center(
+                                  child: _isLoadingMore
+                                      ? const CircularProgressIndicator()
+                                      : hasMore
+                                          ? ElevatedButton.icon(
+                                              onPressed: _loadMore,
+                                              icon:
+                                                  const Icon(Icons.expand_more),
+                                              label: Text(
+                                                'További dokumentumok betöltése',
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 32,
+                                                        vertical: 16),
+                                              ),
+                                            )
+                                          : Text(
+                                              'Minden dokumentum betöltve ($totalMatchingCount dokumentum)',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                  color: Colors.grey),
+                                            ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       );
@@ -366,7 +451,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     if (hasChildren) hierarchy[tag]['hasChildren'] = true;
   }
 
-  List<Widget> _buildHierarchyWidgets(Map<String, dynamic> hierarchy) {
+  List<dynamic> _getUnifiedList(Map<String, dynamic> hierarchy) {
     // Egységes lista létrehozása a mappákból és a közvetlen dokumentumokból
     final List<dynamic> unifiedList = [];
 
@@ -418,18 +503,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       return StringUtils.naturalCompare(titleA, titleB);
     });
 
-    return unifiedList.map((item) {
-      if (item is MapEntry<String, dynamic>) {
-        return _buildFolderWidget(item.key, item.value);
-      } else {
-        final doc = item as QueryDocumentSnapshot<Map<String, dynamic>>;
-        if (doc.reference.path.contains('jogesetek')) {
-          return _buildJogesetWidget(doc);
-        } else {
-          return _buildNoteWidget(doc);
-        }
-      }
-    }).toList();
+    return unifiedList;
   }
 
   Widget _buildNoteWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
