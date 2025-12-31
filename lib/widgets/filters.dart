@@ -15,9 +15,14 @@ class Filters extends StatefulWidget {
   final ValueChanged<String?> onTagChanged;
   final ValueChanged<String?> onTypeChanged;
   final VoidCallback onClearFilters;
+  final VoidCallback? onApplyFilters;
   final bool vertical;
   final bool showStatus;
   final bool showType;
+  final bool showCategory;
+  final bool showScience;
+  final bool showTag;
+  final List<String>? availableTypes;
 
   const Filters({
     super.key,
@@ -35,19 +40,15 @@ class Filters extends StatefulWidget {
     required this.onTagChanged,
     required this.onTypeChanged,
     required this.onClearFilters,
+    this.onApplyFilters,
+    this.availableTypes,
     this.vertical = false,
     this.showStatus = false,
     this.showType = true,
     this.showCategory = true,
     this.showScience = true,
     this.showTag = true,
-    this.availableTypes,
   });
-
-  final bool showCategory;
-  final bool showScience;
-  final bool showTag;
-  final List<String>? availableTypes;
 
   @override
   State<Filters> createState() => _FiltersState();
@@ -202,6 +203,23 @@ class _FiltersState extends State<Filters> {
           widget.onTagChanged(v);
         },
         isExpanded: widget.vertical,
+      ));
+    }
+
+    // Keresés gomb (Manual trigger)
+    if (widget.onApplyFilters != null) {
+      add(ElevatedButton.icon(
+        onPressed: widget.onApplyFilters,
+        icon: const Icon(Icons.search, size: 18),
+        label: const Text('Keresés indítása'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF1E3A8A),
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ));
     }
 

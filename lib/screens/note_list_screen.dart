@@ -10,6 +10,8 @@ import '../widgets/header.dart';
 import '../widgets/filters.dart';
 import '../widgets/note_card_grid.dart';
 import 'category_tags_screen.dart';
+import 'tag_drill_down_screen.dart';
+import '../core/firebase_config.dart'; // Ha a FirebaseConfig.firestore-t használjuk
 
 /// A jegyzetek listáját megjelenítő főképernyő.
 ///
@@ -61,6 +63,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
   List<String> _categories = [];
   List<String> _sciences = [];
   List<String> _tags = [];
+  Map<String, Set<String>> _catToTags = {};
+  Map<String, Set<String>> _tagToCats = {};
 
   /// A widget életciklusának `initState` metódusa.
   ///
@@ -78,6 +82,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     _loadSavedFilters();
     _loadCategories();
     _loadTags();
+    _loadDependencies();
 
     // inicializáljuk a grid-et a kezdeti szűrőkkel
     _rebuildGridIfNeeded(force: true);
@@ -238,6 +243,18 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
+  /// Segédfüggvény a függőségek betöltésére
+  Future<void> _loadDependencies() async {
+    const userScience = 'Jogász';
+    final mapping = await MetadataService.getCategoryTagMapping(userScience);
+    if (mounted) {
+      setState(() {
+        _catToTags = mapping['catToTags']!;
+        _tagToCats = mapping['tagToCats']!;
+      });
+    }
+  }
+
   // Az alábbi metódusok ún. "callback" függvények, amelyeket a gyermek
   // widget-ek (`Header`, `Filters`) hívnak meg, amikor a felhasználó
   // módosítja a keresési vagy szűrési feltételeket.
@@ -270,40 +287,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() {
       _selectedStatus = value;
     });
-    _rebuildGridIfNeeded();
-    // Menti a státusz szűrőt a FilterStorage-ba
-    FilterStorage.status = value;
-    _pushFiltersToUrl();
   }
 
   /// Frissíti a kiválasztott kategóriát a `Filters` widgetből.
   void _onCategoryChanged(String? value) {
-    if (value != null && value.isNotEmpty) {
-      // Ha kategóriát választunk, azonnal "belépünk" oda
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CategoryTagsScreen(category: value),
-        ),
-      );
-      return;
-    }
-
     setState(() {
       _selectedCategory = value;
     });
-    _rebuildGridIfNeeded();
-    // Menti a kategória szűrőt a FilterStorage-ba
-    FilterStorage.category = value;
-    // Menti a CategoryState-be is
-    CategoryState.setCategoryState(
-      searchText: _searchText.isNotEmpty ? _searchText : null,
-      category: value,
-      science: _selectedScience,
-      tag: _selectedTag,
-      type: _selectedType,
-    );
-    _pushFiltersToUrl();
   }
 
   /// Frissíti a kiválasztott tudományt.
@@ -311,35 +301,57 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() {
       _selectedScience = value;
     });
-    _rebuildGridIfNeeded();
-    // Menti a tudomány szűrőt a FilterStorage-ba
-    FilterStorage.science = value;
-    // Menti a CategoryState-be is
-    CategoryState.setCategoryState(
-      searchText: _searchText.isNotEmpty ? _searchText : null,
-      category: _selectedCategory,
-      science: value,
-      tag: _selectedTag,
-      type: _selectedType,
-    );
-    _pushFiltersToUrl();
   }
 
   /// Frissíti a kiválasztott címkét a `Filters` widgetből.
-  void _onTagChanged(String? value) {
+  void _onTagChanged(String? value) async {
     setState(() => _selectedTag = value);
-    _rebuildGridIfNeeded();
-    // Menti a címke szűrőt a FilterStorage-ba
-    FilterStorage.tag = value;
-    // Menti a CategoryState-be is
-    CategoryState.setCategoryState(
-      searchText: _searchText.isNotEmpty ? _searchText : null,
-      category: _selectedCategory,
-      science: _selectedScience,
-      tag: value,
-      type: _selectedType,
-    );
-    _pushFiltersToUrl();
+  }
+
+  /// Megkeresi, hogy az adott címke melyik kategóriához tartozik.
+  /// Ha a címke több kategóriában is szerepel, vagy nem található, null-t ad vissza.
+  Future<String?> _findCategoryForTag(String tagName) async {
+    try {
+      // 1. Lekérdezünk néhány dokumentumot, ami tartalmazza ezt a címkét
+      // A 'notes' kollekció általában a legnagyobb, ott keresünk először
+      final notesSnap = await FirebaseConfig.firestore
+          .collection('notes')
+          .where('tags', arrayContains: tagName)
+          .limit(5)
+          .get();
+
+      final categories = <String>{};
+
+      for (var doc in notesSnap.docs) {
+        final cat = doc.data()['category'] as String?;
+        if (cat != null) categories.add(cat);
+      }
+
+      // Ha még nincs eredmény, megnézhetjük a jogeseteket is (opcionális, de biztonságosabb)
+      if (categories.isEmpty) {
+        final jogesetSnap = await FirebaseConfig.firestore
+            .collection('jogesetek')
+            .where('tags', arrayContains: tagName)
+            .limit(5)
+            .get();
+        for (var doc in jogesetSnap.docs) {
+          final cat = doc.data()['category'] as String?;
+          if (cat != null) categories.add(cat);
+        }
+      }
+
+      // 2. Kiértékelés
+      if (categories.length == 1) {
+        // PONTOSAN EGY kategóriában szerepel -> ez a nyerő
+        return categories.first;
+      } else {
+        // Vagy 0 (nincs ilyen címke), vagy >1 (több kategóriában is van) -> nem egyértelmű
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Hiba a kategória keresésekor: $e');
+      return null;
+    }
   }
 
   /// Frissíti a kiválasztott típust.
@@ -347,18 +359,86 @@ class _NoteListScreenState extends State<NoteListScreen> {
     // Normalizáljuk az "MP" értéket "memoriapalota_allomasok"-ra
     final normalizedValue = value == 'MP' ? 'memoriapalota_allomasok' : value;
     setState(() => _selectedType = normalizedValue);
-    _rebuildGridIfNeeded();
-    // Menti a típus szűrőt a FilterStorage-ba (normalizált értékkel)
-    FilterStorage.type = normalizedValue;
-    // Menti a CategoryState-be is (normalizált értékkel)
+  }
+
+  /// Kézi keresés indítása a szűrők alapján
+  void _onApplyFilters() async {
+    // 1. Ha van kategória és címke is kiválasztva -> TagDrillDownScreen (konkrét címkére a kategóriában)
+    if (_selectedCategory != null &&
+        _selectedCategory!.isNotEmpty &&
+        _selectedTag != null &&
+        _selectedTag!.isNotEmpty) {
+      debugPrint(
+          'SmartNav: Cateogry+Tag -> TagDrillDownScreen ($_selectedCategory, $_selectedTag)');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TagDrillDownScreen(
+            category: _selectedCategory!,
+            tagPath: [_selectedTag!],
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 2. Ha csak címke van -> Megpróbáljuk kitalálni a kategóriát
+    if ((_selectedCategory == null || _selectedCategory!.isEmpty) &&
+        _selectedTag != null &&
+        _selectedTag!.isNotEmpty) {
+      final category = await _findCategoryForTag(_selectedTag!);
+      if (category != null && mounted) {
+        debugPrint(
+            'SmartNav: TagOnly -> Auto-detected category ($category) -> TagDrillDownScreen');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TagDrillDownScreen(
+              category: category,
+              tagPath: [_selectedTag!],
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // 3. Ha csak kategória van -> CategoryTagsScreen
+    if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
+      debugPrint(
+          'SmartNav: CategoryOnly -> CategoryTagsScreen ($_selectedCategory)');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              CategoryTagsScreen(category: _selectedCategory!),
+        ),
+      );
+      return;
+    }
+
+    // 4. Egyéb esetekben (pl. csak típus, státusz) -> Alkalmazzuk a szűrőket helyben
+    _rebuildGridIfNeeded(force: true);
+    _pushFiltersToUrl();
+
+    // Mentsük el a beállításokat a FilterStorage-ba és CategoryState-be most, hogy alkalmaztuk
+    if (_selectedStatus != null) FilterStorage.status = _selectedStatus;
+    if (_selectedCategory != null) FilterStorage.category = _selectedCategory;
+    if (_selectedScience != null) FilterStorage.science = _selectedScience;
+    if (_selectedTag != null) FilterStorage.tag = _selectedTag;
+    if (_selectedType != null) FilterStorage.type = _selectedType;
+
     CategoryState.setCategoryState(
       searchText: _searchText.isNotEmpty ? _searchText : null,
       category: _selectedCategory,
       science: _selectedScience,
       tag: _selectedTag,
-      type: normalizedValue,
+      type: _selectedType,
     );
-    _pushFiltersToUrl();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Szűrési feltételek alkalmazva.')),
+    );
   }
 
   /// Törli az összes aktív szűrőt, kivéve a tudomány szűrőt.
@@ -409,6 +489,25 @@ class _NoteListScreenState extends State<NoteListScreen> {
     // _selectedScience-t nem vesszük figyelembe, mert az fix
   }
 
+  List<String> get _visibleCategories {
+    if (_selectedTag != null && _tagToCats.containsKey(_selectedTag)) {
+      final allowedCats = _tagToCats[_selectedTag]!;
+      // Csak azokat a kategóriákat tartsuk meg, amelyek amúgy is léteznek
+      // (Bár a map az létező jegyzetekből épült, de a _categories lehet, hogy szűkebb/bővebb a metadata alapján)
+      return _categories.where((c) => allowedCats.contains(c)).toList();
+    }
+    return _categories;
+  }
+
+  List<String> get _visibleTags {
+    if (_selectedCategory != null &&
+        _catToTags.containsKey(_selectedCategory)) {
+      final allowedTags = _catToTags[_selectedCategory]!;
+      return _tags.where((t) => allowedTags.contains(t)).toList();
+    }
+    return _tags;
+  }
+
   Widget buildContent({
     required bool showSideFilters,
     required bool includeHeader,
@@ -435,9 +534,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                               fontWeight: FontWeight.w600, fontSize: 14)),
                       const SizedBox(height: 8),
                       Filters(
-                        categories: _categories,
+                        categories: _visibleCategories,
                         sciences: _sciences,
-                        tags: _tags,
+                        tags: _visibleTags,
                         selectedStatus: _selectedStatus,
                         selectedCategory: _selectedCategory,
                         selectedScience: _selectedScience,
@@ -449,6 +548,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                         onTagChanged: _onTagChanged,
                         onTypeChanged: _onTypeChanged,
                         onClearFilters: _onClearFilters,
+                        onApplyFilters: _onApplyFilters,
                         vertical: true,
                       ),
                     ],
@@ -581,9 +681,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   extraPanel: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Filters(
-                      categories: _categories,
+                      categories: _visibleCategories,
                       sciences: _sciences,
-                      tags: _tags,
+                      tags: _visibleTags,
                       selectedStatus: _selectedStatus,
                       selectedCategory: _selectedCategory,
                       selectedScience: _selectedScience,
@@ -595,6 +695,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                       onTagChanged: _onTagChanged,
                       onTypeChanged: _onTypeChanged,
                       onClearFilters: _onClearFilters,
+                      onApplyFilters: _onApplyFilters, // Kézi indító gomb
                       vertical: true,
                       showStatus: false,
                       showType: false,
@@ -630,9 +731,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Filters(
-                        categories: _categories,
+                        categories: _visibleCategories,
                         sciences: _sciences,
-                        tags: _tags,
+                        tags: _visibleTags,
                         selectedStatus: _selectedStatus,
                         selectedCategory: _selectedCategory,
                         selectedScience: _selectedScience,
@@ -644,6 +745,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                         onTagChanged: _onTagChanged,
                         onTypeChanged: _onTypeChanged,
                         onClearFilters: _onClearFilters,
+                        onApplyFilters: _onApplyFilters,
                         vertical: true,
                         showStatus: false,
                         showType: false,

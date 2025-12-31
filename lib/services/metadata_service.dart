@@ -220,4 +220,163 @@ class MetadataService {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+
+  /// Skálázható kapcsolatépítés: Aggregált dokumentum olvasása.
+  /// A `metadata/jogasz_structure` dokumentum tartalmazza az előre kiszámolt térképet.
+  /// Így 1 db olvasás elegendő a több ezer helyett.
+  static Future<Map<String, Map<String, Set<String>>>> getCategoryTagMapping(
+      String science) async {
+    try {
+      final docId = '${science.toLowerCase().replaceAll('á', 'a')}_structure';
+      final doc = await FirebaseConfig.firestore
+          .collection('metadata')
+          .doc(docId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data() ?? {};
+
+        // Firestore Map<String, dynamic> -> Map<String, Set<String>> konverzió
+        final catToTagsMap = <String, Set<String>>{};
+        final tagToCatsMap = <String, Set<String>>{};
+
+        final rawCatToTags = data['catToTags'] as Map<String, dynamic>? ?? {};
+        final rawTagToCats = data['tagToCats'] as Map<String, dynamic>? ?? {};
+
+        rawCatToTags.forEach((key, value) {
+          catToTagsMap[key] = Set<String>.from(value as List? ?? []);
+        });
+
+        rawTagToCats.forEach((key, value) {
+          tagToCatsMap[key] = Set<String>.from(value as List? ?? []);
+        });
+
+        if (kDebugMode) {
+          debugPrint('✅ MetadataService: Aggregated Structure loaded ($docId)');
+        }
+
+        return {
+          'catToTags': catToTagsMap,
+          'tagToCats': tagToCatsMap,
+        };
+      } else {
+        if (kDebugMode) {
+          debugPrint(
+              '⚠️ MetadataService: Aggregated Structure ($docId) NOT found. Empty map returned.');
+        }
+        return {
+          'catToTags': {},
+          'tagToCats': {},
+        };
+      }
+    } catch (e) {
+      debugPrint('🔴 MetadataService: Error loading aggregated map: $e');
+      return {
+        'catToTags': {},
+        'tagToCats': {},
+      };
+    }
+  }
+
+  /// ADMIN FUNKCIÓ: Metadata Aggregáció Frissítése.
+  /// Végigolvassa az összes aktív jegyzetet (és egyéb típusokat) és újraépíti
+  /// a `metadata/jogasz_structure` dokumentumot.
+  /// Ezt a funkciót csak Adminisztrátor hívhatja meg!
+  static Future<int> refreshMetadataAggregation(String science) async {
+    try {
+      if (kDebugMode) debugPrint('🔄 Metadata Aggregation STARTED...');
+
+      final catToTags = <String, Set<String>>{};
+      final tagToCats = <String, Set<String>>{};
+      int docCount = 0;
+
+      // Segédfüggvény egy kollekció feldolgozására
+      Future<void> processCollection(String collectionName) async {
+        try {
+          // Ha 'memoriapalota_allomasok', ott nincs feltétlenül 'status' mező mindenhol?
+          // De a NoteCardGrid szűrés szerint: status IN [Pub, Draft] vagy csak Pub.
+          // Feltételezzük, hogy van status mező, vagy ha nincs, akkor minden elem publikus?
+          // A biztonság kedvéért megpróbáljuk status szűréssel, ha üres lesz, akkor status nélkül.
+          // DE: A legegyszerűbb, ha csak azokat vesszük, ahol VAN status és az megfelelő.
+
+          Query query = FirebaseConfig.firestore
+              .collection(collectionName)
+              .where('science', isEqualTo: science);
+
+          // Csak a releváns státuszúakat
+          if (collectionName == 'notes' || collectionName == 'jogesetek') {
+            query = query
+                .where('status', whereIn: ['Published', 'Draft', 'Public']);
+          } else {
+            // Memóriapalota állomásoknál lehet, hogy nincs status, vagy más a logika.
+            // Ha nincs status mező, a query exceptiont dobhat vagy üreset adhat ha rossz a feltétel.
+            // A biztonság kedvéért itt is rászűrünk, ha a rendszer konzisztens.
+            // Ha biztosra akarunk menni, lekérjük státusz nélkül, és kódban szűrünk (kisebb elemszám).
+            // De maradjunk a konzisztens status szűrésnél, mivel a NoteCardGrid is ezt használja.
+            query = query
+                .where('status', whereIn: ['Published', 'Draft', 'Public']);
+          }
+
+          final snapshot = await query.get();
+          docCount += snapshot.docs.length;
+
+          for (var doc in snapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final category = data['category'] as String?;
+            final tags = List<String>.from(data['tags'] ?? []);
+
+            if (category != null && category.isNotEmpty) {
+              if (!catToTags.containsKey(category)) {
+                catToTags[category] = {};
+              }
+              catToTags[category]!.addAll(tags);
+
+              for (var tag in tags) {
+                if (!tagToCats.containsKey(tag)) {
+                  tagToCats[tag] = {};
+                }
+                tagToCats[tag]!.add(category);
+              }
+            }
+          }
+          if (kDebugMode) {
+            debugPrint(
+                '   -> Processed $collectionName: ${snapshot.docs.length} docs');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error processing collection $collectionName: $e');
+        }
+      }
+
+      // Minden releváns kollekciót feldolgozunk
+      await processCollection('notes');
+      await processCollection('jogesetek');
+      await processCollection('memoriapalota_allomasok');
+
+      // 2. Mentés: Aggregált dokumentum írása
+      // Firestore nem támogat Set-et, List-té kell konvertálni
+      final catToTagsExport = <String, List<String>>{};
+      final tagToCatsExport = <String, List<String>>{};
+
+      catToTags.forEach((k, v) => catToTagsExport[k] = v.toList()..sort());
+      tagToCats.forEach((k, v) => tagToCatsExport[k] = v.toList()..sort());
+
+      final docId = '${science.toLowerCase().replaceAll('á', 'a')}_structure';
+      await FirebaseConfig.firestore.collection('metadata').doc(docId).set({
+        'catToTags': catToTagsExport,
+        'tagToCats': tagToCatsExport,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'docCount': docCount,
+      });
+
+      if (kDebugMode) {
+        debugPrint(
+            '✅ Metadata Aggregation COMPLETED. Processed $docCount docs (Total).');
+      }
+      return docCount;
+    } catch (e) {
+      debugPrint('🔴 Metadata Aggregation FAILED: $e');
+      rethrow;
+    }
+  }
 }

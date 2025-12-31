@@ -27,8 +27,8 @@ class TagDrillDownScreen extends StatefulWidget {
 
 class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   bool _hasPremiumAccess = false;
-  int _currentLimit = 25;
-  bool _isLoadingMore = false;
+  // FIX: Megemelt limit, hogy minden dokumentum betöltődjön egyszerre, gomb nélkül
+  final int _currentLimit = 1000;
   final ScrollController _breadcrumbScrollController = ScrollController();
 
   @override
@@ -81,17 +81,6 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     } catch (e) {
       debugPrint('Error checking premium access: $e');
     }
-  }
-
-  void _loadMore() {
-    if (_isLoadingMore) return;
-    setState(() {
-      _currentLimit += 50;
-      _isLoadingMore = true;
-    });
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _isLoadingMore = false);
-    });
   }
 
   int get _currentDepth => widget.tagPath.length;
@@ -333,29 +322,11 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                               Padding(
                                 padding: const EdgeInsets.all(24.0),
                                 child: Center(
-                                  child: _isLoadingMore
-                                      ? const CircularProgressIndicator()
-                                      : hasMore
-                                          ? ElevatedButton.icon(
-                                              onPressed: _loadMore,
-                                              icon:
-                                                  const Icon(Icons.expand_more),
-                                              label: Text(
-                                                'További dokumentumok betöltése',
-                                              ),
-                                              style: ElevatedButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 32,
-                                                        vertical: 16),
-                                              ),
-                                            )
-                                          : Text(
-                                              'Minden dokumentum betöltve ($totalMatchingCount dokumentum)',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                  color: Colors.grey),
-                                            ),
+                                  child: Text(
+                                    'Összesen: $totalMatchingCount dokumentum',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
                                 ),
                               ),
                             ],

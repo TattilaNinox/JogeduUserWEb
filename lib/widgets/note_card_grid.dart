@@ -7,7 +7,7 @@ import '../core/firebase_config.dart';
 import '../services/auth_service.dart';
 import '../screens/category_tags_screen.dart';
 import '../screens/tag_drill_down_screen.dart';
-import '../widgets/note_list_tile.dart';
+
 import '../utils/string_utils.dart';
 
 class NoteCardGrid extends StatefulWidget {
@@ -34,30 +34,10 @@ class NoteCardGrid extends StatefulWidget {
 
 class _NoteCardGridState extends State<NoteCardGrid> {
   // Pagination state variables
-  int _currentLimit = 25; // Start with 25 notes
-  bool _isLoadingMore = false; // Loading state for "Load More" button
+  // FIX: Megemelt limit, hogy minden dokumentum betöltődjön egyszerre, gomb nélkül
+  final int _currentLimit = 1000;
 
   final _authService = AuthService();
-
-  /// Load more notes by increasing the limit
-  void _loadMore() {
-    if (_isLoadingMore) return;
-
-    setState(() {
-      _currentLimit += 25; // Increase by 25 notes
-      _isLoadingMore = true;
-    });
-
-    // StreamBuilder will automatically re-query with new limit
-    // After rebuild, _isLoadingMore will be set to false
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        setState(() {
-          _isLoadingMore = false;
-        });
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -400,11 +380,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
             final docsResult = filteredDocs;
 
-            // Hibajavítás: A hasMore akkor igaz, ha több találatunk van, mint a jelenlegi limit
-            final bool hasMore =
-                !isSearching && docsResult.length > _currentLimit;
-
-            // Hibajavítás: Csak a limitnek megfelelő mennyiségű elemet mutatunk
             final displayedDocs = isSearching
                 ? docsResult
                 : docsResult.take(_currentLimit).toList();
@@ -575,31 +550,15 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Center(
-                    child: _isLoadingMore
-                        ? const CircularProgressIndicator()
-                        : hasMore
-                            ? ElevatedButton.icon(
-                                onPressed: _loadMore,
-                                icon: const Icon(Icons.expand_more),
-                                label: Text(
-                                  'További dokumentumok betöltése',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 32, vertical: 16),
-                                ),
-                              )
-                            : Text(
-                                'Minden dokumentum betöltve ($totalCount dokumentum)',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: MediaQuery.of(context).size.width <
-                                          600
-                                      ? 12
-                                      : null, // Mobil nézetben 2px-el kisebb (alap 14px -> 12px)
-                                ),
-                              ),
+                    child: Text(
+                      'Összesen: $totalCount dokumentum',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize:
+                            MediaQuery.of(context).size.width < 600 ? 12 : null,
+                      ),
+                    ),
                   ),
                 ),
               ],

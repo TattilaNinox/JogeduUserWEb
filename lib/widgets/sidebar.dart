@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
+import '../services/auth_service.dart';
+import '../services/metadata_service.dart';
 
 /// Az alkalmazás oldalsó menüsávját (sidebar) megvalósító widget.
 ///
@@ -140,6 +142,54 @@ class Sidebar extends StatelessWidget {
                 context, 'notes', 'Tags Főoldal', selectedMenu == 'notes'),
             _buildMenuItem(context, 'my-bundles', 'Saját kötegek',
                 selectedMenu == 'my-bundles'),
+            FutureBuilder<bool>(
+              future: AuthService().isAdmin(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data == true) {
+                  return Padding(
+                    padding:
+                        const EdgeInsets.only(top: 24.0, left: 16, right: 16),
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Metadata frissítése folyamatban...')),
+                          );
+                          final count =
+                              await MetadataService.refreshMetadataAggregation(
+                                  'Jogász');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(
+                                      'Siker! $count jegyzet feldolgozva.')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Hiba történt: $e'),
+                                  backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Adatbázis Frissítése'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade100,
+                        foregroundColor: Colors.red.shade900,
+                        alignment: Alignment.centerLeft,
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
             if (extraPanel != null) ...[
               const SizedBox(height: 8),
               Padding(

@@ -24,8 +24,8 @@ class CategoryTagsScreen extends StatefulWidget {
 
 class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   bool _hasPremiumAccess = false;
-  int _currentLimit = 25; // Alapértelmezett limit
-  bool _isLoadingMore = false;
+  // FIX: Megemelt limit, hogy minden dokumentum betöltődjön egyszerre, gomb nélkül
+  final int _currentLimit = 1000;
 
   @override
   void initState() {
@@ -59,17 +59,6 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
     } catch (e) {
       debugPrint('Error checking premium access: $e');
     }
-  }
-
-  void _loadMore() {
-    if (_isLoadingMore) return;
-    setState(() {
-      _currentLimit += 50;
-      _isLoadingMore = true;
-    });
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _isLoadingMore = false);
-    });
   }
 
   void _navigateToTagDrillDown(BuildContext context, String tag) {
@@ -370,29 +359,11 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                               Padding(
                                 padding: const EdgeInsets.all(24.0),
                                 child: Center(
-                                  child: _isLoadingMore
-                                      ? const CircularProgressIndicator()
-                                      : hasMore
-                                          ? ElevatedButton.icon(
-                                              onPressed: _loadMore,
-                                              icon:
-                                                  const Icon(Icons.expand_more),
-                                              label: Text(
-                                                'További dokumentumok betöltése',
-                                              ),
-                                              style: ElevatedButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 32,
-                                                        vertical: 16),
-                                              ),
-                                            )
-                                          : Text(
-                                              'Minden dokumentum betöltve (${allDocs.length} dokumentum)',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                  color: Colors.grey),
-                                            ),
+                                  child: Text(
+                                    'Összesen: ${allDocs.length} dokumentum',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
                                 ),
                               ),
                             ],
