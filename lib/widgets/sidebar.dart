@@ -183,6 +183,9 @@ class Sidebar extends StatelessWidget {
                         backgroundColor: Colors.red.shade100,
                         foregroundColor: Colors.red.shade900,
                         alignment: Alignment.centerLeft,
+                        minimumSize: const Size.fromHeight(44),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   );
