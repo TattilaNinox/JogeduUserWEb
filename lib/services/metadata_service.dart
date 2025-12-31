@@ -298,24 +298,13 @@ class MetadataService {
           // Feltételezzük, hogy van status mező, vagy ha nincs, akkor minden elem publikus?
           // A biztonság kedvéért megpróbáljuk status szűréssel, ha üres lesz, akkor status nélkül.
           // DE: A legegyszerűbb, ha csak azokat vesszük, ahol VAN status és az megfelelő.
-
           Query query = FirebaseConfig.firestore
               .collection(collectionName)
               .where('science', isEqualTo: science);
 
-          // Csak a releváns státuszúakat
-          if (collectionName == 'notes' || collectionName == 'jogesetek') {
-            query = query
-                .where('status', whereIn: ['Published', 'Draft', 'Public']);
-          } else {
-            // Memóriapalota állomásoknál lehet, hogy nincs status, vagy más a logika.
-            // Ha nincs status mező, a query exceptiont dobhat vagy üreset adhat ha rossz a feltétel.
-            // A biztonság kedvéért itt is rászűrünk, ha a rendszer konzisztens.
-            // Ha biztosra akarunk menni, lekérjük státusz nélkül, és kódban szűrünk (kisebb elemszám).
-            // De maradjunk a konzisztens status szűrésnél, mivel a NoteCardGrid is ezt használja.
-            query = query
-                .where('status', whereIn: ['Published', 'Draft', 'Public']);
-          }
+          // Mindenhol szűrünk statusra, mert a felhasználó megerősítette, hogy fontos és mindenhol van.
+          query =
+              query.where('status', whereIn: ['Published', 'Draft', 'Public']);
 
           final snapshot = await query.get();
           docCount += snapshot.docs.length;
@@ -323,7 +312,19 @@ class MetadataService {
           for (var doc in snapshot.docs) {
             final data = doc.data() as Map<String, dynamic>;
             final category = data['category'] as String?;
-            final tags = List<String>.from(data['tags'] ?? []);
+
+            // Hibatűrő címke olvasás:
+            // A 'dialogus_fajlok' esetén a tags egy Map (pl. {tartalom: "..."}),
+            // nem List<String>. Ezt kezelni kell, különben elszáll a castolásnál.
+            List<String> tags = [];
+            final rawTags = data['tags'];
+            if (rawTags is List) {
+              tags = List<String>.from(rawTags);
+            } else if (rawTags is Map) {
+              // Ha Map, akkor nem címke, hanem egyéb adat (pl. tartalom),
+              // így itt üres listának tekintjük a szűrés szempontjából.
+              tags = [];
+            }
 
             if (category != null && category.isNotEmpty) {
               if (!catToTags.containsKey(category)) {
@@ -352,6 +353,7 @@ class MetadataService {
       await processCollection('notes');
       await processCollection('jogesetek');
       await processCollection('memoriapalota_allomasok');
+      await processCollection('dialogus_fajlok');
 
       // 2. Mentés: Aggregált dokumentum írása
       // Firestore nem támogat Set-et, List-té kell konvertálni
