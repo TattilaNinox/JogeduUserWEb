@@ -500,10 +500,19 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   List<String> get _visibleTags {
-    if (_selectedCategory != null &&
-        _catToTags.containsKey(_selectedCategory)) {
-      final allowedTags = _catToTags[_selectedCategory]!;
-      return _tags.where((t) => allowedTags.contains(t)).toList();
+    // Ha még nem töltődött be a map, mutassunk mindent
+    if (_catToTags.isEmpty) return _tags;
+
+    if (_selectedCategory != null) {
+      if (_catToTags.containsKey(_selectedCategory)) {
+        final allowedTags = _catToTags[_selectedCategory]!;
+        return _tags.where((t) => allowedTags.contains(t)).toList();
+      } else {
+        // Ha van kiválasztott kategória, de nincs hozzá címke a mapben:
+        // Ez lehet hiba (nincs frissítve), vagy tényleg nincs címkéje.
+        // Biztonságosabb üres listát visszaadni, mint mindent.
+        return [];
+      }
     }
     return _tags;
   }

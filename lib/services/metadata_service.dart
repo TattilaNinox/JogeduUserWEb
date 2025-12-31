@@ -9,53 +9,40 @@ class MetadataService {
   /// Lekéri a kategóriákat és címkéket egyetlen dokumentumból.
   /// Ha a dokumentum nem létezik, üres listákkal tér vissza.
   static Future<Map<String, List<String>>> getMetadata(String science) async {
-    // 1. Próbálkozás: Active Metadata dokumentum olvasása (Cloud Function által generált)
-    // Ez a skálázható megoldás (egyetlen olvasás)
+    // 0. Próbálkozás: Az új Aggregált Structure használata (ez a legfrissebb és tartalmazza a dialogus tageket is)
     try {
-      // Konstans 'jogasz_active', vagy dinamikusan: '${science.toLowerCase()}_active'
-      // Mivel a Cloud Function a 'jogasz_active' ID-t használja:
-      final activeDocId =
-          '${science.toLowerCase().replaceAll('á', 'a')}_active';
-
-      if (kDebugMode) {
-        debugPrint(
-            '🔍 MetadataService: Skálázható keresés docId=$activeDocId (science=$science)');
-      }
-      final doc = await FirebaseConfig.firestore
+      final structDocId =
+          '${science.toLowerCase().replaceAll('á', 'a')}_structure';
+      final structDoc = await FirebaseConfig.firestore
           .collection('metadata')
-          .doc(activeDocId)
+          .doc(structDocId)
           .get();
 
-      if (doc.exists) {
-        final data = doc.data() ?? {};
-        final categories = List<String>.from(data['categories'] ?? []);
-        final tags = List<String>.from(data['tags'] ?? []);
+      if (structDoc.exists) {
+        final data = structDoc.data() ?? {};
+        final rawCatToTags = data['catToTags'] as Map<String, dynamic>? ?? {};
+        final rawTagToCats = data['tagToCats'] as Map<String, dynamic>? ?? {};
 
-        if (kDebugMode) {
-          debugPrint(
-              '✅ MetadataService: Active Doc found (Cloud Function). Cats: ${categories.length}, Tags: ${tags.length}');
-        }
+        final categories = rawCatToTags.keys.toList()..sort();
+        final tags = rawTagToCats.keys.toList()..sort();
 
         if (categories.isNotEmpty || tags.isNotEmpty) {
+          if (kDebugMode) {
+            debugPrint(
+                '✅ MetadataService: Loaded from Aggregated Structure ($structDocId). Cats: ${categories.length}, Tags: ${tags.length}');
+          }
           return {
             'categories': categories,
             'tags': tags,
           };
         }
-      } else {
-        if (kDebugMode) {
-          debugPrint(
-              '⚠️ MetadataService: Active Metadata doc ($activeDocId) NOT found yet. Proceeding to fallback.');
-        }
       }
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint(
-            '⚠️ MetadataService: Aktív metadata olvasás hiba ($e). Folytatás fallback stratégiával.');
-      }
+      debugPrint('⚠️ MetadataService: Structure load failed: $e');
     }
 
-    // 2. Próbálkozás: Fallback - közvetlen kollekció olvasás
+    // 1. Próbálkozás: Active Metadata dokumentum olvasása (Legacy Cloud Function)
+
     try {
       if (kDebugMode) {
         debugPrint(
@@ -311,7 +298,7 @@ class MetadataService {
 
           for (var doc in snapshot.docs) {
             final data = doc.data() as Map<String, dynamic>;
-            final category = data['category'] as String?;
+            var category = data['category'] as String?;
 
             // Hibatűrő címke olvasás:
             // A 'dialogus_fajlok' esetén a tags egy Map (pl. {tartalom: "..."}),
@@ -324,6 +311,18 @@ class MetadataService {
               // Ha Map, akkor nem címke, hanem egyéb adat (pl. tartalom),
               // így itt üres listának tekintjük a szűrés szempontjából.
               tags = [];
+            }
+
+            // Dialogus fájlok speciális kezelése
+            if (collectionName == 'dialogus_fajlok') {
+              // A Frontend (NoteCardGrid) "Dialogus tags"-ként csoportosítja őket.
+              // Ezért a Metadata aggregációnál is ezt használjuk FŐ kategóriaként.
+              // A tényleges kategóriát (pl. "Polgári jog") pedig CÍMKEKÉNT adjuk hozzá,
+              // hogy szűrhető legyen.
+              if (category != null && category.isNotEmpty) {
+                tags.add(category);
+              }
+              category = 'Dialogus tags';
             }
 
             if (category != null && category.isNotEmpty) {
