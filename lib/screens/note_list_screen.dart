@@ -278,6 +278,17 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   /// Frissíti a kiválasztott kategóriát a `Filters` widgetből.
   void _onCategoryChanged(String? value) {
+    if (value != null && value.isNotEmpty) {
+      // Ha kategóriát választunk, azonnal "belépünk" oda
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CategoryTagsScreen(category: value),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _selectedCategory = value;
     });

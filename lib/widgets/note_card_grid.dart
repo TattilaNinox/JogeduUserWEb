@@ -556,33 +556,22 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               sortDocs(tags);
             });
 
-            final bool skipCategoryWrapper = widget.selectedCategory != null &&
-                widget.selectedCategory!.isNotEmpty &&
-                hierarchical.containsKey(widget.selectedCategory);
-
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
               children: [
-                if (skipCategoryWrapper)
-                  // Közvetlenül a szint elemeit jelenítjük meg, kategória fejléc/mappa nélkül
-                  ..._buildHierarchyItems(
-                      context, hierarchical[widget.selectedCategory!]!,
-                      category: widget.selectedCategory!,
-                      hasPremiumAccess: hasPremiumAccess)
-                else
-                  ...(hierarchical.entries.toList()
-                        ..sort(
-                            (a, b) => StringUtils.naturalCompare(a.key, b.key)))
-                      .map((categoryEntry) {
-                    return _CategorySection(
-                      key: ValueKey('category_${categoryEntry.key}'),
-                      category: categoryEntry.key,
-                      tagHierarchy: categoryEntry.value,
-                      selectedCategory: widget.selectedCategory,
-                      selectedTag: widget.selectedTag,
-                      hasPremiumAccess: hasPremiumAccess,
-                    );
-                  }),
+                ...(hierarchical.entries.toList()
+                      ..sort(
+                          (a, b) => StringUtils.naturalCompare(a.key, b.key)))
+                    .map((categoryEntry) {
+                  return _CategorySection(
+                    key: ValueKey('category_${categoryEntry.key}'),
+                    category: categoryEntry.key,
+                    tagHierarchy: categoryEntry.value,
+                    selectedCategory: widget.selectedCategory,
+                    selectedTag: widget.selectedTag,
+                    hasPremiumAccess: hasPremiumAccess,
+                  );
+                }),
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Center(
@@ -619,138 +608,6 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         );
       },
     );
-  }
-
-  List<Widget> _buildHierarchyItems(
-    BuildContext context,
-    Map<String, dynamic> hierarchy, {
-    required String category,
-    required bool hasPremiumAccess,
-  }) {
-    final List<dynamic> unifiedList = [];
-    if (hierarchy.containsKey('Nincs címke')) {
-      unifiedList.addAll(hierarchy['Nincs címke']);
-    }
-
-    final tags =
-        hierarchy.entries.where((e) => e.key != 'Nincs címke').toList();
-    unifiedList.addAll(tags);
-
-    unifiedList.sort((a, b) {
-      String titleA;
-      if (a is MapEntry<String, dynamic>) {
-        titleA = a.key;
-      } else {
-        final docA = a as QueryDocumentSnapshot<Map<String, dynamic>>;
-        titleA = (docA.reference.path.contains('jogesetek')
-                ? (docA.data()['title'] ?? docA.id)
-                : (docA.data()['title'] ?? docA.data()['cim'] ?? 'Névtelen'))
-            .toString();
-      }
-      String titleB;
-      if (b is MapEntry<String, dynamic>) {
-        titleB = b.key;
-      } else {
-        final docB = b as QueryDocumentSnapshot<Map<String, dynamic>>;
-        titleB = (docB.reference.path.contains('jogesetek')
-                ? (docB.data()['title'] ?? docB.id)
-                : (docB.data()['title'] ?? docB.data()['cim'] ?? 'Névtelen'))
-            .toString();
-      }
-      return StringUtils.naturalCompare(titleA, titleB);
-    });
-
-    return unifiedList.map((item) {
-      if (item is MapEntry<String, dynamic>) {
-        final tag = item.key;
-        final data = item.value;
-        final count = data is List
-            ? data.length
-            : (data is Map ? (data['docs'] as List? ?? []).length : 0);
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: Colors.grey.shade200)),
-          child: InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TagDrillDownScreen(
-                    category: category,
-                    tagPath: [tag],
-                  ),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(item.value is Map ? Icons.folder : Icons.label,
-                      color: const Color(0xFF3366CC)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(tag,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w500))),
-                  Text('$count',
-                      style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
-              ),
-            ),
-          ),
-        );
-      } else {
-        final doc = item as QueryDocumentSnapshot<Map<String, dynamic>>;
-        final data = doc.data();
-        final isMP = doc.reference.path.contains('memoriapalota_allomasok');
-        final isDialogus = doc.reference.path.contains('dialogus_fajlok');
-        final isJogeset = doc.reference.path.contains('jogesetek');
-
-        String title =
-            (data['title'] ?? data['name'] ?? data['cim'] ?? 'Névtelen')
-                .toString();
-        String type = isMP
-            ? 'memoriapalota_allomasok'
-            : (isDialogus
-                ? 'dialogus_fajlok'
-                : (isJogeset ? 'jogeset' : (data['type'] as String? ?? '')));
-
-        bool isFree = (data['isFree'] == true) ||
-            (data['is_free'] == true) ||
-            (data['isFree'] == 1) ||
-            (data['is_free'] == 1);
-        int? jogesetCount;
-        if (isJogeset) {
-          title = (data['title'] ?? 'Jogeset').toString();
-          final jogesetekList = data['jogesetek'] as List? ?? [];
-          jogesetCount = jogesetekList.length;
-        }
-
-        return NoteListTile(
-          id: doc.id,
-          title: title,
-          type: type,
-          hasDoc: (data['docxUrl'] ?? '').toString().isNotEmpty,
-          hasAudio: (data['audioUrl'] ?? '').toString().isNotEmpty,
-          audioUrl: (data['audioUrl'] ?? '').toString(),
-          hasVideo: (data['videoUrl'] ?? '').toString().isNotEmpty,
-          deckCount: type == 'deck'
-              ? (data['flashcards'] as List? ?? []).length
-              : null,
-          isLocked: !isFree && !hasPremiumAccess,
-          jogesetCount: jogesetCount,
-          category: category,
-          customFromUrl: '/notes',
-        );
-      }
-    }).toList();
   }
 }
 
