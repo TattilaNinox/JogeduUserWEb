@@ -6,6 +6,10 @@ import 'package:flutter/foundation.dart';
 /// Az audit alapján egyetlen 'metadata' dokumentumból olvashatóak ki az adatok,
 /// így elkerülhető a teljes kollekció-scan.
 class MetadataService {
+  /// Értesítő, amit a metadata frissítése után kiváltunk.
+  /// A UI widgetek erre figyelhetnek, hogy újratöltsék az adataikat.
+  static final refreshNotifier = ValueNotifier<int>(0);
+
   /// Lekéri a kategóriákat és címkéket egyetlen dokumentumból.
   /// Ha a dokumentum nem létezik, üres listákkal tér vissza.
   static Future<Map<String, List<String>>> getMetadata(String science) async {
@@ -360,6 +364,10 @@ class MetadataService {
         debugPrint(
             '✅ Metadata Aggregation COMPLETED. Processed $docCount docs (Total).');
       }
+
+      // Értesítjük a UI-t, hogy frissült a metadata
+      refreshNotifier.value++;
+
       return docCount;
     } catch (e) {
       debugPrint('🔴 Metadata Aggregation FAILED: $e');

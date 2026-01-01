@@ -86,6 +86,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
     // inicializáljuk a grid-et a kezdeti szűrőkkel
     _rebuildGridIfNeeded(force: true);
+
+    // Figyelünk a metadata frissítésére
+    MetadataService.refreshNotifier.addListener(_onMetadataRefreshed);
+  }
+
+  void _onMetadataRefreshed() {
+    // Újratöltjük a metaadatokat
+    _loadCategories();
+    _loadTags();
+    _loadDependencies();
   }
 
   void _rebuildGridIfNeeded({bool force = false}) {
@@ -158,6 +168,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   @override
   void dispose() {
+    MetadataService.refreshNotifier.removeListener(_onMetadataRefreshed);
     _searchController.dispose();
     super.dispose();
   }
