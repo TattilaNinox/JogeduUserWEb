@@ -154,201 +154,191 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           ),
         ),
       ),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .snapshots(),
-        builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData) {
+      // LAZY LOADING: Először ellenőrizzük a metadata-ból, vannak-e alcímkék
+      // Ha VANNAK alcímkék → Csak címke kártyákat mutatunk (0 Firestore olvasás!)
+      // Ha NINCSENEK alcímkék → Betöltjük a dokumentumokat
+      body: FutureBuilder<Map<String, int>>(
+        future: MetadataService.getSubTagsForPath(
+            'Jogász', widget.category, widget.tagPath),
+        builder: (context, subTagsSnapshot) {
+          if (subTagsSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = userSnapshot.data?.data() ?? {};
-          final userType =
-              (userData['userType'] as String? ?? '').toLowerCase();
-          final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
-          final isAdminBool = userData['isAdmin'] == true;
-          final bool isAdmin =
-              userType == 'admin' || isAdminEmail || isAdminBool;
-          const String science = 'Jogász';
+          final subTags = subTagsSnapshot.data ?? {};
+          final hasSubTags = subTags.isNotEmpty;
 
-          // Lekérdezések építése
-          Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
-              .collection('notes')
-              .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category)
-              .orderBy('title')
-              .limit(_currentLimit + 1);
-
-          if (isAdmin) {
-            notesQuery = notesQuery.where('status',
-                whereIn: const ['Published', 'Public', 'Draft']);
-          } else {
-            notesQuery = notesQuery
-                .where('status', whereIn: const ['Published', 'Public']);
+          if (kDebugMode) {
+            debugPrint(
+                '🔍 TagDrillDownScreen: tagPath=${widget.tagPath}, hasSubTags=$hasSubTags, subTags=$subTags');
           }
 
-          // Jogesetek: Restore science and category filters
-          Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
-              .collection('jogesetek')
-              .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category)
-              .orderBy(FieldPath.documentId)
-              .limit(_currentLimit + 1);
-
-          if (isAdmin) {
-            jogesetQuery = jogesetQuery.where('status',
-                whereIn: const ['Published', 'Public', 'Draft']);
-          } else {
-            jogesetQuery = jogesetQuery
-                .where('status', whereIn: const ['Published', 'Public']);
+          // Ha VANNAK alcímkék → Csak címke kártyákat mutatunk
+          if (hasSubTags) {
+            return _buildSubTagsView(subTags);
           }
 
-          Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
-              .collection('memoriapalota_allomasok')
-              .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category)
-              .orderBy('title')
-              .limit(_currentLimit + 1);
+          // Ha NINCSENEK alcímkék → Betöltjük a dokumentumokat
+          return _buildDocumentsView();
+        },
+      ),
+    );
+  }
 
-          if (isAdmin) {
-            allomasQuery = allomasQuery.where('status',
-                whereIn: const ['Published', 'Public', 'Draft']);
-          } else {
-            allomasQuery = allomasQuery
-                .where('status', whereIn: const ['Published', 'Public']);
-          }
+  /// LAZY LOADING: Alcímke kártyák megjelenítése metadata-ból
+  /// 0 Firestore olvasás!
+  Widget _buildSubTagsView(Map<String, int> subTags) {
+    // Rendezés ABC sorrendben
+    final sortedTags = subTags.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
 
-          Query<Map<String, dynamic>>? dialogusQuery;
-          if (widget.category == 'Dialogus tags') {
-            dialogusQuery = FirebaseConfig.firestore
-                .collection('dialogus_fajlok')
-                .where('science', isEqualTo: science);
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        ...sortedTags.map((entry) => _buildSubTagCard(entry.key, entry.value)),
+        Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Center(
+            child: Text(
+              'Címkék: ${sortedTags.length}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-            // Ha van kiválasztott címke-útvonal, szűrjünk rá az utolsó elemmel
-            if (widget.tagPath.isNotEmpty) {
-              dialogusQuery = dialogusQuery.where('tags',
-                  arrayContains: widget.tagPath.last);
-            }
-
-            // FONTOS: Nem használunk .orderBy('title')-t, mert ha hiányzik a mező,
-            // a Firestore nem adja vissza a dokumentumot!
-          }
-
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: notesQuery.snapshots(),
-            builder: (context, notesSnap) {
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: jogesetQuery.snapshots(),
-                builder: (context, jogesetSnap) {
-                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: allomasQuery.snapshots(),
-                    builder: (context, allomasSnap) {
-                      final dStream =
-                          dialogusQuery?.snapshots() ?? const Stream.empty();
-                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: dStream,
-                        builder: (context, dSnap) {
-                          if (notesSnap.hasError) {
-                            return Center(
-                                child: Text('Hiba: ${notesSnap.error}'));
-                          }
-
-                          // Adatok összefésülése és szűrése a tagPath alapján
-                          final allDocs =
-                              <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                          if (notesSnap.hasData) {
-                            allDocs.addAll(notesSnap.data!.docs
-                                .where((d) => d.data()['deletedAt'] == null));
-                          }
-                          if (jogesetSnap.hasData) {
-                            allDocs.addAll(jogesetSnap.data!.docs
-                                .where((d) => d.data()['deletedAt'] == null));
-                          }
-                          if (allomasSnap.hasData) {
-                            allDocs.addAll(allomasSnap.data!.docs
-                                .where((d) => d.data()['deletedAt'] == null));
-                          }
-
-                          final Map<String, dynamic> hierarchy =
-                              _buildHierarchy(allDocs, jogesetSnap.data?.docs,
-                                  dSnap.data?.docs, isAdmin);
-
-                          final List<dynamic> unifiedList =
-                              _getUnifiedList(hierarchy);
-
-                          // Kiszámoljuk az összes dokumentumot ezen a szinten (és alatta)
-                          int totalMatchingCount = 0;
-                          if (hierarchy.containsKey('_direct')) {
-                            totalMatchingCount +=
-                                (hierarchy['_direct'] as List).length;
-                          }
-                          hierarchy.forEach((key, value) {
-                            if (!key.startsWith('_')) {
-                              totalMatchingCount +=
-                                  (value['docs'] as List).length;
-                            }
-                          });
-
-                          if (unifiedList.isEmpty) {
-                            if (!notesSnap.hasData && !allomasSnap.hasData) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            }
-                            return const Center(
-                                child: Text(
-                                    'Nincs megjeleníthető tartalom ezen a szinten.'));
-                          }
-
-                          final bool hasMore =
-                              unifiedList.length > _currentLimit;
-                          final displayedItems = hasMore
-                              ? unifiedList.take(_currentLimit).toList()
-                              : unifiedList;
-
-                          final List<Widget> widgetsList = [];
-                          for (var item in displayedItems) {
-                            if (item is MapEntry<String, dynamic>) {
-                              widgetsList.add(
-                                  _buildFolderWidget(item.key, item.value));
-                            } else {
-                              final doc = item as QueryDocumentSnapshot<
-                                  Map<String, dynamic>>;
-                              if (doc.reference.path.contains('jogesetek')) {
-                                widgetsList.add(_buildJogesetWidget(doc));
-                              } else {
-                                widgetsList.add(_buildNoteWidget(doc));
-                              }
-                            }
-                          }
-
-                          return ListView(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: [
-                              ...widgetsList,
-                              Padding(
-                                padding: const EdgeInsets.all(24.0),
-                                child: Center(
-                                  child: Text(
-                                    'Összesen: $totalMatchingCount dokumentum',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
+  /// Alcímke kártya UI (hasonló a CategoryTagsScreen-hez)
+  Widget _buildSubTagCard(String tagName, int count) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.folder_outlined, color: Colors.blue),
+        title: Text(tagName),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$count',
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TagDrillDownScreen(
+                category: widget.category,
+                tagPath: [...widget.tagPath, tagName],
+              ),
+            ),
           );
         },
       ),
+    );
+  }
+
+  /// LAZY LOADING: Dokumentumok betöltése (leaf szint, nincs több alcímke)
+  Widget _buildDocumentsView() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Kérjük, jelentkezzen be.'));
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseConfig.firestore
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userData = userSnapshot.data?.data() ?? {};
+        final userType = (userData['userType'] as String? ?? '').toLowerCase();
+        final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
+        final isAdminBool = userData['isAdmin'] == true;
+        final bool isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+        const String science = 'Jogász';
+
+        // Lekérdezések építése - CSAK a pontos tagPath-ra szűrve
+        Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
+            .collection('notes')
+            .where('science', isEqualTo: science)
+            .where('category', isEqualTo: widget.category);
+
+        // Szűrés a tagPath utolsó elemére
+        if (widget.tagPath.isNotEmpty) {
+          notesQuery =
+              notesQuery.where('tags', arrayContains: widget.tagPath.last);
+        }
+
+        notesQuery = notesQuery.orderBy('title').limit(_currentLimit + 1);
+
+        if (isAdmin) {
+          notesQuery = notesQuery
+              .where('status', whereIn: const ['Published', 'Public', 'Draft']);
+        } else {
+          notesQuery = notesQuery
+              .where('status', whereIn: const ['Published', 'Public']);
+        }
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: notesQuery.snapshots(),
+          builder: (context, notesSnap) {
+            if (notesSnap.hasError) {
+              return Center(child: Text('Hiba: ${notesSnap.error}'));
+            }
+            if (!notesSnap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // Szűrés: csak azok a dokumentumok, ahol a tags PONTOSAN egyezik a tagPath-tal
+            final allDocs = notesSnap.data!.docs
+                .where((d) => d.data()['deletedAt'] == null)
+                .where((d) {
+              final tags =
+                  (d.data()['tags'] as List<dynamic>? ?? []).cast<String>();
+              // A tags-nak PONTOSAN meg kell egyeznie a tagPath-tal
+              if (tags.length != widget.tagPath.length) return false;
+              for (int i = 0; i < widget.tagPath.length; i++) {
+                if (i >= tags.length || tags[i] != widget.tagPath[i]) {
+                  return false;
+                }
+              }
+              return true;
+            }).toList();
+
+            if (allDocs.isEmpty) {
+              return const Center(
+                  child: Text('Nincs megjeleníthető tartalom ezen a szinten.'));
+            }
+
+            return ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                ...allDocs.map((doc) => _buildNoteWidget(doc)),
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Center(
+                    child: Text(
+                      'Összesen: ${allDocs.length} dokumentum',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

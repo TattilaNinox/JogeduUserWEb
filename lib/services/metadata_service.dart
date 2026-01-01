@@ -298,6 +298,55 @@ class MetadataService {
     }
   }
 
+  /// LAZY LOADING: Alcímkék és count-ok lekérése egy adott tagPath-hoz.
+  /// Visszaadja azokat az alcímkéket, amelyek a megadott tagPath alatt vannak,
+  /// a count-okkal együtt.
+  ///
+  /// Pl. category="Alkotmányjog", tagPath=["Alaptörvény"] esetén:
+  /// Visszaadja: {"4. Az Állam": 14, "7. Memóriaútvonal": 19, ...}
+  static Future<Map<String, int>> getSubTagsForPath(
+      String science, String category, List<String> tagPath) async {
+    try {
+      final metadata = await getCategoryTagMapping(science);
+      final hierarchicalCounts =
+          metadata['hierarchicalCounts'] as Map<String, Map<String, int>>? ??
+              {};
+      final categoryHierarchy = hierarchicalCounts[category] ?? {};
+
+      // A prefix, ami alapján szűrünk (pl. "Alaptörvény/")
+      final prefix = tagPath.isEmpty ? '' : '${tagPath.join('/')}/';
+      final prefixDepth = tagPath.length;
+
+      final subTags = <String, int>{};
+
+      categoryHierarchy.forEach((path, count) {
+        // Ellenőrizzük, hogy a path a prefix-szel kezdődik
+        if (tagPath.isEmpty || path.startsWith(prefix)) {
+          final parts = path.split('/');
+          // Az alcímke az a rész, ami közvetlenül a tagPath után jön
+          if (parts.length > prefixDepth) {
+            final subTag = parts[prefixDepth];
+            // Csak az első szintű alcímkéket adjuk hozzá
+            // Ha már van ilyen kulcs, a nagyobb count-ot tartjuk meg
+            if (!subTags.containsKey(subTag) || subTags[subTag]! < count) {
+              subTags[subTag] = count;
+            }
+          }
+        }
+      });
+
+      if (kDebugMode) {
+        debugPrint(
+            '🔍 getSubTagsForPath: category=$category, tagPath=$tagPath, found ${subTags.length} subTags');
+      }
+
+      return subTags;
+    } catch (e) {
+      debugPrint('🔴 getSubTagsForPath error: $e');
+      return {};
+    }
+  }
+
   /// ADMIN FUNKCIÓ: Metadata Aggregáció Frissítése.
   /// Végigolvassa az összes aktív jegyzetet (és egyéb típusokat) és újraépíti
   /// a `metadata/jogasz_structure` dokumentumot.
