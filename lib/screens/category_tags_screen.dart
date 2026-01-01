@@ -140,9 +140,12 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           }
 
           // Egységes lista: címkék + címke nélküli jegyzetek
+          // JAVÍTVA: Csak olyan címkéket jelenítünk meg, ahol count > 0
           final List<dynamic> unifiedList = [
-            ...tags.map((tag) =>
-                {'type': 'tag', 'name': tag, 'count': tagCounts[tag] ?? 0}),
+            ...tags
+                .where((tag) => (tagCounts[tag] ?? 0) > 0) // 0 count kiszűrése
+                .map((tag) =>
+                    {'type': 'tag', 'name': tag, 'count': tagCounts[tag] ?? 0}),
             ...untaggedDocs,
           ];
 

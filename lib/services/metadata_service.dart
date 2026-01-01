@@ -421,7 +421,17 @@ class MetadataService {
       final tagCountsExport = <String, Map<String, int>>{};
       final hierarchicalCountsExport = <String, Map<String, int>>{};
 
-      catToTags.forEach((k, v) => catToTagsExport[k] = v.toList()..sort());
+      // JAVÍTVA: Csak aktív címkék exportálása (count > 0)
+      catToTags.forEach((category, tagsSet) {
+        final activeTags = tagsSet.where((tag) {
+          final count = tagCounts[category]?[tag] ?? 0;
+          return count > 0;
+        }).toList()
+          ..sort();
+        if (activeTags.isNotEmpty) {
+          catToTagsExport[category] = activeTags;
+        }
+      });
       tagToCats.forEach((k, v) => tagToCatsExport[k] = v.toList()..sort());
       tagCounts.forEach((k, v) => tagCountsExport[k] = v);
       hierarchicalCounts.forEach((k, v) => hierarchicalCountsExport[k] = v);
