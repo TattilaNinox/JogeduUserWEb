@@ -185,28 +185,153 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     );
   }
 
-  /// LAZY LOADING: Alcímke kártyák megjelenítése metadata-ból
-  /// 0 Firestore olvasás!
+  /// LAZY LOADING: Alcímke kártyák és közvetlen jegyzetek megjelenítése
+  /// Az alcímkék metadata-ból jönnek (0 Firestore olvasás!)
+  /// A közvetlen jegyzetek (ahol tags.length == tagPath.length) Firestore-ból
   Widget _buildSubTagsView(Map<String, int> subTags) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Kérjük, jelentkezzen be.'));
+    }
+
     // Rendezés ABC sorrendben
     final sortedTags = subTags.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
-        ...sortedTags.map((entry) => _buildSubTagCard(entry.key, entry.value)),
-        Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Center(
-            child: Text(
-              'Címkék: ${sortedTags.length}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ),
-        ),
-      ],
+    // Közvetlen jegyzetek betöltése (ahol tags.length == tagPath.length)
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseConfig.firestore
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userData = userSnapshot.data?.data() ?? {};
+        final userType = (userData['userType'] as String? ?? '').toLowerCase();
+        final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
+        final isAdminBool = userData['isAdmin'] == true;
+        final bool isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
+
+        // Lekérdezés a közvetlen jegyzetekhez
+        Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
+            .collection('notes')
+            .where('science', isEqualTo: 'Jogász')
+            .where('category', isEqualTo: widget.category);
+
+        if (widget.tagPath.isNotEmpty) {
+          notesQuery =
+              notesQuery.where('tags', arrayContains: widget.tagPath.last);
+        }
+        notesQuery = notesQuery.orderBy('title').limit(_currentLimit + 1);
+        if (isAdmin) {
+          notesQuery = notesQuery
+              .where('status', whereIn: const ['Published', 'Public', 'Draft']);
+        } else {
+          notesQuery = notesQuery
+              .where('status', whereIn: const ['Published', 'Public']);
+        }
+
+        // Memoriapalota állomások lekérdezése
+        Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
+            .collection('memoriapalota_allomasok')
+            .where('science', isEqualTo: 'Jogász')
+            .where('category', isEqualTo: widget.category);
+        if (widget.tagPath.isNotEmpty) {
+          allomasQuery =
+              allomasQuery.where('tags', arrayContains: widget.tagPath.last);
+        }
+        allomasQuery = allomasQuery.orderBy('title').limit(_currentLimit + 1);
+        if (isAdmin) {
+          allomasQuery = allomasQuery
+              .where('status', whereIn: const ['Published', 'Public', 'Draft']);
+        } else {
+          allomasQuery = allomasQuery
+              .where('status', whereIn: const ['Published', 'Public']);
+        }
+
+        // Jogesetek lekérdezése
+        Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
+            .collection('jogesetek')
+            .where('science', isEqualTo: 'Jogász')
+            .where('category', isEqualTo: widget.category);
+        if (widget.tagPath.isNotEmpty) {
+          jogesetQuery =
+              jogesetQuery.where('tags', arrayContains: widget.tagPath.last);
+        }
+        jogesetQuery =
+            jogesetQuery.orderBy(FieldPath.documentId).limit(_currentLimit + 1);
+        if (isAdmin) {
+          jogesetQuery = jogesetQuery
+              .where('status', whereIn: const ['Published', 'Public', 'Draft']);
+        } else {
+          jogesetQuery = jogesetQuery
+              .where('status', whereIn: const ['Published', 'Public']);
+        }
+
+        // PÁRHUZAMOS BETÖLTÉS: összes kollekció egyszerre
+        return FutureBuilder<List<QuerySnapshot<Map<String, dynamic>>>>(
+          future: Future.wait([
+            notesQuery.get(),
+            allomasQuery.get(),
+            jogesetQuery.get(),
+          ]),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Hiba: ${snapshot.error}'));
+            }
+
+            final results = snapshot.data!;
+            final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+            // Összes kollekció dokumentumainak összegyűjtése
+            for (final result in results) {
+              allDocs.addAll(result.docs);
+            }
+
+            // Közvetlen jegyzetek szűrése: tags.length == tagPath.length
+            final directDocs =
+                allDocs.where((d) => d.data()['deletedAt'] == null).where((d) {
+              final tags =
+                  (d.data()['tags'] as List<dynamic>? ?? []).cast<String>();
+              // PONTOS egyezés: tags == tagPath
+              if (tags.length != widget.tagPath.length) return false;
+              for (int i = 0; i < widget.tagPath.length; i++) {
+                if (i >= tags.length || tags[i] != widget.tagPath[i]) {
+                  return false;
+                }
+              }
+              return true;
+            }).toList();
+
+            return ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                // Közvetlen jegyzetek (ha vannak)
+                ...directDocs.map((doc) => _buildNoteWidget(doc)),
+                // Alcímke kártyák
+                ...sortedTags
+                    .map((entry) => _buildSubTagCard(entry.key, entry.value)),
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Center(
+                    child: Text(
+                      'Közvetlen jegyzetek: ${directDocs.length}, Címkék: ${sortedTags.length}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -289,18 +414,69 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               .where('status', whereIn: const ['Published', 'Public']);
         }
 
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: notesQuery.snapshots(),
-          builder: (context, notesSnap) {
-            if (notesSnap.hasError) {
-              return Center(child: Text('Hiba: ${notesSnap.error}'));
-            }
-            if (!notesSnap.hasData) {
+        // Memoriapalota állomások lekérdezése
+        Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
+            .collection('memoriapalota_allomasok')
+            .where('science', isEqualTo: science)
+            .where('category', isEqualTo: widget.category);
+        if (widget.tagPath.isNotEmpty) {
+          allomasQuery =
+              allomasQuery.where('tags', arrayContains: widget.tagPath.last);
+        }
+        allomasQuery = allomasQuery.orderBy('title').limit(_currentLimit + 1);
+        if (isAdmin) {
+          allomasQuery = allomasQuery
+              .where('status', whereIn: const ['Published', 'Public', 'Draft']);
+        } else {
+          allomasQuery = allomasQuery
+              .where('status', whereIn: const ['Published', 'Public']);
+        }
+
+        // Jogesetek lekérdezése
+        Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
+            .collection('jogesetek')
+            .where('science', isEqualTo: science)
+            .where('category', isEqualTo: widget.category);
+        if (widget.tagPath.isNotEmpty) {
+          jogesetQuery =
+              jogesetQuery.where('tags', arrayContains: widget.tagPath.last);
+        }
+        jogesetQuery =
+            jogesetQuery.orderBy(FieldPath.documentId).limit(_currentLimit + 1);
+        if (isAdmin) {
+          jogesetQuery = jogesetQuery
+              .where('status', whereIn: const ['Published', 'Public', 'Draft']);
+        } else {
+          jogesetQuery = jogesetQuery
+              .where('status', whereIn: const ['Published', 'Public']);
+        }
+
+        // PÁRHUZAMOS BETÖLTÉS: összes kollekció egyszerre
+        return FutureBuilder<List<QuerySnapshot<Map<String, dynamic>>>>(
+          future: Future.wait([
+            notesQuery.get(),
+            allomasQuery.get(),
+            jogesetQuery.get(),
+          ]),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Hiba: ${snapshot.error}'));
+            }
+
+            final results = snapshot.data!;
+            final combinedDocs =
+                <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+            // Összes kollekció dokumentumainak összegyűjtése
+            for (final result in results) {
+              combinedDocs.addAll(result.docs);
             }
 
             // Szűrés: csak azok a dokumentumok, ahol a tags PONTOSAN egyezik a tagPath-tal
-            final allDocs = notesSnap.data!.docs
+            final allDocs = combinedDocs
                 .where((d) => d.data()['deletedAt'] == null)
                 .where((d) {
               final tags =
