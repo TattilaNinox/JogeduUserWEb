@@ -377,11 +377,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         final data = doc.data();
         final status = data['status'] as String? ?? 'Draft';
         if (!isAdmin && status != 'Published') continue;
-        final category = data['category'] as String? ?? '';
-
         final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
-        // Dialógusoknál a tags tömb a 2. szinttől kezdődik (az 1. szint a kategória)
-        final effectiveTags = [category, ...tags];
+        // Dialógusoknál is csak a valódi címkéket használjuk
+        final effectiveTags = tags;
 
         final matchIndex = _findTagPathIndex(effectiveTags, widget.tagPath);
         if (matchIndex == -1) continue;

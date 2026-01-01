@@ -317,11 +317,6 @@ class MetadataService {
             if (collectionName == 'dialogus_fajlok') {
               // A Frontend (NoteCardGrid) "Dialogus tags"-ként csoportosítja őket.
               // Ezért a Metadata aggregációnál is ezt használjuk FŐ kategóriaként.
-              // A tényleges kategóriát (pl. "Polgári jog") pedig CÍMKEKÉNT adjuk hozzá,
-              // hogy szűrhető legyen.
-              if (category != null && category.isNotEmpty) {
-                tags.add(category);
-              }
               category = 'Dialogus tags';
             }
 
