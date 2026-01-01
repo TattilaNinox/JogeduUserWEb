@@ -83,8 +83,6 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     }
   }
 
-  int get _currentDepth => widget.tagPath.length;
-
   void _navigateToNextLevel(BuildContext context, String nextTag) {
     final screen = TagDrillDownScreen(
       category: widget.category,
@@ -357,19 +355,20 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     for (var doc in docs) {
       final data = doc.data();
       final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
-      if (!_matchesPath(tags)) continue;
 
-      if (tags.length > _currentDepth) {
-        final nextTag = tags[_currentDepth];
+      final matchIndex = _findTagPathIndex(tags, widget.tagPath);
+      if (matchIndex == -1) continue;
+
+      final effectiveDepth = matchIndex + widget.tagPath.length;
+
+      if (tags.length > effectiveDepth) {
+        final nextTag = tags[effectiveDepth];
         _addToHierarchy(
-            hierarchy, nextTag, doc, tags.length > _currentDepth + 1);
+            hierarchy, nextTag, doc, tags.length > effectiveDepth + 1);
       } else {
         direct.add(doc);
       }
     }
-
-    // Jogesetek: top-level fields are processed in the docs loop above.
-    // Removed redundant nested jogesetek loop.
 
     // Dialógusok
     if (widget.category == 'Dialogus tags' && dialogusDocs != null) {
@@ -380,18 +379,19 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         if (!isAdmin && status != 'Published') continue;
         final category = data['category'] as String? ?? '';
 
-        // Dialógusoknál a tagPath első eleme a category
-        if (category != widget.tagPath[0]) continue;
-
         final tags = (data['tags'] as List<dynamic>? ?? []).cast<String>();
-        // Dialógusoknál a tags tömb a 2. szinttől kezdődik
+        // Dialógusoknál a tags tömb a 2. szinttől kezdődik (az 1. szint a kategória)
         final effectiveTags = [category, ...tags];
-        if (!_matchesPath(effectiveTags)) continue;
 
-        if (effectiveTags.length > _currentDepth) {
-          final nextTag = effectiveTags[_currentDepth];
+        final matchIndex = _findTagPathIndex(effectiveTags, widget.tagPath);
+        if (matchIndex == -1) continue;
+
+        final effectiveDepth = matchIndex + widget.tagPath.length;
+
+        if (effectiveTags.length > effectiveDepth) {
+          final nextTag = effectiveTags[effectiveDepth];
           _addToHierarchy(hierarchy, nextTag, doc,
-              effectiveTags.length > _currentDepth + 1);
+              effectiveTags.length > effectiveDepth + 1);
         } else {
           direct.add(doc);
         }
@@ -402,12 +402,21 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     return hierarchy;
   }
 
-  bool _matchesPath(List<String> tags) {
-    if (tags.length < widget.tagPath.length) return false;
-    for (int i = 0; i < widget.tagPath.length; i++) {
-      if (tags[i] != widget.tagPath[i]) return false;
+  /// Megkeresi a tagPathv sorrendet a dokumentum saját tags listájában.
+  /// Visszatér a találat kezdetének indexével, vagy -1-gyel.
+  int _findTagPathIndex(List<String> tags, List<String> path) {
+    if (path.isEmpty) return 0;
+    for (int i = 0; i <= tags.length - path.length; i++) {
+      bool match = true;
+      for (int j = 0; j < path.length; j++) {
+        if (tags[i + j] != path[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return i;
     }
-    return true;
+    return -1;
   }
 
   void _addToHierarchy(Map<String, dynamic> hierarchy, String tag,
