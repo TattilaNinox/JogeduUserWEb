@@ -59,11 +59,22 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         // FIX: Webalkalmazásban MINDIG csak "Jogász" tudományág
         const userScience = 'Jogász';
 
-        Query<Map<String, dynamic>> query =
-            FirebaseConfig.firestore.collection('notes');
+        // OPTIMALIZÁLÁS: Notes kollekció feltételes betöltése
+        // Ha speciális típus van kiválasztva (memoriapalota, dialogus, jogeset),
+        // akkor nem töltjük be a notes kollekciót (költségcsökkentés)
+        final shouldLoadNotes = widget.selectedType == null ||
+            widget.selectedType!.isEmpty ||
+            !['memoriapalota_allomasok', 'dialogus_fajlok', 'jogeset']
+                .contains(widget.selectedType);
+
+        Query<Map<String, dynamic>>? query = shouldLoadNotes
+            ? FirebaseConfig.firestore.collection('notes')
+            : null;
 
         // KÖTELEZŐ: Csak "Jogász" tudományágú jegyzetek
-        query = query.where('science', isEqualTo: userScience);
+        if (query != null) {
+          query = query.where('science', isEqualTo: userScience);
+        }
 
         // Keresés állapotának meghatározása
         final bool isSearching = widget.searchText.trim().isNotEmpty;
@@ -74,48 +85,51 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         // FREEMIUM MODEL: Minden jegyzet látszik, de a zártak nem nyithatók meg
         // Nem szűrünk isFree alapján, hogy a prémium jegyzetek is látszódjanak
 
-        // Státusz szűrés: admin esetén Draft jegyzeteket is mutatunk
-        if (widget.selectedStatus != null &&
-            widget.selectedStatus!.isNotEmpty) {
-          // Ha van kiválasztott státusz, azt használjuk
-          query = query.where('status', isEqualTo: widget.selectedStatus);
-        } else {
-          // Ha nincs kiválasztott státusz, alapértelmezett szűrés
-          if (isAdmin) {
-            // Admin esetén Published és Draft jegyzeteket mutatunk
-            query = query.where('status', whereIn: ['Published', 'Draft']);
-            if (kDebugMode) {
-              debugPrint(
-                  '[NoteCardGrid] Admin query - showing Published and Draft notes');
-            }
+        // Notes kollekció szűrései (csak ha betöltjük)
+        if (query != null) {
+          // Státusz szűrés: admin esetén Draft jegyzeteket is mutatunk
+          if (widget.selectedStatus != null &&
+              widget.selectedStatus!.isNotEmpty) {
+            // Ha van kiválasztott státusz, azt használjuk
+            query = query.where('status', isEqualTo: widget.selectedStatus);
           } else {
-            // Nem admin csak Published jegyzeteket lát
-            query = query.where('status', isEqualTo: 'Published');
-            if (kDebugMode) {
-              debugPrint(
-                  '[NoteCardGrid] Non-admin query - showing only Published notes');
+            // Ha nincs kiválasztott státusz, alapértelmezett szűrés
+            if (isAdmin) {
+              // Admin esetén Published és Draft jegyzeteket mutatunk
+              query = query.where('status', whereIn: ['Published', 'Draft']);
+              if (kDebugMode) {
+                debugPrint(
+                    '[NoteCardGrid] Admin query - showing Published and Draft notes');
+              }
+            } else {
+              // Nem admin csak Published jegyzeteket lát
+              query = query.where('status', isEqualTo: 'Published');
+              if (kDebugMode) {
+                debugPrint(
+                    '[NoteCardGrid] Non-admin query - showing only Published notes');
+              }
             }
           }
-        }
-        if (widget.selectedCategory != null &&
-            widget.selectedCategory!.isNotEmpty) {
-          query = query.where('category', isEqualTo: widget.selectedCategory);
-        }
-        // selectedScience szűrő NEM kell, mert már a userScience alapján szűrünk
-        if (widget.selectedTag != null && widget.selectedTag!.isNotEmpty) {
-          query = query.where('tags', arrayContains: widget.selectedTag);
-        }
-        if (widget.selectedType != null && widget.selectedType!.isNotEmpty) {
-          query = query.where('type', isEqualTo: widget.selectedType);
-        }
+          if (widget.selectedCategory != null &&
+              widget.selectedCategory!.isNotEmpty) {
+            query = query.where('category', isEqualTo: widget.selectedCategory);
+          }
+          // selectedScience szűrő NEM kell, mert már a userScience alapján szűrünk
+          if (widget.selectedTag != null && widget.selectedTag!.isNotEmpty) {
+            query = query.where('tags', arrayContains: widget.selectedTag);
+          }
+          if (widget.selectedType != null && widget.selectedType!.isNotEmpty) {
+            query = query.where('type', isEqualTo: widget.selectedType);
+          }
 
-        // Pagination: Add ordering by title (ABC) and limit
-        query = query.orderBy('title').limit(queryLimit);
+          // Pagination: Add ordering by title (ABC) and limit
+          query = query.orderBy('title').limit(queryLimit);
+        }
 
         // Debug: lekérdezés paraméterek
         if (kDebugMode) {
           debugPrint(
-              '[NoteCardGrid] Query params - science: $userScience, status: ${isAdmin ? "Published/Draft" : "Published"}, type: ${widget.selectedType ?? "all"}');
+              '[NoteCardGrid] Query params - science: $userScience, status: ${isAdmin ? "Published/Draft" : "Published"}, type: ${widget.selectedType ?? "all"}, shouldLoadNotes: $shouldLoadNotes');
         }
 
         // Ha nincs típus szűrő, vagy ha a típus szűrő "memoriapalota_allomasok", betöltjük a fő útvonal dokumentumokat
@@ -248,7 +262,8 @@ class _NoteCardGridState extends State<NoteCardGrid> {
         return FutureBuilder<List<QuerySnapshot<Map<String, dynamic>>>>(
           key: ValueKey(compositeFutureKey),
           future: Future.wait([
-            query.get(),
+            // JAVÍTVA: Notes kollekció is feltételesen töltődik
+            if (query != null) query.get() else Future.value(null),
             if (allomasQuery != null)
               allomasQuery.get()
             else
@@ -273,17 +288,19 @@ class _NoteCardGridState extends State<NoteCardGrid> {
             }
 
             final results = snapshots.data!;
-            final snapshot = results[0];
 
-            int idx = 1;
+            // JAVÍTVA: Dinamikus indexelés a shouldLoad* feltételek alapján
+            int idx = 0;
+            final snapshot = shouldLoadNotes ? results[idx++] : null;
             final allomasSnapshot = shouldLoadAllomasok ? results[idx++] : null;
             final dialogusSnapshot = shouldLoadDialogus ? results[idx++] : null;
             final jogesetSnapshot = shouldLoadJogeset ? results[idx++] : null;
 
             // Debug: találatok száma
-            final docs = snapshot.docs;
+            final docs = snapshot?.docs ?? [];
             if (kDebugMode) {
-              debugPrint('[NoteCardGrid] Found ${docs.length} notes');
+              debugPrint(
+                  '[NoteCardGrid] Found ${docs.length} notes (shouldLoadNotes: $shouldLoadNotes)');
             }
             // Debug: típusok listája
             final types = docs
