@@ -300,17 +300,10 @@ class MetadataService {
             final data = doc.data() as Map<String, dynamic>;
             var category = data['category'] as String?;
 
-            // Hibatűrő címke olvasás:
-            // A 'dialogus_fajlok' esetén a tags egy Map (pl. {tartalom: "..."}),
-            // nem List<String>. Ezt kezelni kell, különben elszáll a castolásnál.
             List<String> tags = [];
             final rawTags = data['tags'];
             if (rawTags is List) {
-              tags = List<String>.from(rawTags);
-            } else if (rawTags is Map) {
-              // Ha Map, akkor nem címke, hanem egyéb adat (pl. tartalom),
-              // így itt üres listának tekintjük a szűrés szempontjából.
-              tags = [];
+              tags = rawTags.map((e) => e.toString()).toList();
             }
 
             // Dialogus fájlok speciális kezelése
