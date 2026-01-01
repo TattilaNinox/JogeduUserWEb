@@ -257,6 +257,44 @@ class MetadataService {
     }
   }
 
+  /// Segédfüggvény: Megkeresi a teljes útvonalat egy adott címkéhez a hierarchiában.
+  /// Példa: '4. Az Állam' -> ['Alaptörvény', '4. Az Állam']
+  /// A Filter űrlaphoz szükséges, ahol csak a címke neve ismert, de a navigációhoz full path kell.
+  static Future<List<String>> getFullPathForTag(
+      String science, String category, String tag) async {
+    try {
+      final metadata = await getCategoryTagMapping(science);
+      final hierarchicalCounts =
+          metadata['hierarchicalCounts'] as Map<String, Map<String, int>>?;
+
+      if (hierarchicalCounts == null ||
+          !hierarchicalCounts.containsKey(category)) {
+        return [tag]; // Fallback: feltételezzük, hogy top-level vagy nincs adat
+      }
+
+      final categoryCounts = hierarchicalCounts[category]!;
+
+      // Keressük azt az útvonalat, ami ezzel a címkével végződik
+      // 1. Pontos egyezés (top-level)
+      if (categoryCounts.containsKey(tag)) {
+        return [tag];
+      }
+
+      // 2. Végződésre keresés (nested)
+      final suffix = '/$tag';
+      for (var path in categoryCounts.keys) {
+        if (path.endsWith(suffix)) {
+          return path.split('/');
+        }
+      }
+
+      return [tag]; // Nem találtuk, visszaadjuk magát
+    } catch (e) {
+      debugPrint('⚠️ Error resolving full path for tag $tag: $e');
+      return [tag];
+    }
+  }
+
   /// Skálázható kapcsolatépítés: Aggregált dokumentum olvasása.
   /// A `metadata/jogasz_structure` dokumentum tartalmazza az előre kiszámolt térképet.
   /// Így 1 db olvasás elegendő a több ezer helyett.
@@ -316,8 +354,22 @@ class MetadataService {
           debugPrint('✅ MetadataService: Aggregated Structure loaded ($docId)');
         }
 
+        // Generate catToAllTags by inverting tagToCats
+        // This is needed for the Filter form to show ALL tags for a category, not just top-level ones
+        final catToAllTagsMap = <String, Set<String>>{};
+
+        tagToCatsMap.forEach((tag, categories) {
+          for (final category in categories) {
+            if (!catToAllTagsMap.containsKey(category)) {
+              catToAllTagsMap[category] = {};
+            }
+            catToAllTagsMap[category]!.add(tag);
+          }
+        });
+
         return {
-          'catToTags': catToTagsMap,
+          'catToTags': catToTagsMap, // Only top-level tags (for DrillDown)
+          'catToAllTags': catToAllTagsMap, // All tags (for Filter Form)
           'tagToCats': tagToCatsMap,
           'tagCounts': tagCountsMap,
           'hierarchicalCounts': hierarchicalCountsMap,

@@ -260,7 +260,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
     final mapping = await MetadataService.getCategoryTagMapping(userScience);
     if (mounted) {
       setState(() {
-        _catToTags = mapping['catToTags']!;
+        // Use catToAllTags for filtering in the list (allows seeing nested tags)
+        // Fallback to catToTags if catToAllTags is missing (backward compatibility)
+        _catToTags = (mapping['catToAllTags'] ?? mapping['catToTags'])!;
         _tagToCats = mapping['tagToCats']!;
       });
     }
@@ -380,16 +382,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
         _selectedTag != null &&
         _selectedTag!.isNotEmpty) {
       debugPrint(
-          'SmartNav: Cateogry+Tag -> TagDrillDownScreen ($_selectedCategory, $_selectedTag)');
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TagDrillDownScreen(
-            category: _selectedCategory!,
-            tagPath: [_selectedTag!],
+          'SmartNav: Category+Tag -> Resolving Path for TagDrillDownScreen ($_selectedCategory, $_selectedTag)');
+
+      // Megkeressük a címke teljes útvonalát (pl. '4. Az Állam' -> ['Alaptörvény', '4. Az Állam'])
+      // Ez szükséges, mert a TagDrillDownScreen pontos útvonalat vár a szűréshez
+      final fullPath = await MetadataService.getFullPathForTag(
+          'Jogász', _selectedCategory!, _selectedTag!);
+
+      debugPrint('SmartNav: Path Resolved: $fullPath');
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TagDrillDownScreen(
+              category: _selectedCategory!,
+              tagPath: fullPath,
+            ),
           ),
-        ),
-      );
+        );
+      }
       return;
     }
 
@@ -398,18 +410,24 @@ class _NoteListScreenState extends State<NoteListScreen> {
         _selectedTag != null &&
         _selectedTag!.isNotEmpty) {
       final category = await _findCategoryForTag(_selectedTag!);
-      if (category != null && mounted) {
+      if (category != null) {
         debugPrint(
-            'SmartNav: TagOnly -> Auto-detected category ($category) -> TagDrillDownScreen');
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TagDrillDownScreen(
-              category: category,
-              tagPath: [_selectedTag!],
+            'SmartNav: TagOnly -> Auto-detected category ($category) -> Resolving Path');
+
+        final fullPath = await MetadataService.getFullPathForTag(
+            'Jogász', category, _selectedTag!);
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TagDrillDownScreen(
+                category: category,
+                tagPath: fullPath,
+              ),
             ),
-          ),
-        );
+          );
+        }
         return;
       }
     }
