@@ -186,6 +186,8 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
             dialogusQuery = FirebaseConfig.firestore
                 .collection('dialogus_fajlok')
                 .where('science', isEqualTo: science);
+
+            // FONTOS: Itt sem használunk .orderBy('title')-t a hiányzó mezők miatt
           }
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -260,10 +262,18 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                               if (!isAdmin && status != 'Published') {
                                 continue;
                               }
-                              tagMap
-                                  .putIfAbsent(
-                                      data['category'] ?? 'Egyéb', () => [])
-                                  .add(doc);
+
+                              final tags =
+                                  (data['tags'] as List? ?? []).cast<String>();
+                              if (tags.isNotEmpty) {
+                                tagMap.putIfAbsent(tags[0], () => []).add(doc);
+                              } else {
+                                // Ha nincs címke, akkor az eredeti kategóriát használjuk végső megoldásként
+                                tagMap
+                                    .putIfAbsent(
+                                        data['category'] ?? 'Egyéb', () => [])
+                                    .add(doc);
+                              }
                             }
                           }
 

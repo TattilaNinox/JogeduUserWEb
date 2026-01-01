@@ -224,6 +224,15 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
             dialogusQuery = FirebaseConfig.firestore
                 .collection('dialogus_fajlok')
                 .where('science', isEqualTo: science);
+
+            // Ha van kiválasztott címke-útvonal, szűrjünk rá az utolsó elemmel
+            if (widget.tagPath.isNotEmpty) {
+              dialogusQuery = dialogusQuery.where('tags',
+                  arrayContains: widget.tagPath.last);
+            }
+
+            // FONTOS: Nem használunk .orderBy('title')-t, mert ha hiányzik a mező,
+            // a Firestore nem adja vissza a dokumentumot!
           }
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -382,6 +391,17 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         final effectiveTags = tags;
 
         final matchIndex = _findTagPathIndex(effectiveTags, widget.tagPath);
+
+        // Ha üres a keresési út, minden dialógust mutatunk, ami ide tartozik
+        if (widget.tagPath.isEmpty) {
+          if (tags.isNotEmpty) {
+            _addToHierarchy(hierarchy, tags[0], doc, tags.length > 1);
+          } else {
+            direct.add(doc);
+          }
+          continue;
+        }
+
         if (matchIndex == -1) continue;
 
         final effectiveDepth = matchIndex + widget.tagPath.length;
