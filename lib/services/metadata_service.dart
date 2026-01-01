@@ -210,6 +210,53 @@ class MetadataService {
     }, SetOptions(merge: true));
   }
 
+  /// Segédfüggvény: Visszaadja a közvetlen alcímkéket egy adott útvonalhoz.
+  /// Csak a memóriából dolgozik (getCategoryTagMapping), 0 Firestore olvasás.
+  static Future<List<String>> getSubTagsForPath(
+      String science, String category, List<String> currentPath) async {
+    try {
+      final metadata = await getCategoryTagMapping(science);
+
+      // Ha nincs path, akkor a kategória közvetlen címkéit adjuk vissza
+      if (currentPath.isEmpty) {
+        final catToTags =
+            metadata['catToTags'] as Map<String, Set<String>>? ?? {};
+        return catToTags[category]?.toList() ?? [];
+      }
+
+      // Hierarchikus keresés
+      final hierarchicalCounts =
+          metadata['hierarchicalCounts'] as Map<String, Map<String, int>>?;
+      if (hierarchicalCounts == null ||
+          !hierarchicalCounts.containsKey(category)) {
+        return [];
+      }
+
+      final categoryCounts = hierarchicalCounts[category]!;
+      final pathPrefix = '${currentPath.join('/')}/';
+      final subTags = <String>{};
+
+      for (var path in categoryCounts.keys) {
+        if (path.startsWith(pathPrefix)) {
+          // Levágjuk a prefixet: 'Alaptörvény/1. Cikk/...' -> '1. Cikk/...'
+          final remaining = path.substring(pathPrefix.length);
+          // Vesszük az első szegmenst (a közvetlen gyermeket)
+          final parts = remaining.split('/');
+          if (parts.isNotEmpty && parts[0].isNotEmpty) {
+            subTags.add(parts[0]);
+          }
+        }
+      }
+
+      return subTags.toList()..sort();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ Error getting subtags: $e');
+      }
+      return [];
+    }
+  }
+
   /// Skálázható kapcsolatépítés: Aggregált dokumentum olvasása.
   /// A `metadata/jogasz_structure` dokumentum tartalmazza az előre kiszámolt térképet.
   /// Így 1 db olvasás elegendő a több ezer helyett.

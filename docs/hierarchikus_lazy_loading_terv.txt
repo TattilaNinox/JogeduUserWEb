@@ -1,0 +1,43 @@
+# HIERARCHIKUS LAZY LOADING TERV
+# Egyeztetett 2026-01-01
+
+## A CÉL
+Címke szinteken NEM töltődnek be a jegyzetek.
+Csak a címke kártyák jelennek meg (count metadata-ból).
+Jegyzetek CSAK a legalsó szinten töltődnek be (ahol nincs alcímke).
+
+## MŰKÖDÉS
+
+1. Kategória szint (pl. Alkotmányjog)
+   ├── Címke nélküli jegyzetek → BETÖLTŐDNEK
+   ├── 🏷️ Alaptörvény (40) → CSAK COUNT (metadata-ból)
+   └── 🏷️ Jogeset (2) → CSAK COUNT (metadata-ból)
+
+2. Címke szint (Alaptörvény rákattintása után)
+   ├── Alcímke nélküli jegyzetek → BETÖLTŐDNEK
+   ├── 🏷️ 4. Az Állam (14) → CSAK COUNT (metadata-ból)
+   └── 🏷️ 7. Memóriaútvonal (19) → CSAK COUNT (metadata-ból)
+
+3. Legalsó szint (4. Az Állam, nincs több alcímke)
+   └── MINDEN jegyzet betöltődik
+
+## MEGLÉVŐ INDEXEK HASZNÁLATA
+
+A lekérdezések NEM változnak, csak OPCIONÁLISAK lesznek:
+- Ha vannak alcímkék → NEM futtatjuk a lekérdezést (0 Firestore)
+- Ha nincsenek alcímkék → Futtatjuk (meglévő indexek)
+
+## IMPLEMENTÁCIÓ
+
+1. MetadataService.getSubTagsForPath() - megvan
+2. TagDrillDownScreen módosítása:
+   - Először: getSubTagsForPath() hívás
+   - Ha subTags.isNotEmpty → címke kártyák mutatása
+   - Ha subTags.isEmpty → jegyzet lekérdezés (meglévő logika)
+
+## KRITIKUS SZABÁLYOK
+
+1. A meglévő lekérdezéseket NEM módosítjuk
+2. A meglévő indexeket használjuk
+3. where() → orderBy() → limit() sorrend
+4. Új indexet NEM kérünk
