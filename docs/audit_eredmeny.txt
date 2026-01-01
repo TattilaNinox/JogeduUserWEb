@@ -1,0 +1,69 @@
+JOGEDU USER WEB - RÉSZLETES TECHNIKAI AUDIT
+Dátum: 2026.01.01.
+
+1. VEZETŐI ÖSSZEFOGLALÓ
+--------------------------------------------------------------------------------
+A webalkalmazás alapvető architektúrája modern (Flutter Web + Firebase), és számos helyen tartalmaz költség-optimalizációs megoldásokat (pl. főoldali lapozás, statikus verziókövetés).
+
+AZONBAN azonosítottunk egy kritikus skálázódási pontot a "Címke böngésző" (TagDrillDownScreen) felületen, amely 7000 felhasználó esetén jelentős költségnövekedést és teljesítményromlást okozhat. A fő listanézet (NoteCardGrid) jól van optimalizálva.
+
+2. RÉSZLETES ELEMZÉS
+--------------------------------------------------------------------------------
+
+A) ADATKEZELÉS ÉS SKÁLÁZHATÓSÁG (1200 dokumentum / 7000 felhasználó)
+
+✅ POZITÍVUMOK:
+1. Főoldali lista (NoteCardGrid):
+   - Helyesen használ "Pagination"-t (lapozást), alapértelmezetten 50-es limittel.
+   - Nem tölti le mind az 1200 jegyzetet indításkor.
+   - `.get()` metódust használ `.snapshots()` helyett, ami jelentősen csökkenti a Firebase olvasási költségeket (nem tart fenn élő kapcsolatot).
+   - "Lazy loading" (lusta betöltés) elv érvényesül.
+
+2. Verziókezelés (VersionCheckService):
+   - A rendszeres (5 perces) ellenőrzés egy statikus JSON fájlt hív le, nem adatbázis olvasást generál. Ez kiváló, költséghatékony megoldás.
+
+⚠️ KOCKÁZATOK:
+1. Címke böngésző (TagDrillDownScreen) - KRITIKUS PONT:
+   - Ez a képernyő jelenleg `.snapshots()`-t használ, ami valós idejű kapcsolatot nyit. 7000 felhasználónál ez 7000 nyitott socket kapcsolatot jelenthet.
+   - A lekérdezési limit 300 elemre van állítva, de a szűrés "kliens oldalon" történik. Ez azt jelenti, hogy letölt a rendszer akár 300 adatlapot, majd a Dart kód dönti el, hogy megmutassa-e. Ez felesleges adatforgalmat és adatbázis-olvasási költséget generál.
+   - Párhuzamosan indít 4 különböző lekérdezést (jegyzetek, jogesetek, memóriapalota, dialógusok), ami megszorozza a terhelést.
+
+2. Memória Cache (NoteSessionCache):
+   - A cache a böngésző memóriájában tárolja a letöltött jegyzeteket. Ha egy felhasználó végigkattintgat sok kategóriát, a memória megtelhet, ami lassulást okozhat a böngészőben (főleg régebbi mobilokon). Nincs benne "ürítési" mechanizmus (pl. LRU cache).
+
+B) MÉDIA ÉS SÁVSZÉLESSÉG (Audio/Video)
+
+⚠️ KOCKÁZATOK:
+1. Audio Streaming (MiniAudioPlayer):
+   - A lejátszó közvetlen URL-ről (`UrlSource`) játszik. Bár a böngészők cache-elnek, nincs explicit helyi gyorsítótárazás implementálva az appban.
+   - Ha a 7000 felhasználó ugyanazt a nagy hangfájlt hallgatja, az jelentős kimenő adatforgalmat (Egress) generál a Firebase Storage-on, ami költséges lehet.
+
+C) TELJESÍTMÉNY
+
+- A "State Management" (Provider) használata megfelelő, nem találtunk nyilvánvaló "rebuild" problémákat, amelyek lassítanák az UI-t.
+- Az alkalmazás indulási sebessége jónak ígérkezik a főoldali optimalizációk miatt.
+
+3. KÖLTSÉGBECSLÉS ÉS KOCKÁZATOK
+--------------------------------------------------------------------------------
+
+A legnagyobb költségkockázat a Firestore "Read" (olvasás) műveletek száma.
+
+- Forgatókönyv: 7000 felhasználó naponta 10-szer megnyit egy kategóriát a "TagDrillDownScreen"-en.
+- Jelenlegi működés: 7000 * 10 * 300 (limit) = 21,000,000 olvasás / nap (szélsőséges esetben).
+- Ez havi szinten több száz dolláros költséget is jelenthet csak erre az egy funkcióra, ha nincs optimalizálva.
+
+4. JAVASLATOK (PRIORITÁSI SORRENDBEN)
+--------------------------------------------------------------------------------
+
+1. 🔴 KRITIKUS (Azonnal javítandó):
+   - A `TagDrillDownScreen`-ben cserélje le a `.snapshots()` (élő) figyelést `.get()` (egyszeri) lekérdezésre, ahogy a főoldalon is van.
+   - A kliens oldali szűrés helyett próbálja meg az adatbázis query-t pontosítani, vagy csökkenteni a limitet (pl. 50-re) és "Load More" gombot használni itt is.
+
+2. 🟡 FONTOS (Költségcsökkentés):
+   - Ellenőrizze a Firebase Storage beállításait (Cache-Control headerek), hogy a böngészők minél hosszabb ideig tárolják az audio fájlokat, csökkentve az újraletöltést.
+
+3. 🟢 AJÁNLOTT (Stabilitás):
+   - A `NoteSessionCache`-be építsen be egy limitet (pl. max 100 elem), hogy ne fogyassza el a böngésző memóriáját hosszú használat alatt.
+
+ÖSSZEGZÉS:
+Az alkalmazás "gerince" stabil és jól skálázható. A főoldal (NoteCardGrid) kiválóan van megírva. A "Címke böngésző" (TagDrillDownScreen) az egyetlen komoly gyenge pont, amit javítva az alkalmazás biztonsággal kiszolgálhatja a 7000 felhasználót.

@@ -1,0 +1,47 @@
+AUDIT JAVÍTÁSI TERV - VÉGLEGES (v3)
+Dátum: 2026.01.01.
+
+1. CÉL
+--------------------------------------------------------------------------------
+A "TagDrillDownScreen" (Címke böngésző) átalakítása, hogy a `parentTag` mező kihasználásával hatékony, szerver oldali szűrést és skálázható működést biztosítson 7000+ felhasználó számára.
+
+2. PROBLÉMA
+--------------------------------------------------------------------------------
+A korábbi rendszer kliens oldalon szűrte a dokumentumokat, ami felesleges adatletöltést és magas Firestore olvasási költségeket eredményezett. A valós idejű figyelés (.snapshots) pedig feleslegesen terhelte a szervert.
+
+3. MEGOLDÁS: `parentTag` ALAPÚ OPTIMALIZÁCIÓ
+--------------------------------------------------------------------------------
+
+A) Adatbázis Változás (Admin oldalon kezelve)
+   - Minden dokumentum kap egy `parentTag` mezőt, ami a hierarchiában közvetlenül felette lévő mappa nevét tartalmazza.
+   - Ez lehetővé teszi a pontos lekérdezést: "Add azokat a dokumentumokat, amiknek a szülője X".
+
+B) Technikai Implementáció
+   1. StreamBuilder -> FutureBuilder váltás:
+      - Megszünteti a folyamatos élő kapcsolatot.
+      - Egyszeri lekérdezés (.get()) minden lapozásnál.
+
+   2. Szerver oldali szűrés és rendezés:
+      - Query: `.where('parentTag', isEqualTo: currentCategory)`
+      - Rendezés: `.orderBy('title')` (vagy releváns mező).
+      - Eredmény: Csak a releváns adatokat töltjük le, ABC sorrendben.
+
+   3. Infinite Scroll (Végtelen Gördítés):
+      - Limit: 50 elem / lekérdezés (költségoptimalizálás).
+      - Automatikus betöltés: Amikor a felhasználó a lista aljára ér, a rendszer betölti a következő 50 elemet.
+      - Nincs "Load More" gomb, a folyamat transzparens.
+
+   4. Pull-to-Refresh:
+      - A lista tetejét lehúzva a felhasználó frissítheti az adatokat.
+
+4. VÁRHATÓ EREDMÉNYEK
+--------------------------------------------------------------------------------
+- Költségcsökkentés: Csak a megjelenített adatokat olvassuk.
+- Sebesség: Gyorsabb betöltés a kisebb (50-es) adagok miatt.
+- Skálázhatóság: A rendszer stabil marad több ezer felhasználó esetén is.
+
+5. VERIFIKÁCIÓ
+--------------------------------------------------------------------------------
+- Ellenőrizni, hogy a hálózati forgalomban csak 50 elem érkezik-e.
+- Ellenőrizni, hogy görgetéskor betöltődnek-e az új elemek.
+- Ellenőrizni a memóriahasználatot hosszú böngészés után.

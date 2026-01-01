@@ -1,0 +1,33 @@
+AUDIT JAVÍTÁSI TERV - TagDrillDownScreen
+Dátum: 2026.01.01.
+
+CÉL
+A "TagDrillDownScreen" (Címke böngésző) kritikus skálázhatósági problémáinak javítása, amelyeket a technikai audit tárt fel. A legfontosabb cél a Firestore költségek és a szerver terhelés csökkentése.
+
+PROBLÉMA (AZ AUDIT ALAPJÁN)
+A jelenlegi rendszer valós idejű figyelést (.snapshots) használ, ami 7000 felhasználónál 7000 nyitott kapcsolatot jelent. Emellett 300 elemes limittel dolgozik és kliens oldalon szűr, ami felesleges adatforgalmat generál.
+
+TERVEZETT VÁLTOZTATÁSOK
+
+1. Valós idejű kapcsolat megszüntetése
+   - A `StreamBuilder` (.snapshots) helyett `FutureBuilder` (.get) használata.
+   - Ez azt jelenti, hogy az alkalmazás egyszer letölti az adatokat, és utána bontja a kapcsolatot. Nem figyeli folyamatosan a változásokat (tehát ha valaki más feltölt egy jegyzetet, az nem jelenik meg azonnal, csak frissítés után).
+
+2. Lapozás (Pagination) és Infinite Scroll
+   - A lekérdezési limitet csökkentjük 300-ról 50-re.
+   - "Infinite Scroll" (Végtelen gördítés) bevezetése: Amikor a felhasználó a lista aljára ér, a rendszer automatikusan betölti a következő 50 elemet. Így nem kell "Töltés még" gombot nyomkodni.
+   - Kliens oldali (további) szűrés esetén a rendszer rekurzívan tölti be az adatokat, amíg össze nem gyűlik egy képernyőnyi tartalom.
+
+3. Manuális Frissítés
+   - Beépítünk egy "Pull-to-Refresh" funkciót (a lista lehúzásával frissíthető a tartalom).
+
+VÁRHATÓ EREDMÉNY
+- Drasztikusan csökkenő Firestore "Read" költségek.
+- Stabilabb működés nagy terhelés (7000 user) mellett is.
+- A böngésző memóriájának kímélése (kisebb adagok betöltése miatt).
+
+VERIFIKÁCIÓS LÉPÉSEK
+1. Network fül ellenőrzése: Csak egyszeri kérések menjenek ki.
+2. Teljesítmény teszt: A mappák megnyitása legyen gyors.
+3. Lapozás teszt: Görgetésre töltse be az új elemeket.
+4. Frissítés teszt: Lehúzásra frissüljön a lista.

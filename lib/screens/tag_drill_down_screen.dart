@@ -29,16 +29,17 @@ class TagDrillDownScreen extends StatefulWidget {
 class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   bool _hasPremiumAccess = false;
   bool _isAdmin = false;
-  
+
   // Infinite scroll és pagination állapot változók
   static const int _pageSize = 50;
   int _currentLimit = _pageSize;
   bool _isLoadingMore = false;
   bool _hasMore = true;
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _allLoadedDocs = [];
-  Map<String, DocumentSnapshot?> _lastDocuments = {}; // Kollekciónként az utolsó dokumentum
+  Map<String, DocumentSnapshot?> _lastDocuments =
+      {}; // Kollekciónként az utolsó dokumentum
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _documentsFuture;
-  
+
   final ScrollController _breadcrumbScrollController = ScrollController();
   final ScrollController _scrollController = ScrollController();
 
@@ -78,9 +79,9 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   void _onScroll() {
-    if (_scrollController.position.pixels >= 
+    if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.9) {
       if (!_isLoadingMore && _hasMore) {
         _loadMoreDocuments();
@@ -112,7 +113,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
       final isAdminBool = userData['isAdmin'] == true;
       final isAdmin = userType == 'admin' || isAdminEmail || isAdminBool;
-      
+
       setState(() {
         _isAdmin = isAdmin;
         if (isAdmin) {
@@ -164,42 +165,55 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         ? const ['Published', 'Public', 'Draft']
         : const ['Published', 'Public'];
 
-    // 1. Notes kollekció
-    try {
-      Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
-          .collection('notes')
-          .where('science', isEqualTo: science)
-          .where('category', isEqualTo: widget.category)
-          .where('status', whereIn: statusFilter)
-          .orderBy('title')
-          .limit(_currentLimit);
+    // FONTOS: Kontextus alapú kollekció szűrés
+    // Ha a tagPath-ban van "Memóriaútvonal" (bármilyen számozással), akkor csak memoriapalota_allomasok-ot töltünk
+    // Ha a tagPath-ban van "Dialogus" vagy a kategória "Dialogus tags", akkor csak dialogus_fajlok-ot töltünk
+    // Egyébként csak notes-t töltünk (a jogesetek mindig betöltődnek)
+    final bool isMemoriaContext = widget.tagPath.any((tag) =>
+        tag.toLowerCase().contains('memóriaútvonal') ||
+        tag.toLowerCase().contains('memoriaútvonal') ||
+        tag.toLowerCase().contains('memoriautvonal'));
 
-      if (parentTag != null) {
-        notesQuery = notesQuery.where('parentTag', isEqualTo: parentTag);
-      } else {
-        // Ha üres a tagPath, akkor a parentTag null vagy üres string lehet
-        notesQuery = notesQuery.where('parentTag', isNull: true);
-      }
+    // 1. Notes kollekció - CSAK ha NEM memória kontextusban vagyunk
+    if (!isMemoriaContext) {
+      try {
+        Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
+            .collection('notes')
+            .where('science', isEqualTo: science)
+            .where('category', isEqualTo: widget.category)
+            .where('status', whereIn: statusFilter);
 
-      // Pagination: ha van lastDocument, használjuk startAfter-t
-      if (_lastDocuments['notes'] != null && !refresh) {
-        notesQuery = notesQuery.startAfterDocument(_lastDocuments['notes']!);
-      }
+        // FONTOS: parentTag szűrőt az orderBy ELŐTT kell hozzáadni!
+        if (parentTag != null) {
+          notesQuery = notesQuery.where('parentTag', isEqualTo: parentTag);
+        } else {
+          // Ha üres a tagPath, akkor a parentTag null vagy üres string lehet
+          notesQuery = notesQuery.where('parentTag', isNull: true);
+        }
 
-      final notesSnapshot = await notesQuery.get();
-      final notesDocs = notesSnapshot.docs
-          .where((d) => d.data()['deletedAt'] == null)
-          .toList();
-      allDocs.addAll(notesDocs);
+        // orderBy és limit a végén
+        notesQuery = notesQuery.orderBy('title').limit(_currentLimit);
 
-      if (notesSnapshot.docs.length < _currentLimit) {
-        _lastDocuments['notes'] = null; // Nincs több adat
-      } else if (notesDocs.isNotEmpty) {
-        _lastDocuments['notes'] = notesDocs.last;
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading notes: $e');
+        // Pagination: ha van lastDocument, használjuk startAfter-t
+        if (_lastDocuments['notes'] != null && !refresh) {
+          notesQuery = notesQuery.startAfterDocument(_lastDocuments['notes']!);
+        }
+
+        final notesSnapshot = await notesQuery.get();
+        final notesDocs = notesSnapshot.docs
+            .where((d) => d.data()['deletedAt'] == null)
+            .toList();
+        allDocs.addAll(notesDocs);
+
+        if (notesSnapshot.docs.length < _currentLimit) {
+          _lastDocuments['notes'] = null; // Nincs több adat
+        } else if (notesDocs.isNotEmpty) {
+          _lastDocuments['notes'] = notesDocs.last;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error loading notes: $e');
+        }
       }
     }
 
@@ -209,15 +223,18 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
           .collection('jogesetek')
           .where('science', isEqualTo: science)
           .where('category', isEqualTo: widget.category)
-          .where('status', whereIn: statusFilter)
-          .orderBy(FieldPath.documentId)
-          .limit(_currentLimit);
+          .where('status', whereIn: statusFilter);
 
+      // FONTOS: parentTag szűrőt az orderBy ELŐTT kell hozzáadni!
       if (parentTag != null) {
         jogesetQuery = jogesetQuery.where('parentTag', isEqualTo: parentTag);
       } else {
         jogesetQuery = jogesetQuery.where('parentTag', isNull: true);
       }
+
+      // orderBy és limit a végén
+      jogesetQuery =
+          jogesetQuery.orderBy(FieldPath.documentId).limit(_currentLimit);
 
       if (_lastDocuments['jogesetek'] != null && !refresh) {
         jogesetQuery =
@@ -241,41 +258,45 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       }
     }
 
-    // 3. Memoriapalota állomások kollekció
-    try {
-      Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
-          .collection('memoriapalota_allomasok')
-          .where('science', isEqualTo: science)
-          .where('category', isEqualTo: widget.category)
-          .where('status', whereIn: statusFilter)
-          .orderBy('title')
-          .limit(_currentLimit);
+    // 3. Memoriapalota állomások kollekció - CSAK ha memória kontextusban vagyunk
+    if (isMemoriaContext) {
+      try {
+        Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
+            .collection('memoriapalota_allomasok')
+            .where('science', isEqualTo: science)
+            .where('category', isEqualTo: widget.category)
+            .where('status', whereIn: statusFilter);
 
-      if (parentTag != null) {
-        allomasQuery = allomasQuery.where('parentTag', isEqualTo: parentTag);
-      } else {
-        allomasQuery = allomasQuery.where('parentTag', isNull: true);
-      }
+        // FONTOS: parentTag szűrőt az orderBy ELŐTT kell hozzáadni!
+        if (parentTag != null) {
+          allomasQuery = allomasQuery.where('parentTag', isEqualTo: parentTag);
+        } else {
+          allomasQuery = allomasQuery.where('parentTag', isNull: true);
+        }
 
-      if (_lastDocuments['memoriapalota_allomasok'] != null && !refresh) {
-        allomasQuery =
-            allomasQuery.startAfterDocument(_lastDocuments['memoriapalota_allomasok']!);
-      }
+        // orderBy és limit a végén
+        allomasQuery = allomasQuery.orderBy('title').limit(_currentLimit);
 
-      final allomasSnapshot = await allomasQuery.get();
-      final allomasDocs = allomasSnapshot.docs
-          .where((d) => d.data()['deletedAt'] == null)
-          .toList();
-      allDocs.addAll(allomasDocs);
+        if (_lastDocuments['memoriapalota_allomasok'] != null && !refresh) {
+          allomasQuery = allomasQuery
+              .startAfterDocument(_lastDocuments['memoriapalota_allomasok']!);
+        }
 
-      if (allomasSnapshot.docs.length < _currentLimit) {
-        _lastDocuments['memoriapalota_allomasok'] = null;
-      } else if (allomasDocs.isNotEmpty) {
-        _lastDocuments['memoriapalota_allomasok'] = allomasDocs.last;
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading memoriapalota_allomasok: $e');
+        final allomasSnapshot = await allomasQuery.get();
+        final allomasDocs = allomasSnapshot.docs
+            .where((d) => d.data()['deletedAt'] == null)
+            .toList();
+        allDocs.addAll(allomasDocs);
+
+        if (allomasSnapshot.docs.length < _currentLimit) {
+          _lastDocuments['memoriapalota_allomasok'] = null;
+        } else if (allomasDocs.isNotEmpty) {
+          _lastDocuments['memoriapalota_allomasok'] = allomasDocs.last;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error loading memoriapalota_allomasok: $e');
+        }
       }
     }
 
@@ -285,19 +306,22 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         Query<Map<String, dynamic>> dialogusQuery = FirebaseConfig.firestore
             .collection('dialogus_fajlok')
             .where('science', isEqualTo: science)
-            .where('status', whereIn: statusFilter)
-            .orderBy('title')
-            .limit(_currentLimit);
+            .where('status', whereIn: statusFilter);
 
+        // FONTOS: parentTag szűrőt az orderBy ELŐTT kell hozzáadni!
         if (parentTag != null) {
-          dialogusQuery = dialogusQuery.where('parentTag', isEqualTo: parentTag);
+          dialogusQuery =
+              dialogusQuery.where('parentTag', isEqualTo: parentTag);
         } else {
           dialogusQuery = dialogusQuery.where('parentTag', isNull: true);
         }
 
+        // orderBy és limit a végén
+        dialogusQuery = dialogusQuery.orderBy('title').limit(_currentLimit);
+
         if (_lastDocuments['dialogus_fajlok'] != null && !refresh) {
-          dialogusQuery =
-              dialogusQuery.startAfterDocument(_lastDocuments['dialogus_fajlok']!);
+          dialogusQuery = dialogusQuery
+              .startAfterDocument(_lastDocuments['dialogus_fajlok']!);
         }
 
         final dialogusSnapshot = await dialogusQuery.get();
@@ -322,10 +346,10 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     allDocs.sort((a, b) {
       final dataA = a.data();
       final dataB = b.data();
-      final titleA = (dataA['title'] ?? dataA['name'] ?? dataA['cim'] ?? '')
-          .toString();
-      final titleB = (dataB['title'] ?? dataB['name'] ?? dataB['cim'] ?? '')
-          .toString();
+      final titleA =
+          (dataA['title'] ?? dataA['name'] ?? dataA['cim'] ?? '').toString();
+      final titleB =
+          (dataB['title'] ?? dataB['name'] ?? dataB['cim'] ?? '').toString();
       return StringUtils.naturalCompare(titleA, titleB);
     });
 
@@ -344,7 +368,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         : false;
 
     setState(() {
-      _hasMore = hasMoreNotes || hasMoreJogeset || hasMoreAllomas || hasMoreDialogus;
+      _hasMore =
+          hasMoreNotes || hasMoreJogeset || hasMoreAllomas || hasMoreDialogus;
       _isLoadingMore = false;
     });
 
@@ -422,7 +447,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: Text(widget.tagPath.isEmpty ? widget.category : widget.tagPath.last),
+        title: Text(
+            widget.tagPath.isEmpty ? widget.category : widget.tagPath.last),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
@@ -442,7 +468,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               subTagsSnapshot.connectionState == ConnectionState.waiting;
 
           // Dokumentumok betöltése FutureBuilder-rel
-          return FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+          return FutureBuilder<
+              List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
             future: _documentsFuture,
             builder: (context, docsSnapshot) {
               if (docsSnapshot.connectionState == ConnectionState.waiting &&
@@ -458,11 +485,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                 final tag = subTags[i];
                 final colorIndex = i % _folderColors.length;
                 widgetsList.add(_buildFolderWidget(
-                    tag,
-                    {
-                      'docs': [],
-                      'hasChildren': true
-                    },
+                    tag, {'docs': [], 'hasChildren': true},
                     bgColor: _folderColors[colorIndex],
                     iconColor: _folderIconColors[colorIndex]));
               }
@@ -514,7 +537,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 return const Center(
-                    child: Text('Nincs megjeleníthető tartalom ezen a szinten.'));
+                    child:
+                        Text('Nincs megjeleníthető tartalom ezen a szinten.'));
               }
 
               // Összesítés
@@ -533,8 +557,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     children: [
-                      if (isLoadingFolders)
-                        const LinearProgressIndicator(),
+                      if (isLoadingFolders) const LinearProgressIndicator(),
                       ...widgetsList,
                       Padding(
                         padding: const EdgeInsets.all(24.0),
@@ -556,7 +579,6 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       ),
     );
   }
-
 
   Widget _buildNoteWidget(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
