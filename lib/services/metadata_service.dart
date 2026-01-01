@@ -26,16 +26,14 @@ class MetadataService {
         final categories = rawCatToTags.keys.toList()..sort();
         final tags = rawTagToCats.keys.toList()..sort();
 
-        if (categories.isNotEmpty || tags.isNotEmpty) {
-          if (kDebugMode) {
-            debugPrint(
-                '✅ MetadataService: Loaded from Aggregated Structure ($structDocId). Cats: ${categories.length}, Tags: ${tags.length}');
-          }
-          return {
-            'categories': categories,
-            'tags': tags,
-          };
+        if (kDebugMode) {
+          debugPrint(
+              '✅ MetadataService: Loaded from Aggregated Structure ($structDocId). Cats: ${categories.length}, Tags: ${tags.length}');
         }
+        return {
+          'categories': categories,
+          'tags': tags,
+        };
       }
     } catch (e) {
       debugPrint('⚠️ MetadataService: Structure load failed: $e');

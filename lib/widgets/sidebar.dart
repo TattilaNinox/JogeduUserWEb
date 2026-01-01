@@ -164,8 +164,16 @@ class Sidebar extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                   content: Text(
-                                      'Siker! $count jegyzet feldolgozva.')),
+                                      'Siker! $count jegyzet feldolgozva. Oldal újratöltése...')),
                             );
+                            // Rövid várakozás, hogy a snackbar látszódjon, majd újrahívjuk a navigációt
+                            Future.delayed(const Duration(seconds: 1), () {
+                              if (context.mounted) {
+                                // A go_router-rel az aktuális útvonalra navigálunk kényszerített frissítéssel
+                                context.go(
+                                    GoRouterState.of(context).uri.toString());
+                              }
+                            });
                           }
                         } catch (e) {
                           if (context.mounted) {
