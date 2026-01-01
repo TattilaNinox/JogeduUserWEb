@@ -421,21 +421,19 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     return hierarchy;
   }
 
-  /// Megkeresi a tagPathv sorrendet a dokumentum saját tags listájában.
-  /// Visszatér a találat kezdetének indexével, vagy -1-gyel.
+  /// Megkeresi a tagPath sorrendet a dokumentum saját tags listájában.
+  /// JAVÍTVA: Csak a tags elejétől (0. pozíciótól) egyeztet!
+  /// Visszatér 0-val ha egyezik, vagy -1-gyel ha nem.
   int _findTagPathIndex(List<String> tags, List<String> path) {
     if (path.isEmpty) return 0;
-    for (int i = 0; i <= tags.length - path.length; i++) {
-      bool match = true;
-      for (int j = 0; j < path.length; j++) {
-        if (tags[i + j] != path[j]) {
-          match = false;
-          break;
-        }
+    // Ellenőrizzük, hogy a path PONTOSAN megegyezik a tags elejével
+    if (tags.length < path.length) return -1;
+    for (int j = 0; j < path.length; j++) {
+      if (tags[j] != path[j]) {
+        return -1;
       }
-      if (match) return i;
     }
-    return -1;
+    return 0;
   }
 
   void _addToHierarchy(Map<String, dynamic> hierarchy, String tag,

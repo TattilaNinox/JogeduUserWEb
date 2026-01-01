@@ -352,6 +352,10 @@ class MetadataService {
               // Így a CategoryTagsScreen csak az első szintű címkéket jeleníti meg
               if (tags.isNotEmpty) {
                 catToTags[category]!.add(tags[0]);
+                if (kDebugMode && category == 'Alkotmányjog') {
+                  debugPrint(
+                      '📌 catToTags["Alkotmányjog"].add("${tags[0]}") - teljes tags: $tags');
+                }
               }
 
               // Tag counts inicializálása kategóriánként

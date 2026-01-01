@@ -34,8 +34,10 @@ class NoteCardGrid extends StatefulWidget {
 
 class _NoteCardGridState extends State<NoteCardGrid> {
   // Pagination state variables
-  // FIX: Megemelt limit, hogy minden dokumentum betöltődjön egyszerre, gomb nélkül
-  final int _currentLimit = 1000;
+  // OPTIMALIZÁLVA: Limit csökkentése 1000-ről 50-re a költségek drasztikus csökkentéséhez
+  int _currentLimit = 50;
+  static const int _loadMoreIncrement = 50;
+  static const int _maxLimit = 500; // Maximális limit biztonsági korlátként
 
   final _authService = AuthService();
 
@@ -65,7 +67,9 @@ class _NoteCardGridState extends State<NoteCardGrid> {
 
         // Keresés állapotának meghatározása
         final bool isSearching = widget.searchText.trim().isNotEmpty;
-        final int queryLimit = isSearching ? 1000 : _currentLimit + 1;
+        // JAVÍTVA: A keresés is a már betöltött jegyzeteken fut,
+        // nem tölt be extra dokumentumokat (költségoptimalizálás)
+        final int queryLimit = _currentLimit + 1;
 
         // FREEMIUM MODEL: Minden jegyzet látszik, de a zártak nem nyithatók meg
         // Nem szűrünk isFree alapján, hogy a prémium jegyzetek is látszódjanak
@@ -531,6 +535,9 @@ class _NoteCardGridState extends State<NoteCardGrid> {
               sortDocs(tags);
             });
 
+            // Van-e több dokumentum, mint a jelenlegi limit?
+            final bool hasMore = docsResult.length > _currentLimit;
+
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
               children: [
@@ -547,11 +554,39 @@ class _NoteCardGridState extends State<NoteCardGrid> {
                     hasPremiumAccess: hasPremiumAccess,
                   );
                 }),
+                // "Több betöltése" gomb, ha van még dokumentum
+                if (hasMore && _currentLimit < _maxLimit)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _currentLimit = (_currentLimit + _loadMoreIncrement)
+                                .clamp(0, _maxLimit);
+                          });
+                        },
+                        icon: const Icon(Icons.expand_more),
+                        label: Text(
+                          'Több betöltése (${docsResult.length - _currentLimit}+ további)',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3366CC),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Center(
                     child: Text(
-                      'Összesen: $totalCount dokumentum',
+                      hasMore
+                          ? 'Megjelenítve: $totalCount / ${docsResult.length}+ dokumentum'
+                          : 'Összesen: $totalCount dokumentum',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.grey,
