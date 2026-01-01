@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
 import '../widgets/note_list_tile.dart';
 import '../utils/string_utils.dart';
+import '../services/metadata_service.dart';
+import '../services/note_session_cache.dart';
 import 'tag_drill_down_screen.dart';
 
 /// Kategória címkék képernyő - megjeleníti egy kategória 0-s indexű címkéit és a címke nélküli elemeket.
@@ -24,8 +26,6 @@ class CategoryTagsScreen extends StatefulWidget {
 
 class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
   bool _hasPremiumAccess = false;
-  // FIX: Megemelt limit, hogy minden dokumentum betöltődjön egyszerre, gomb nélkül
-  final int _currentLimit = 1000;
 
   @override
   void initState() {
@@ -113,285 +113,324 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           ),
         ),
       ),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .snapshots(),
-        builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData) {
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _loadCategoryData(user.uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = userSnapshot.data?.data() ?? {};
-          final userType =
-              (userData['userType'] as String? ?? '').toLowerCase();
-          final isAdminEmail = user.email == 'tattila.ninox@gmail.com';
-          final isAdminBool = userData['isAdmin'] == true;
-          final bool isAdmin =
-              userType == 'admin' || isAdminEmail || isAdminBool;
-          const String science = 'Jogász';
-
-          // Lekérdezések építése
-          Query<Map<String, dynamic>> notesQuery = FirebaseConfig.firestore
-              .collection('notes')
-              .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category)
-              .orderBy('title')
-              .limit(_currentLimit + 1);
-
-          if (isAdmin) {
-            notesQuery = notesQuery.where('status',
-                whereIn: const ['Published', 'Public', 'Draft']);
-          } else {
-            notesQuery = notesQuery
-                .where('status', whereIn: const ['Published', 'Public']);
+          if (snapshot.hasError) {
+            return Center(child: Text('Hiba: ${snapshot.error}'));
           }
 
-          // Jogesetek: Restore science and category filters
-          debugPrint(
-              '🔵 Jogesetek query - science: $science, category: ${widget.category}');
-          Query<Map<String, dynamic>> jogesetQuery = FirebaseConfig.firestore
-              .collection('jogesetek')
-              .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category)
-              .orderBy(FieldPath.documentId)
-              .limit(_currentLimit + 1);
-
-          if (isAdmin) {
-            jogesetQuery = jogesetQuery.where('status',
-                whereIn: const ['Published', 'Public', 'Draft']);
-          } else {
-            jogesetQuery = jogesetQuery
-                .where('status', whereIn: const ['Published', 'Public']);
+          if (!snapshot.hasData) {
+            return const Center(child: Text('Nincs adat.'));
           }
 
-          Query<Map<String, dynamic>> allomasQuery = FirebaseConfig.firestore
-              .collection('memoriapalota_allomasok')
-              .where('science', isEqualTo: science)
-              .where('category', isEqualTo: widget.category)
-              .orderBy('title')
-              .limit(_currentLimit + 1);
+          final data = snapshot.data!;
+          final tags = data['tags'] as List<String>;
+          final untaggedDocs = data['untaggedDocs']
+              as List<QueryDocumentSnapshot<Map<String, dynamic>>>;
+          final tagCounts = data['tagCounts'] as Map<String, int>;
+          final isAdmin = data['isAdmin'] as bool;
 
-          if (isAdmin) {
-            allomasQuery = allomasQuery.where('status',
-                whereIn: const ['Published', 'Public', 'Draft']);
-          } else {
-            allomasQuery = allomasQuery
-                .where('status', whereIn: const ['Published', 'Public']);
+          if (tags.isEmpty && untaggedDocs.isEmpty) {
+            return const Center(child: Text('Nincs megjeleníthető tartalom.'));
           }
 
-          Query<Map<String, dynamic>>? dialogusQuery;
-          if (widget.category == 'Dialogus tags') {
-            dialogusQuery = FirebaseConfig.firestore
-                .collection('dialogus_fajlok')
-                .where('science', isEqualTo: science);
+          // Egységes lista: címkék + címke nélküli jegyzetek
+          final List<dynamic> unifiedList = [
+            ...tags.map((tag) =>
+                {'type': 'tag', 'name': tag, 'count': tagCounts[tag] ?? 0}),
+            ...untaggedDocs,
+          ];
 
-            // FONTOS: Itt sem használunk .orderBy('title')-t a hiányzó mezők miatt
-          }
+          // Rendezés
+          unifiedList.sort((a, b) {
+            String titleA;
+            if (a is Map) {
+              titleA = a['name'] as String;
+            } else {
+              final doc = a as QueryDocumentSnapshot<Map<String, dynamic>>;
+              final dataA = doc.data();
+              final isJogeset = doc.reference.path.contains('jogesetek');
+              titleA = (isJogeset
+                      ? (dataA['title'] ?? doc.id)
+                      : (dataA['title'] ??
+                          dataA['name'] ??
+                          dataA['cim'] ??
+                          'Névtelen'))
+                  .toString();
+            }
 
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: notesQuery.snapshots(),
-            builder: (context, notesSnap) {
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: jogesetQuery.snapshots(),
-                builder: (context, jogesetSnap) {
-                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: allomasQuery.snapshots(),
-                    builder: (context, allomasSnap) {
-                      final dialogusStream =
-                          dialogusQuery?.snapshots() ?? const Stream.empty();
-                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: dialogusStream,
-                        builder: (context, dSnap) {
-                          if (notesSnap.hasError) {
-                            return Center(
-                                child: Text('Hiba: ${notesSnap.error}'));
-                          }
+            String titleB;
+            if (b is Map) {
+              titleB = b['name'] as String;
+            } else {
+              final doc = b as QueryDocumentSnapshot<Map<String, dynamic>>;
+              final dataB = doc.data();
+              final isJogeset = doc.reference.path.contains('jogesetek');
+              titleB = (isJogeset
+                      ? (dataB['title'] ?? doc.id)
+                      : (dataB['title'] ??
+                          dataB['name'] ??
+                          dataB['cim'] ??
+                          'Névtelen'))
+                  .toString();
+            }
 
-                          final allDocs =
-                              <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                          if (notesSnap.hasData) {
-                            allDocs.addAll(notesSnap.data!.docs
-                                .where((d) => d.data()['deletedAt'] == null));
-                          }
-                          if (jogesetSnap.hasData) {
-                            debugPrint(
-                                '🔵 Jogesetek betöltve: ${jogesetSnap.data!.docs.length} dokumentum');
-                            allDocs.addAll(jogesetSnap.data!.docs
-                                .where((d) => d.data()['deletedAt'] == null));
-                          }
-                          if (allomasSnap.hasData) {
-                            allDocs.addAll(allomasSnap.data!.docs
-                                .where((d) => d.data()['deletedAt'] == null));
-                          }
+            return StringUtils.naturalCompare(titleA, titleB);
+          });
 
-                          debugPrint(
-                              '🔵 Összes dokumentum (notes+jogesetek+allomasok): ${allDocs.length}');
+          // final totalCount = tags.length + untaggedDocs.length; // Not used
 
-                          final tagMap = <String,
-                              List<
-                                  QueryDocumentSnapshot<
-                                      Map<String, dynamic>>>>{};
-                          final directDocs =
-                              <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-                          for (var doc in allDocs) {
-                            final tags =
-                                (doc.data()['tags'] as List<dynamic>? ?? [])
-                                    .cast<String>();
-                            if (tags.isNotEmpty) {
-                              tagMap.putIfAbsent(tags[0], () => []).add(doc);
-                            } else {
-                              directDocs.add(doc);
-                            }
-                          }
-
-                          // Jogesetek: top-level fields are processed in the allDocs loop above.
-                          // Removed redundant nested jogesetek loop.
-
-                          if (widget.category == 'Dialogus tags' &&
-                              dSnap.hasData) {
-                            for (var doc in dSnap.data!.docs) {
-                              if (doc.data()['deletedAt'] != null) {
-                                continue;
-                              }
-                              final data = doc.data();
-                              final status =
-                                  data['status'] as String? ?? 'Draft';
-                              if (!isAdmin && status != 'Published') {
-                                continue;
-                              }
-
-                              final tags =
-                                  (data['tags'] as List? ?? []).cast<String>();
-                              if (tags.isNotEmpty) {
-                                tagMap.putIfAbsent(tags[0], () => []).add(doc);
-                              } else {
-                                // Ha nincs címke, akkor az eredeti kategóriát használjuk végső megoldásként
-                                tagMap
-                                    .putIfAbsent(
-                                        data['category'] ?? 'Egyéb', () => [])
-                                    .add(doc);
-                              }
-                            }
-                          }
-
-                          if (tagMap.isEmpty && directDocs.isEmpty) {
-                            if (!notesSnap.hasData && !allomasSnap.hasData) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            }
-                            return const Center(
-                                child: Text('Nincs megjeleníthető tartalom.'));
-                          }
-
-                          // Egységes lista létrehozása a tag-ekből és a közvetlen dokumentumokból
-                          final sortedTags = tagMap.keys.toList();
-                          final List<dynamic> unifiedList = [
-                            ...sortedTags,
-                            ...directDocs,
-                          ];
-
-                          unifiedList.sort((a, b) {
-                            String titleA;
-                            if (a is String) {
-                              titleA = a;
-                            } else {
-                              final dataA = (a as QueryDocumentSnapshot<
-                                      Map<String, dynamic>>)
-                                  .data();
-                              final isJogesetA =
-                                  a.reference.path.contains('jogesetek');
-                              titleA = (isJogesetA
-                                      ? (dataA['title'] ?? a.id)
-                                      : (dataA['title'] ??
-                                          dataA['name'] ??
-                                          dataA['cim'] ??
-                                          'Névtelen'))
-                                  .toString();
-                            }
-
-                            String titleB;
-                            if (b is String) {
-                              titleB = b;
-                            } else {
-                              final dataB = (b as QueryDocumentSnapshot<
-                                      Map<String, dynamic>>)
-                                  .data();
-                              final isJogesetB =
-                                  b.reference.path.contains('jogesetek');
-                              titleB = (isJogesetB
-                                      ? (dataB['title'] ?? b.id)
-                                      : (dataB['title'] ??
-                                          dataB['name'] ??
-                                          dataB['cim'] ??
-                                          'Névtelen'))
-                                  .toString();
-                            }
-
-                            return StringUtils.naturalCompare(titleA, titleB);
-                          });
-
-                          final bool hasMore =
-                              unifiedList.length > _currentLimit;
-                          final displayedItems = hasMore
-                              ? unifiedList.take(_currentLimit).toList()
-                              : unifiedList;
-
-                          return ListView(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: [
-                              ...displayedItems.map((item) {
-                                if (item is String) {
-                                  final docs = tagMap[item]!;
-                                  final hasDeepTags = docs.any((doc) {
-                                    if (doc.reference.path
-                                        .contains('jogesetek')) {
-                                      final list =
-                                          doc.data()['jogesetek'] as List? ??
-                                              [];
-                                      return list.any((j) =>
-                                          (j['tags'] as List).length > 1);
-                                    }
-                                    return (doc.data()['tags'] as List? ?? [])
-                                            .length >
-                                        1;
-                                  });
-                                  return _buildTagCard(
-                                      item, docs.length, hasDeepTags);
-                                } else {
-                                  final doc = item as QueryDocumentSnapshot<
-                                      Map<String, dynamic>>;
-                                  return _buildDirectNoteWidget(doc, isAdmin);
-                                }
-                              }).toList(),
-                              Padding(
-                                padding: const EdgeInsets.all(24.0),
-                                child: Center(
-                                  child: Text(
-                                    'Összesen: ${allDocs.length} dokumentum',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              ...unifiedList.map((item) {
+                if (item is Map) {
+                  // Címke kártya
+                  return _buildTagCard(
+                    item['name'] as String,
+                    item['count'] as int,
                   );
-                },
-              );
-            },
+                } else {
+                  // Címke nélküli jegyzet
+                  final doc =
+                      item as QueryDocumentSnapshot<Map<String, dynamic>>;
+                  return _buildDirectNoteWidget(doc, isAdmin);
+                }
+              }).toList(),
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Center(
+                  child: Text(
+                    'Címkék: ${tags.length}, Címke nélküli jegyzetek: ${untaggedDocs.length}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildTagCard(String tag, int count, bool hasDeep) {
+  /// Kategória adatok betöltése: címkék listája + címke nélküli jegyzetek
+  Future<Map<String, dynamic>> _loadCategoryData(String userId) async {
+    // 1. Ellenőrizzük a cache-t
+    final cached = NoteSessionCache.getCategoryCache(widget.category);
+    if (cached != null) {
+      if (kDebugMode) {
+        debugPrint('💾 CategoryTagsScreen: Cache HIT - ${widget.category}');
+      }
+
+      // Admin státusz lekérése
+      final isAdmin = await _checkIsAdmin(userId);
+
+      // Tag counts kiszámítása (metadata-ból)
+      final tagCounts = await _getTagCounts();
+
+      return {
+        'tags': cached.tags,
+        'untaggedDocs': cached.untaggedNotes,
+        'tagCounts': tagCounts,
+        'isAdmin': isAdmin,
+      };
+    }
+
+    if (kDebugMode) {
+      debugPrint('🔄 CategoryTagsScreen: Cache MISS - betöltés indul...');
+    }
+
+    // 2. Admin státusz ellenőrzése
+    final isAdmin = await _checkIsAdmin(userId);
+
+    // 3. Metadata-ból címkék listája
+    final metadata = await MetadataService.getCategoryTagMapping('Jogász');
+    final catToTags = metadata['catToTags'] ?? {};
+    final tags = (catToTags[widget.category]?.toList() as List<String>?) ?? [];
+    tags.sort();
+
+    // 4. Tag counts lekérése
+    final tagCounts = await _getTagCounts();
+
+    // 5. Címke NÉLKÜLI jegyzetek betöltése (limit: 100)
+    final untaggedDocs = await _loadUntaggedNotes(isAdmin);
+
+    // 6. Cache-eljük az eredményt
+    NoteSessionCache.cacheCategory(
+      category: widget.category,
+      tags: tags,
+      untaggedNotes: untaggedDocs,
+    );
+
+    return {
+      'tags': tags,
+      'untaggedDocs': untaggedDocs,
+      'tagCounts': tagCounts,
+      'isAdmin': isAdmin,
+    };
+  }
+
+  /// Admin státusz ellenőrzése
+  Future<bool> _checkIsAdmin(String userId) async {
+    try {
+      final userDoc =
+          await FirebaseConfig.firestore.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) return false;
+
+      final userData = userDoc.data()!;
+      final userType = (userData['userType'] as String? ?? '').toLowerCase();
+      final isAdminEmail =
+          FirebaseAuth.instance.currentUser?.email == 'tattila.ninox@gmail.com';
+      final isAdminBool = userData['isAdmin'] == true;
+
+      return userType == 'admin' || isAdminEmail || isAdminBool;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error checking admin status: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Tag counts lekérése a metadata aggregációból
+  Future<Map<String, int>> _getTagCounts() async {
+    try {
+      final metadata = await MetadataService.getCategoryTagMapping('Jogász');
+
+      if (kDebugMode) {
+        debugPrint(
+            '🔍 _getTagCounts: Keresett kategória: "${widget.category}"');
+        debugPrint(
+            '🔍 _getTagCounts: Metadata keys: ${metadata.keys.toList()}');
+      }
+
+      final tagCountsData =
+          metadata['tagCounts'] as Map<String, Map<String, int>>?;
+
+      if (kDebugMode) {
+        debugPrint(
+            '🔍 _getTagCounts: tagCountsData null? ${tagCountsData == null}');
+        if (tagCountsData != null) {
+          debugPrint(
+              '🔍 _getTagCounts: tagCountsData keys: ${tagCountsData.keys.toList()}');
+        }
+      }
+
+      if (tagCountsData != null && tagCountsData.containsKey(widget.category)) {
+        final counts = tagCountsData[widget.category]!;
+        if (kDebugMode) {
+          debugPrint(
+              '✅ Tag counts betöltve metadata-ból: ${counts.length} címke, értékek: $counts');
+        }
+        return counts;
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+            '⚠️ Tag counts nem található a metadata-ban a(z) "${widget.category}" kategóriához');
+      }
+      return {};
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Hiba a tag counts betöltésekor: $e');
+      }
+      return {};
+    }
+  }
+
+  /// Címke NÉLKÜLI jegyzetek betöltése
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _loadUntaggedNotes(
+      bool isAdmin) async {
+    const science = 'Jogász';
+    final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    final int currentLimit = 100;
+
+    // Notes kollekció
+    final notesQuery = FirebaseConfig.firestore
+        .collection('notes')
+        .where('science', isEqualTo: science)
+        .where('category', isEqualTo: widget.category)
+        .where('status',
+            whereIn: isAdmin
+                ? ['Published', 'Public', 'Draft']
+                : ['Published', 'Public'])
+        .orderBy('title')
+        .limit(currentLimit);
+
+    final notesSnapshot = await notesQuery.get();
+    allDocs
+        .addAll(notesSnapshot.docs.where((d) => d.data()['deletedAt'] == null));
+
+    // Jogesetek kollekció
+    final jogesetQuery = FirebaseConfig.firestore
+        .collection('jogesetek')
+        .where('science', isEqualTo: science)
+        .where('category', isEqualTo: widget.category)
+        .where('status',
+            whereIn: isAdmin
+                ? ['Published', 'Public', 'Draft']
+                : ['Published', 'Public'])
+        .orderBy(FieldPath.documentId)
+        .limit(currentLimit);
+
+    final jogesetSnapshot = await jogesetQuery.get();
+    allDocs.addAll(
+        jogesetSnapshot.docs.where((d) => d.data()['deletedAt'] == null));
+
+    // Memoriapalota állomások
+    final allomasQuery = FirebaseConfig.firestore
+        .collection('memoriapalota_allomasok')
+        .where('science', isEqualTo: science)
+        .where('category', isEqualTo: widget.category)
+        .where('status',
+            whereIn: isAdmin
+                ? ['Published', 'Public', 'Draft']
+                : ['Published', 'Public'])
+        .orderBy('title')
+        .limit(currentLimit);
+
+    final allomasSnapshot = await allomasQuery.get();
+    allDocs.addAll(
+        allomasSnapshot.docs.where((d) => d.data()['deletedAt'] == null));
+
+    // Dialogus fajlok (csak ha "Dialogus tags" kategória)
+    if (widget.category == 'Dialogus tags') {
+      final dialogusQuery = FirebaseConfig.firestore
+          .collection('dialogus_fajlok')
+          .where('science', isEqualTo: science)
+          .limit(currentLimit);
+
+      final dialogusSnapshot = await dialogusQuery.get();
+      allDocs.addAll(dialogusSnapshot.docs.where((d) {
+        if (d.data()['deletedAt'] != null) return false;
+        final status = d.data()['status'] as String? ?? 'Draft';
+        if (!isAdmin && status != 'Published') return false;
+        return true;
+      }));
+    }
+
+    // Szűrés: CSAK azok, ahol tags üres vagy nincs
+    final untaggedDocs = allDocs.where((doc) {
+      final tags = doc.data()['tags'] as List? ?? [];
+      return tags.isEmpty;
+    }).toList();
+
+    if (kDebugMode) {
+      debugPrint(
+          '✅ Címke nélküli jegyzetek betöltve: ${untaggedDocs.length} db (összesen: ${allDocs.length} db vizsgálva)');
+    }
+
+    return untaggedDocs;
+  }
+
+  Widget _buildTagCard(String tag, int count) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       elevation: 0,
@@ -405,8 +444,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(hasDeep ? Icons.folder : Icons.label,
-                  color: const Color(0xFF3366CC)),
+              const Icon(Icons.label, color: Color(0xFF3366CC)),
               const SizedBox(width: 12),
               Expanded(
                   child: Text(tag,

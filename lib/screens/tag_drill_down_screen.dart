@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firebase_config.dart';
 import '../widgets/note_list_tile.dart';
 import '../utils/string_utils.dart';
+import '../services/metadata_service.dart';
 
 /// Drill-down navigációs képernyő a címkék hierarchikus böngészéséhez.
 ///
@@ -27,8 +28,8 @@ class TagDrillDownScreen extends StatefulWidget {
 
 class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   bool _hasPremiumAccess = false;
-  // FIX: Megemelt limit, hogy minden dokumentum betöltődjön egyszerre, gomb nélkül
-  final int _currentLimit = 1000;
+  // OPTIMALIZÁLT: Limit csökkentése a költséghatékonyság érdekében
+  final int _currentLimit = 100;
   final ScrollController _breadcrumbScrollController = ScrollController();
 
   @override
@@ -560,7 +561,17 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
   }
 
   Widget _buildFolderWidget(String tag, Map<String, dynamic> data) {
-    final count = (data['docs'] as List).length;
+    // Betöltött dokumentumok száma (fallback)
+    final loadedCount = (data['docs'] as List).length;
+
+    // Hierarchikus path építése a jelenlegi címke útvonalból
+    final tagPath = [...widget.tagPath, tag];
+    final hierarchicalPath = tagPath.join('/');
+
+    // Próbáljuk meg lekérni a pontos count-ot a metadata-ból
+    // Ez egy Future, de mivel a widget build-ban vagyunk, használjuk a betöltött count-ot
+    // és egy FutureBuilder-t a pontos count megjelenítéséhez
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       elevation: 0,
@@ -580,13 +591,41 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                   child: Text(tag,
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w500))),
-              Text('$count',
-                  style: const TextStyle(color: Colors.grey, fontSize: 14)),
+              FutureBuilder<int>(
+                future: _getHierarchicalCount(hierarchicalPath),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? loadedCount;
+                  return Text('$count',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14));
+                },
+              ),
               const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Hierarchikus count lekérése a metadata-ból
+  Future<int> _getHierarchicalCount(String hierarchicalPath) async {
+    try {
+      final metadata = await MetadataService.getCategoryTagMapping('Jogász');
+      final hierarchicalCounts =
+          metadata['hierarchicalCounts'] as Map<String, Map<String, int>>?;
+
+      if (hierarchicalCounts != null &&
+          hierarchicalCounts.containsKey(widget.category)) {
+        final categoryCounts = hierarchicalCounts[widget.category]!;
+        return categoryCounts[hierarchicalPath] ?? 0;
+      }
+
+      return 0;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Hiba a hierarchikus count lekérésekor: $e');
+      }
+      return 0;
+    }
   }
 }

@@ -213,7 +213,7 @@ class MetadataService {
   /// Skálázható kapcsolatépítés: Aggregált dokumentum olvasása.
   /// A `metadata/jogasz_structure` dokumentum tartalmazza az előre kiszámolt térképet.
   /// Így 1 db olvasás elegendő a több ezer helyett.
-  static Future<Map<String, Map<String, Set<String>>>> getCategoryTagMapping(
+  static Future<Map<String, dynamic>> getCategoryTagMapping(
       String science) async {
     try {
       final docId = '${science.toLowerCase().replaceAll('á', 'a')}_structure';
@@ -228,9 +228,14 @@ class MetadataService {
         // Firestore Map<String, dynamic> -> Map<String, Set<String>> konverzió
         final catToTagsMap = <String, Set<String>>{};
         final tagToCatsMap = <String, Set<String>>{};
+        final tagCountsMap = <String, Map<String, int>>{};
+        final hierarchicalCountsMap = <String, Map<String, int>>{};
 
         final rawCatToTags = data['catToTags'] as Map<String, dynamic>? ?? {};
         final rawTagToCats = data['tagToCats'] as Map<String, dynamic>? ?? {};
+        final rawTagCounts = data['tagCounts'] as Map<String, dynamic>? ?? {};
+        final rawHierarchicalCounts =
+            data['hierarchicalCounts'] as Map<String, dynamic>? ?? {};
 
         rawCatToTags.forEach((key, value) {
           catToTagsMap[key] = Set<String>.from(value as List? ?? []);
@@ -240,6 +245,26 @@ class MetadataService {
           tagToCatsMap[key] = Set<String>.from(value as List? ?? []);
         });
 
+        rawTagCounts.forEach((category, countsData) {
+          final counts = <String, int>{};
+          if (countsData is Map) {
+            countsData.forEach((tag, count) {
+              counts[tag.toString()] = count as int? ?? 0;
+            });
+          }
+          tagCountsMap[category.toString()] = counts;
+        });
+
+        rawHierarchicalCounts.forEach((category, countsData) {
+          final counts = <String, int>{};
+          if (countsData is Map) {
+            countsData.forEach((path, count) {
+              counts[path.toString()] = count as int? ?? 0;
+            });
+          }
+          hierarchicalCountsMap[category.toString()] = counts;
+        });
+
         if (kDebugMode) {
           debugPrint('✅ MetadataService: Aggregated Structure loaded ($docId)');
         }
@@ -247,6 +272,8 @@ class MetadataService {
         return {
           'catToTags': catToTagsMap,
           'tagToCats': tagToCatsMap,
+          'tagCounts': tagCountsMap,
+          'hierarchicalCounts': hierarchicalCountsMap,
         };
       } else {
         if (kDebugMode) {
@@ -256,6 +283,8 @@ class MetadataService {
         return {
           'catToTags': {},
           'tagToCats': {},
+          'tagCounts': {},
+          'hierarchicalCounts': {},
         };
       }
     } catch (e) {
@@ -263,6 +292,8 @@ class MetadataService {
       return {
         'catToTags': {},
         'tagToCats': {},
+        'tagCounts': {},
+        'hierarchicalCounts': {},
       };
     }
   }
@@ -277,21 +308,21 @@ class MetadataService {
 
       final catToTags = <String, Set<String>>{};
       final tagToCats = <String, Set<String>>{};
+      // Tag counts tárolása kategóriánként (első szintű címkék)
+      final tagCounts = <String, Map<String, int>>{};
+      // ÚJ: Hierarchikus tag counts - kategória > tag path > count
+      // Formátum: hierarchicalCounts['Alkotmányjog']['Alaptörvény'] = 39
+      //           hierarchicalCounts['Alkotmányjog']['Alaptörvény/1. Nemzeti hitvallás'] = 5
+      final hierarchicalCounts = <String, Map<String, int>>{};
       int docCount = 0;
 
       // Segédfüggvény egy kollekció feldolgozására
       Future<void> processCollection(String collectionName) async {
         try {
-          // Ha 'memoriapalota_allomasok', ott nincs feltétlenül 'status' mező mindenhol?
-          // De a NoteCardGrid szűrés szerint: status IN [Pub, Draft] vagy csak Pub.
-          // Feltételezzük, hogy van status mező, vagy ha nincs, akkor minden elem publikus?
-          // A biztonság kedvéért megpróbáljuk status szűréssel, ha üres lesz, akkor status nélkül.
-          // DE: A legegyszerűbb, ha csak azokat vesszük, ahol VAN status és az megfelelő.
           Query query = FirebaseConfig.firestore
               .collection(collectionName)
               .where('science', isEqualTo: science);
 
-          // Mindenhol szűrünk statusra, mert a felhasználó megerősítette, hogy fontos és mindenhol van.
           query =
               query.where('status', whereIn: ['Published', 'Draft', 'Public']);
 
@@ -310,8 +341,6 @@ class MetadataService {
 
             // Dialogus fájlok speciális kezelése
             if (collectionName == 'dialogus_fajlok') {
-              // A Frontend (NoteCardGrid) "Dialogus tags"-ként csoportosítja őket.
-              // Ezért a Metadata aggregációnál is ezt használjuk FŐ kategóriaként.
               category = 'Dialogus tags';
             }
 
@@ -319,7 +348,45 @@ class MetadataService {
               if (!catToTags.containsKey(category)) {
                 catToTags[category] = {};
               }
-              catToTags[category]!.addAll(tags);
+              // JAVÍTVA: Csak az első szintű címkét (tags[0]) tároljuk a catToTags-ban
+              // Így a CategoryTagsScreen csak az első szintű címkéket jeleníti meg
+              if (tags.isNotEmpty) {
+                catToTags[category]!.add(tags[0]);
+              }
+
+              // Tag counts inicializálása kategóriánként
+              if (!tagCounts.containsKey(category)) {
+                tagCounts[category] = {};
+              }
+
+              // Hierarchikus counts inicializálása
+              if (!hierarchicalCounts.containsKey(category)) {
+                hierarchicalCounts[category] = {};
+              }
+
+              // JAVÍTVA: MINDEN címke számolása, nem csak az első!
+              // Így a "3. Szabadság és felelősség" is megjelenik, ha tags[0] az
+              if (tags.isNotEmpty) {
+                // Első szintű címke (tags[0]) - ez jelenik meg a CategoryTagsScreen-en
+                final firstTag = tags[0];
+                tagCounts[category]![firstTag] =
+                    (tagCounts[category]![firstTag] ?? 0) + 1;
+
+                // Hierarchikus count - minden útvonalhoz
+                // Példa: ['Alaptörvény', '1. Nemzeti hitvallás']
+                // Számoljuk: 'Alaptörvény', 'Alaptörvény/1. Nemzeti hitvallás'
+                String currentPath = '';
+                for (int i = 0; i < tags.length; i++) {
+                  if (i == 0) {
+                    currentPath = tags[i];
+                  } else {
+                    currentPath = '$currentPath/${tags[i]}';
+                  }
+
+                  hierarchicalCounts[category]![currentPath] =
+                      (hierarchicalCounts[category]![currentPath] ?? 0) + 1;
+                }
+              }
 
               for (var tag in tags) {
                 if (!tagToCats.containsKey(tag)) {
@@ -345,17 +412,23 @@ class MetadataService {
       await processCollection('dialogus_fajlok');
 
       // 2. Mentés: Aggregált dokumentum írása
-      // Firestore nem támogat Set-et, List-té kell konvertálni
       final catToTagsExport = <String, List<String>>{};
       final tagToCatsExport = <String, List<String>>{};
+      final tagCountsExport = <String, Map<String, int>>{};
+      final hierarchicalCountsExport = <String, Map<String, int>>{};
 
       catToTags.forEach((k, v) => catToTagsExport[k] = v.toList()..sort());
       tagToCats.forEach((k, v) => tagToCatsExport[k] = v.toList()..sort());
+      tagCounts.forEach((k, v) => tagCountsExport[k] = v);
+      hierarchicalCounts.forEach((k, v) => hierarchicalCountsExport[k] = v);
 
       final docId = '${science.toLowerCase().replaceAll('á', 'a')}_structure';
       await FirebaseConfig.firestore.collection('metadata').doc(docId).set({
         'catToTags': catToTagsExport,
         'tagToCats': tagToCatsExport,
+        'tagCounts': tagCountsExport, // Első szintű címkék count-ja
+        'hierarchicalCounts':
+            hierarchicalCountsExport, // ÚJ: Hierarchikus counts
         'updatedAt': FieldValue.serverTimestamp(),
         'docCount': docCount,
       });
@@ -363,6 +436,8 @@ class MetadataService {
       if (kDebugMode) {
         debugPrint(
             '✅ Metadata Aggregation COMPLETED. Processed $docCount docs (Total).');
+        debugPrint(
+            '   Hierarchical paths stored: ${hierarchicalCounts.values.fold(0, (sum, map) => sum + map.length)}');
       }
 
       // Értesítjük a UI-t, hogy frissült a metadata
