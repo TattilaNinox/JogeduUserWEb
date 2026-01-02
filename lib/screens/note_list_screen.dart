@@ -899,6 +899,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Widget _buildMapFolder(String category) {
+    // Speciális dekoráció a Dialogus tags kategóriához (hanganyagok)
+    final bool isDialogus = category == 'Dialogus tags';
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
       elevation: 0,
@@ -916,26 +919,93 @@ class _NoteListScreenState extends State<NoteListScreen> {
           );
         },
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: [
-              const Icon(Icons.folder_outlined,
-                  color: Color(0xFF1976D2), size: 24),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  category,
-                  style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      color: Color(0xFF202122)),
-                ),
+        child: Stack(
+          children: [
+            // Halvány hanghullám/equalizer dekoráció a Dialogus tags-hoz
+            // Desktopon középen, mobilon jobb szélén
+            if (isDialogus)
+              Builder(
+                builder: (context) {
+                  final isMobile = MediaQuery.of(context).size.width < 600;
+                  return Positioned.fill(
+                    child: Align(
+                      alignment:
+                          isMobile ? Alignment.centerRight : Alignment.center,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: isMobile ? 36 : 0),
+                        child: Opacity(
+                          opacity: 0.15,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _buildSoundBar(8),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(16),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(6),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(20),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(10),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(24),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(12),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(18),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(8),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(22),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(14),
+                              const SizedBox(width: 3),
+                              _buildSoundBar(10),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
-            ],
-          ),
+            // Fő tartalom
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Row(
+                children: [
+                  const Icon(Icons.folder_outlined,
+                      color: Color(0xFF1976D2), size: 24),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      category,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          color: Color(0xFF202122)),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right,
+                      color: Colors.grey.shade400, size: 24),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  // Hangsáv elem az equalizer hatáshoz
+  Widget _buildSoundBar(double height) {
+    return Container(
+      width: 4,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFF7B1FA2),
+        borderRadius: BorderRadius.circular(2),
       ),
     );
   }
