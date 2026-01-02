@@ -52,14 +52,6 @@ class LearningService {
       debugPrint(
           'LearningService: Successfully saved learning data to Firestore');
 
-      // Legacy dokumentum törlése, ha létezik
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('user_learning_data')
-          .doc(cardId)
-          .delete();
-
       // Deck és kategória statisztikák frissítése
       final cardIndex = cardId.split('#')[1]; // String index formátumban
       await _updateDeckSnapshot(
@@ -188,10 +180,10 @@ class LearningService {
       final learningDataMap = <int, FlashcardLearningData>{};
 
       // Először az új útvonalról próbáljuk lekérni batch-ben
-      // Firestore whereIn filter maximum 10 elemű listát engedélyez.
-      // Nagyobb pakli esetén daraboljuk a lekérdezéseket 10-es blokkokra.
+      // Firestore whereIn filter maximum 30 elemű listát engedélyez.
+      // Nagyobb pakli esetén daraboljuk a lekérdezéseket 30-as blokkokra.
       final allCardIds = List.generate(cardCount, (i) => '$deckId#$i');
-      const chunkSize = 10;
+      const chunkSize = 30;
       final learningFutures = <Future>[];
       for (var i = 0; i < allCardIds.length; i += chunkSize) {
         final chunk =
@@ -213,41 +205,6 @@ class LearningService {
           final index = int.tryParse(cardId.split('#').last) ?? -1;
           if (index >= 0) {
             learningDataMap[index] = FlashcardLearningData.fromMap(doc.data());
-          }
-        }
-      }
-
-      // Hiányzó kártyák esetén legacy útvonal ellenőrzése
-      final missingIndices = <int>[];
-      for (int i = 0; i < cardCount; i++) {
-        if (!learningDataMap.containsKey(i)) {
-          missingIndices.add(i);
-        }
-      }
-
-      if (missingIndices.isNotEmpty) {
-        final legacyIds = missingIndices.map((i) => '$deckId#$i').toList();
-        final legacyFutures = <Future>[];
-        for (var i = 0; i < legacyIds.length; i += chunkSize) {
-          final chunk =
-              legacyIds.sublist(i, (i + chunkSize).clamp(0, legacyIds.length));
-          legacyFutures.add(_firestore
-              .collection('users')
-              .doc(user.uid)
-              .collection('user_learning_data')
-              .where(FieldPath.documentId, whereIn: chunk)
-              .get());
-        }
-
-        final legacySnaps = await Future.wait(legacyFutures);
-        for (final querySnap in legacySnaps) {
-          for (final doc in querySnap.docs) {
-            final cardId = doc.id;
-            final index = int.tryParse(cardId.split('#').last) ?? -1;
-            if (index >= 0) {
-              learningDataMap[index] =
-                  FlashcardLearningData.fromMap(doc.data());
-            }
           }
         }
       }
@@ -300,14 +257,6 @@ class LearningService {
             .collection('learning')
             .doc(cardId);
         batch.delete(newPathRef);
-
-        // Legacy útvonal törlése
-        final legacyPathRef = _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('user_learning_data')
-            .doc(cardId);
-        batch.delete(legacyPathRef);
       }
 
       // Kategória statisztikák törlése

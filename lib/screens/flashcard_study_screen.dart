@@ -18,6 +18,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
   bool _isLoading = true;
   int _currentIndex = 0;
   bool _showAnswer = false;
+  bool _isProcessing = false; // Rate limiting flag
 
   // Evaluation counters
   int _againCount = 0;
@@ -135,6 +136,9 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
   }
 
   Future<void> _evaluateCard(String evaluation) async {
+    if (_isProcessing) return; // Debounce védelem
+    _isProcessing = true;
+
     try {
       final currentCardIndex = _dueCardIndices[_currentIndex];
       final cardId =
@@ -217,6 +221,12 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      // 500ms késleltetés a véletlen dupla kattintások ellen
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        _isProcessing = false;
       }
     }
   }
