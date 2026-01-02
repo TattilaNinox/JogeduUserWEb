@@ -332,11 +332,14 @@ class NoteListTile extends StatelessWidget {
                     (audioUrl?.isNotEmpty ?? false)) {
                   audioWidget = Align(
                     alignment: Alignment.center,
-                    child: MiniAudioPlayer(
-                      audioUrl: audioUrl!,
-                      compact: false,
-                      large: true,
-                    ),
+                    child: isLocked
+                        ? const Icon(Icons.lock_outline,
+                            color: Colors.grey, size: 24)
+                        : MiniAudioPlayer(
+                            audioUrl: audioUrl!,
+                            compact: false,
+                            large: true,
+                          ),
                   );
                 } else if (hasAudio && (audioUrl?.isNotEmpty ?? false)) {
                   audioWidget = Align(

@@ -1,0 +1,327 @@
+# FLASHCARD ALGYŰJTEMÉNY MIGRÁCIÓ - KIVITELEZÉSI TERV
+# ============================================================
+# Cél: A kártyák áthelyezése a dokumentumon belüli tömbből algyűjteménybe
+# Dokumentum méret limit elkerülése (1 MB Firestore limit)
+# ============================================================
+
+## 1. JELENLEGI STRUKTÚRA (PROBLÉMA)
+------------------------------------------------------------
+Kollekció: notes
+Dokumentum: {deckId}
+
+{
+  "title": "Pakli neve",
+  "type": "deck",
+  "category": "Alkotmányjog",
+  "tags": ["Alaptörvény", "8. Tanulókártyák"],
+  "flashcards": [                          // <-- TÖMB A DOKUMENTUMBAN
+    {
+      "front": "Kérdés 1",
+      "back": "Válasz 1",
+      "explanation": "Részletes magyarázat...",
+      "processed_explanation": "..."       // Ha van hyphenation
+    },
+    {
+      "front": "Kérdés 2",
+      "back": "Válasz 2",
+      "explanation": "..."
+    }
+    // ... akár 500+ kártya = DOKUMENTUM MÉRET TÚLLÉPÉS
+  ]
+}
+
+Probléma: Firestore dokumentum limit 1 MB
+- 500 kártya × 1 KB = 500 KB (közelít a limithez)
+- 1000 kártya × 1.5 KB = 1.5 MB (TÚLLÉPI a limitet)
+
+
+## 2. ÚJ STRUKTÚRA (MEGOLDÁS)
+------------------------------------------------------------
+Kollekció: notes
+Dokumentum: {deckId}
+
+{
+  "title": "Pakli neve",
+  "type": "deck",
+  "category": "Alkotmányjog",
+  "tags": ["Alaptörvény", "8. Tanulókártyák"],
+  "cardCount": 250,                        // <-- ÚJ: kártyák száma
+  "flashcards": null                       // <-- ÜRES (migráció után törölhető)
+}
+
+Algyűjtemény: notes/{deckId}/cards
+Dokumentum: {cardIndex} (pl. "0", "1", "2", ...)
+
+{
+  "index": 0,                              // Sorrend megőrzése
+  "front": "Kérdés 1",
+  "back": "Válasz 1",
+  "explanation": "Részletes magyarázat...",
+  "processed_explanation": "...",
+  "createdAt": Timestamp,
+  "updatedAt": Timestamp
+}
+
+Előnyök:
+- Akár 10,000+ kártya paklinként
+- Kártyánkénti mentés/frissítés
+- Jobb teljesítmény (csak a szükséges kártyák töltődnek be)
+
+
+## 3. ADMIN FELÜLET MÓDOSÍTÁSOK
+------------------------------------------------------------
+
+### 3.1. Deck Edit Screen (DeckEditScreen.dart)
+
+JELENLEG:
+- Kártyák betöltése: deck['flashcards'] tömb olvasása
+- Mentés: teljes flashcards tömb visszaírása
+
+MÓDOSÍTÁS:
+- Kártyák betöltése:
+  ```dart
+  // ÚJ: Algyűjteményből olvasás
+  final cardsSnapshot = await FirebaseFirestore.instance
+      .collection('notes')
+      .doc(deckId)
+      .collection('cards')
+      .orderBy('index')
+      .get();
+  
+  final cards = cardsSnapshot.docs.map((doc) => doc.data()).toList();
+  ```
+
+- Mentés:
+  ```dart
+  // ÚJ: Batch write az algyűjteménybe
+  final batch = FirebaseFirestore.instance.batch();
+  final cardsRef = FirebaseFirestore.instance
+      .collection('notes')
+      .doc(deckId)
+      .collection('cards');
+  
+  // Meglévő kártyák törlése (ha szükséges)
+  final existingCards = await cardsRef.get();
+  for (var doc in existingCards.docs) {
+    batch.delete(doc.reference);
+  }
+  
+  // Új kártyák mentése
+  for (int i = 0; i < cards.length; i++) {
+    final cardRef = cardsRef.doc(i.toString());
+    batch.set(cardRef, {
+      'index': i,
+      'front': cards[i]['front'],
+      'back': cards[i]['back'],
+      'explanation': cards[i]['explanation'],
+      'processed_explanation': cards[i]['processed_explanation'],
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+  
+  // Deck dokumentum frissítése
+  batch.update(deckDocRef, {
+    'cardCount': cards.length,
+    'flashcards': FieldValue.delete(),  // Régi tömb törlése
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+  
+  await batch.commit();
+  ```
+
+### 3.2. Deck Create Screen
+
+Új pakli létrehozásakor:
+- Ne használd a flashcards tömböt
+- Közvetlenül az algyűjteménybe mentsd a kártyákat
+
+
+## 4. USER APP (jogedu_user_web) MÓDOSÍTÁSOK
+------------------------------------------------------------
+
+### 4.1. DeckViewScreen.dart
+
+JELENLEG:
+```dart
+final flashcards = deckData['flashcards'] as List<dynamic>? ?? [];
+```
+
+MÓDOSÍTÁS (backward compatible):
+```dart
+// Először ellenőrizzük, hogy algyűjteményben vannak-e a kártyák
+final cardsSnapshot = await FirebaseFirestore.instance
+    .collection('notes')
+    .doc(deckId)
+    .collection('cards')
+    .orderBy('index')
+    .get();
+
+List<Map<String, dynamic>> flashcards;
+
+if (cardsSnapshot.docs.isNotEmpty) {
+  // ÚJ: Algyűjteményből
+  flashcards = cardsSnapshot.docs.map((doc) => doc.data()).toList();
+} else {
+  // FALLBACK: Régi tömbből (migrálatlan paklik)
+  flashcards = List<Map<String, dynamic>>.from(
+    deckData['flashcards'] as List<dynamic>? ?? []
+  );
+}
+```
+
+### 4.2. LearningService.dart
+
+Ha van kártya-szintű tanulási állapot kezelés,
+frissíteni kell a kártya ID-k kezelését:
+- Régi: index a tömbben (0, 1, 2, ...)
+- Új: algyűjtemény dokumentum ID ("0", "1", "2", ...)
+
+
+## 5. MIGRÁCIÓ (Meglévő paklik átalakítása)
+------------------------------------------------------------
+
+### 5.1. Migráló script (Node.js / Cloud Function)
+
+```javascript
+const admin = require('firebase-admin');
+admin.initializeApp();
+
+async function migrateDecks() {
+  const db = admin.firestore();
+  const decksSnapshot = await db
+    .collection('notes')
+    .where('type', '==', 'deck')
+    .get();
+  
+  console.log(`Found ${decksSnapshot.size} decks to migrate`);
+  
+  for (const deckDoc of decksSnapshot.docs) {
+    const deckData = deckDoc.data();
+    const flashcards = deckData.flashcards;
+    
+    if (!flashcards || flashcards.length === 0) {
+      console.log(`Skipping ${deckDoc.id} - no flashcards`);
+      continue;
+    }
+    
+    // Ellenőrzés: már migrálva van-e?
+    const existingCards = await deckDoc.ref.collection('cards').limit(1).get();
+    if (!existingCards.empty) {
+      console.log(`Skipping ${deckDoc.id} - already migrated`);
+      continue;
+    }
+    
+    console.log(`Migrating ${deckDoc.id} with ${flashcards.length} cards...`);
+    
+    const batch = db.batch();
+    
+    // Kártyák áthelyezése algyűjteménybe
+    for (let i = 0; i < flashcards.length; i++) {
+      const cardRef = deckDoc.ref.collection('cards').doc(i.toString());
+      batch.set(cardRef, {
+        index: i,
+        front: flashcards[i].front || '',
+        back: flashcards[i].back || '',
+        explanation: flashcards[i].explanation || '',
+        processed_explanation: flashcards[i].processed_explanation || null,
+        migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    
+    // Deck dokumentum frissítése
+    batch.update(deckDoc.ref, {
+      cardCount: flashcards.length,
+      migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      // NE töröld a flashcards mezőt még - fallback-hez kell!
+    });
+    
+    await batch.commit();
+    console.log(`✅ Migrated ${deckDoc.id}`);
+  }
+  
+  console.log('Migration complete!');
+}
+
+migrateDecks().catch(console.error);
+```
+
+### 5.2. Migráció lépései
+
+1. BACKUP készítése (Firestore Export)
+2. Migráló script futtatása (tesztelés 1-2 paklikkal)
+3. User app frissítése (backward compatible verzió deploy)
+4. Teljes migráció futtatása
+5. Admin felület frissítése
+6. Ellenőrzés: minden pakli algyűjteményből töltődik
+7. OPCIONÁLIS: Régi flashcards tömb törlése a deck dokumentumokból
+
+
+## 6. FIRESTORE INDEXEK
+------------------------------------------------------------
+
+Szükséges index az algyűjteményhez:
+
+Kollekció: notes/{deckId}/cards
+Index: index (Ascending)
+
+Ez engedélyezi az orderBy('index') lekérdezést.
+
+
+## 7. BIZTONSÁGI SZABÁLYOK (firestore.rules)
+------------------------------------------------------------
+
+Hozzáadandó a meglévő /notes/{noteId} szabályokhoz:
+
+```javascript
+match /notes/{noteId}/cards/{cardId} {
+  // Olvasás: minden bejelentkezett felhasználó
+  allow read: if request.auth != null;
+  // Írás: csak admin
+  allow create, update, delete: if isAdmin();
+}
+```
+
+
+## 8. ÜTEMEZÉS ÉS PRIORITÁS
+------------------------------------------------------------
+
+| Fázis | Feladat | Becsült idő |
+|-------|---------|-------------|
+| 1 | User app frissítése (backward compatible) | 2 óra |
+| 2 | Firestore rules frissítése | 30 perc |
+| 3 | Migráló script elkészítése és tesztelése | 2 óra |
+| 4 | Teljes migráció futtatása | 1 óra |
+| 5 | Admin felület módosítása | 4-6 óra |
+| 6 | Végső tesztelés | 2 óra |
+| **ÖSSZESEN** | | **~12 óra** |
+
+
+## 9. ROLLBACK TERV
+------------------------------------------------------------
+
+Ha probléma van a migráció után:
+
+1. User app: A backward compatible kód automatikusan fallback-el
+   a régi flashcards tömbre, ha az algyűjtemény üres
+
+2. Admin: Visszaállítható a régi mentési logika
+
+3. Adatok: A régi flashcards tömb NEM törlődik a migrációkor,
+   így bármikor visszaállítható
+
+
+## 10. TESZTELÉSI CHECKLIST
+------------------------------------------------------------
+
+[ ] Új pakli létrehozása (admin) - kártyák algyűjteménybe kerülnek
+[ ] Meglévő pakli szerkesztése (admin) - kártyák frissülnek
+[ ] Pakli megnyitása (user app) - algyűjteményből töltődik
+[ ] Migrálatlan pakli megnyitása (user app) - fallback működik
+[ ] Nagy pakli (100+ kártya) működik
+[ ] Tanulási állapot mentése működik
+[ ] Hyphenation (processed_explanation) működik
+
+============================================================
+Készítette: AI Assistant
+Dátum: 2026-01-02
+============================================================
