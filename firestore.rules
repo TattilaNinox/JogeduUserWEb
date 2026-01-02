@@ -12,18 +12,31 @@ service cloud.firestore {
     }
 
     // Helper function to check for premium access
+    // OPTIMIZED: First checks Custom Claims (0 Firestore reads), then falls back to Firestore
     function hasPremiumAccess() {
-      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let token = request.auth.token;
       let now = request.time;
       
-      // Próbaidő ellenőrzése: ha van freeTrialEndDate és még nem járt le
-      let hasActiveTrial = userData.freeTrialEndDate != null && userData.freeTrialEndDate > now;
+      // 1. Custom Claims ellenőrzés (LexGO felhasználók) - 0 extra read!
+      // A premiumUntil milliszekundumban van tárolva
+      let hasPremiumClaim = token.premium == true && 
+        (token.premiumUntil == null || token.premiumUntil > now.toMillis());
       
-      // Előfizetés ellenőrzése: ha aktív, akkor ellenőrizzük a subscriptionEndDate-et is
-      let hasActiveSubscription = userData.isSubscriptionActive == true && 
-        (userData.subscriptionEndDate == null || userData.subscriptionEndDate > now);
+      if (hasPremiumClaim) {
+        return true;
+      }
       
-      return hasActiveTrial || hasActiveSubscription;
+      // 2. Fallback: Firestore ellenőrzés (trial / régi felhasználók / másik app)
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      
+      // Ha a dokumentum nem létezik, nincs prémium hozzáférés
+      return userDoc.exists && (
+        // Próbaidő ellenőrzése: ha van freeTrialEndDate és még nem járt le
+        (userDoc.data.freeTrialEndDate != null && userDoc.data.freeTrialEndDate > now) ||
+        // Előfizetés ellenőrzése: ha aktív, akkor ellenőrizzük a subscriptionEndDate-et is
+        (userDoc.data.isSubscriptionActive == true && 
+         (userDoc.data.subscriptionEndDate == null || userDoc.data.subscriptionEndDate > now))
+      );
     }
 
     // ────────── Felhasználók (+ alsó-gyűjtemények) ──────────

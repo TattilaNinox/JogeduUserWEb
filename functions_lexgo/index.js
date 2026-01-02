@@ -97,7 +97,7 @@ exports.initiateWebPaymentLexgo = onCall(
       const nextAuthBase = (returnBase || '').replace(/\/$/, '');
 
       const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || '';
-      const webhookUrl = `https://europe-west1-${projectId}.cloudfunctions.net/simplepayWebhook`;
+      const webhookUrl = `https://europe-west1-${projectId}.cloudfunctions.net/simplepayWebhookLexgo`;
 
       const timeout = new Date(Date.now() + 30 * 60 * 1000)
         .toISOString()
@@ -250,3 +250,366 @@ exports.maintainActiveMetadata = onSchedule('every 60 minutes', async (event) =>
     return null;
   }
 });
+
+// ============================================================================
+// LEXGO PREMIUM CLAIMS HELPER
+// ============================================================================
+
+/**
+ * Helper: Custom Claims beállítása a Firebase Auth tokenben.
+ * Ezáltal a Firestore rules 0 extra read-del tudja ellenőrizni a prémium státuszt.
+ */
+async function setPremiumClaims(userId, expiryDate) {
+  try {
+    await admin.auth().setCustomUserClaims(userId, {
+      premium: true,
+      premiumUntil: expiryDate.getTime(),
+    });
+    console.log(`[LexGO] Premium claims set for user ${userId}, expires: ${expiryDate.toISOString()}`);
+  } catch (error) {
+    console.error(`[LexGO] Failed to set premium claims for ${userId}:`, error);
+    // Ne dobjunk hibát, a Firestore fallback működni fog
+  }
+}
+
+/**
+ * Helper: Custom Claims törlése (előfizetés lejáratakor).
+ */
+async function clearPremiumClaims(userId) {
+  try {
+    await admin.auth().setCustomUserClaims(userId, {
+      premium: false,
+      premiumUntil: null,
+    });
+    console.log(`[LexGO] Premium claims cleared for user ${userId}`);
+  } catch (error) {
+    console.error(`[LexGO] Failed to clear premium claims for ${userId}:`, error);
+  }
+}
+
+// ============================================================================
+// LEXGO PAYMENT CONFIRMATION (kliens hívja sikeres fizetés után)
+// ============================================================================
+
+/**
+ * Fizetés lezárása (CONFIRM) SimplePay v2 API-val - LexGO verzió.
+ * - Client a sikeres visszairányítás után hívja: { orderRef }
+ * - Siker esetén users/{uid} frissül, web_payments status COMPLETED-re vált
+ * - Custom Claims beállítása a tokenben
+ */
+exports.confirmWebPaymentLexgo = onCall(
+  {
+    secrets: ['SIMPLEPAY_MERCHANT_ID', 'SIMPLEPAY_SECRET_KEY', 'SIMPLEPAY_ENV'],
+  },
+  async (request) => {
+    try {
+      const SIMPLEPAY_CONFIG = getSimplePayConfig();
+      const { orderRef } = request.data || {};
+
+      if (!orderRef || typeof orderRef !== 'string') {
+        throw new HttpsError('invalid-argument', 'orderRef szükséges');
+      }
+
+      const orderRefParts = orderRef.split('_');
+      if (orderRefParts.length < 3 || orderRefParts[0] !== 'WEB') {
+        throw new HttpsError('invalid-argument', 'Érvénytelen orderRef formátum');
+      }
+      const userId = orderRefParts[1];
+
+      if (!SIMPLEPAY_CONFIG.merchantId || !SIMPLEPAY_CONFIG.secretKey) {
+        throw new HttpsError('failed-precondition', 'SimplePay konfiguráció hiányzik');
+      }
+
+      // Lekérjük a fizetési rekordot
+      const paymentRef = db.collection('web_payments').doc(orderRef);
+      const paymentSnap = await paymentRef.get();
+      if (!paymentSnap.exists) {
+        throw new HttpsError('not-found', 'Fizetési rekord nem található');
+      }
+
+      const pay = paymentSnap.data();
+
+      // Ellenőrizzük, hogy LexGO fizetés-e
+      if (pay.source !== 'lexgo') {
+        throw new HttpsError('failed-precondition', 'Ez nem LexGO fizetés');
+      }
+
+      const rawPlanId = pay.planId;
+      const canonicalPlanId = CANONICAL_PLAN_ID[rawPlanId] || rawPlanId;
+      const plan = PAYMENT_PLANS[canonicalPlanId];
+      if (!plan) {
+        throw new HttpsError('failed-precondition', 'Érvénytelen csomag');
+      }
+
+      // QUERY – ellenőrzés SimplePay v2 API-val
+      const queryPayload = {
+        salt: crypto.randomBytes(16).toString('hex'),
+        merchant: SIMPLEPAY_CONFIG.merchantId.trim(),
+        orderRef,
+      };
+      const queryBody = JSON.stringify(queryPayload);
+      const querySig = crypto
+        .createHmac('sha384', SIMPLEPAY_CONFIG.secretKey.trim())
+        .update(queryBody)
+        .digest('base64');
+
+      const queryResp = await fetch(`${SIMPLEPAY_CONFIG.baseUrl.trim()}query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          Signature: querySig,
+        },
+        body: queryBody,
+      });
+
+      if (!queryResp.ok) {
+        const txt = await queryResp.text();
+        console.error('[confirmWebPaymentLexgo] query HTTP error', { status: queryResp.status, txt });
+        throw new HttpsError('internal', 'Query hívás sikertelen');
+      }
+
+      const queryTxt = await queryResp.text();
+      let queryData;
+      try {
+        queryData = JSON.parse(queryTxt);
+      } catch (_) {
+        queryData = { raw: queryTxt };
+      }
+
+      const successLike =
+        (queryData?.status || '').toString().toUpperCase() === 'SUCCESS' ||
+        !!queryData?.transactionId;
+
+      if (!successLike) {
+        console.warn('[confirmWebPaymentLexgo] query not SUCCESS', { orderRef, queryData });
+        return { success: false, status: queryData?.status || 'UNKNOWN' };
+      }
+
+      const transactionId = queryData?.transactionId || pay.simplePayTransactionId || null;
+      const orderId = queryData?.orderId || null;
+
+      // Előfizetés aktiválása
+      const now = new Date();
+      const expiryDate = new Date(now.getTime() + plan.subscriptionDays * 24 * 60 * 60 * 1000);
+
+      const subscriptionData = {
+        isSubscriptionActive: true,
+        subscriptionStatus: 'premium',
+        subscriptionEndDate: admin.firestore.Timestamp.fromDate(expiryDate),
+        subscription: {
+          status: 'ACTIVE',
+          productId: canonicalPlanId,
+          purchaseToken: transactionId,
+          orderId: orderId,
+          endTime: expiryDate.toISOString(),
+          lastUpdateTime: now.toISOString(),
+          source: 'lexgo_simplepay',
+        },
+        lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        // Próbaidőszak lezárása az első fizetéskor
+        freeTrialEndDate: admin.firestore.Timestamp.fromDate(now),
+      };
+
+      await db.collection('users').doc(userId).set(subscriptionData, { merge: true });
+      await db.collection('users').doc(userId).update({
+        lastReminder: admin.firestore.FieldValue.delete(),
+      });
+
+      // Custom Claims beállítása (0 extra read a rules-ban)
+      await setPremiumClaims(userId, expiryDate);
+
+      await paymentRef.update({
+        status: 'COMPLETED',
+        transactionId,
+        orderId,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log('[confirmWebPaymentLexgo] completed', { userId, orderRef });
+      return { success: true, status: 'COMPLETED' };
+    } catch (err) {
+      console.error('[confirmWebPaymentLexgo] error', { message: err?.message, stack: err?.stack });
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError('internal', err?.message || 'Ismeretlen hiba');
+    }
+  }
+);
+
+// ============================================================================
+// LEXGO SIMPLEPAY WEBHOOK (SimplePay server-to-server hívja)
+// ============================================================================
+
+const { onRequest } = require('firebase-functions/v2/https');
+
+/**
+ * HTTP webhook endpoint SimplePay számára - LexGO verzió.
+ * Custom Claims beállítással.
+ */
+exports.simplepayWebhookLexgo = onRequest(
+  {
+    secrets: ['SIMPLEPAY_SECRET_KEY', 'NEXTAUTH_URL', 'SIMPLEPAY_ENV'],
+    region: 'europe-west1',
+  },
+  async (req, res) => {
+    try {
+      const SIMPLEPAY_CONFIG = getSimplePayConfig();
+
+      // CORS headers
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Signature, x-simplepay-signature, x-signature');
+
+      if (req.method === 'OPTIONS') {
+        res.status(200).send('');
+        return;
+      }
+
+      if (req.method !== 'POST') {
+        res.status(405).send('Method not allowed');
+        return;
+      }
+
+      const body = req.body;
+      const headerSignature = (
+        req.headers['signature'] ||
+        req.headers['x-simplepay-signature'] ||
+        req.headers['x-signature'] ||
+        ''
+      ).toString();
+
+      if (!headerSignature) {
+        console.error('[simplepayWebhookLexgo] Missing signature');
+        res.status(400).send('Missing signature');
+        return;
+      }
+
+      // Aláírás ellenőrzése
+      if (!SIMPLEPAY_CONFIG.secretKey) {
+        console.error('[simplepayWebhookLexgo] Secret key not configured');
+        res.status(500).send('Configuration error');
+        return;
+      }
+
+      const raw = Buffer.isBuffer(req.rawBody)
+        ? req.rawBody
+        : Buffer.from(JSON.stringify(body));
+
+      const expectedSig = crypto
+        .createHmac('sha384', SIMPLEPAY_CONFIG.secretKey)
+        .update(raw)
+        .digest('base64');
+
+      const a = Buffer.from(headerSignature);
+      const b = Buffer.from(expectedSig);
+      const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+      if (!valid) {
+        console.error('[simplepayWebhookLexgo] Invalid signature');
+        res.status(401).send('Invalid signature');
+        return;
+      }
+
+      const incomingStatus = (body?.status || '').toString().toUpperCase();
+      console.log('[simplepayWebhookLexgo] received', {
+        status: incomingStatus,
+        orderRef: body?.orderRef,
+      });
+
+      // Csak sikeres fizetéseket dolgozunk fel
+      if (incomingStatus !== 'SUCCESS' && incomingStatus !== 'FINISHED') {
+        console.log('[simplepayWebhookLexgo] non-success status, ignoring');
+        res.status(200).send('OK');
+        return;
+      }
+
+      const { orderRef, transactionId, orderId } = body;
+
+      // Felhasználó azonosítása az orderRef-ből
+      const orderRefParts = orderRef.split('_');
+      if (orderRefParts.length < 3 || orderRefParts[0] !== 'WEB') {
+        console.error('[simplepayWebhookLexgo] Invalid orderRef format:', orderRef);
+        res.status(400).send('Invalid order reference');
+        return;
+      }
+
+      const userId = orderRefParts[1];
+
+      // Fizetési rekord lekérése
+      const paymentRef = db.collection('web_payments').doc(orderRef);
+      const paymentDoc = await paymentRef.get();
+
+      if (!paymentDoc.exists) {
+        console.error('[simplepayWebhookLexgo] Payment record not found', { orderRef });
+        res.status(404).send('Payment record not found');
+        return;
+      }
+
+      const paymentData = paymentDoc.data();
+
+      // Ellenőrizzük, hogy LexGO fizetés-e
+      if (paymentData.source !== 'lexgo') {
+        console.log('[simplepayWebhookLexgo] Not a LexGO payment, ignoring', { orderRef });
+        res.status(200).send('OK - not LexGO');
+        return;
+      }
+
+      const rawPlanId = paymentData.planId;
+      const canonicalPlanId = CANONICAL_PLAN_ID[rawPlanId] || rawPlanId;
+      const plan = PAYMENT_PLANS[canonicalPlanId];
+
+      if (!plan) {
+        console.error('[simplepayWebhookLexgo] Invalid plan', { planId: rawPlanId });
+        res.status(400).send('Invalid plan');
+        return;
+      }
+
+      // Előfizetés aktiválása
+      const now = new Date();
+      const expiryDate = new Date(now.getTime() + plan.subscriptionDays * 24 * 60 * 60 * 1000);
+
+      const subscriptionData = {
+        isSubscriptionActive: true,
+        subscriptionStatus: 'premium',
+        subscriptionEndDate: admin.firestore.Timestamp.fromDate(expiryDate),
+        subscription: {
+          status: 'ACTIVE',
+          productId: canonicalPlanId,
+          purchaseToken: transactionId || null,
+          orderId: orderId || null,
+          endTime: expiryDate.toISOString(),
+          lastUpdateTime: now.toISOString(),
+          source: 'lexgo_simplepay',
+        },
+        lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        freeTrialEndDate: admin.firestore.Timestamp.fromDate(now),
+      };
+
+      // Felhasználói dokumentum frissítése
+      await db.collection('users').doc(userId).set(subscriptionData, { merge: true });
+      await db.collection('users').doc(userId).update({
+        lastReminder: admin.firestore.FieldValue.delete(),
+      });
+
+      // Custom Claims beállítása (0 extra read a rules-ban)
+      await setPremiumClaims(userId, expiryDate);
+
+      // Fizetési rekord frissítése
+      await paymentRef.update({
+        status: 'COMPLETED',
+        transactionId: transactionId || null,
+        orderId: orderId || null,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log('[simplepayWebhookLexgo] completed', { userId, orderRef });
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('[simplepayWebhookLexgo] error', { message: error?.message, stack: error?.stack });
+      res.status(500).send('Internal error');
+    }
+  }
+);

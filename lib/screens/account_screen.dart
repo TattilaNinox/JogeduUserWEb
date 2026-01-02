@@ -56,16 +56,18 @@ class _AccountScreenState extends State<AccountScreen> {
         debugPrint('[PaymentCallback] Update error: $e');
       });
 
-      // Sikeres fizetés esetén megerősítjük a fizetést (confirmWebPayment)
-      // Ez biztosítja, hogy az előfizetés aktiválódjon, még ha a SimplePay nem irányított vissza is
+      // Sikeres fizetés esetén megerősítjük a fizetést (confirmWebPaymentLexgo)
+      // Ez biztosítja, hogy az előfizetés aktiválódjon és a Custom Claims beállítódjon
       if (paymentStatus == 'success') {
         try {
           FirebaseFunctions.instanceFor(region: 'europe-west1')
-              .httpsCallable('confirmWebPayment')
+              .httpsCallable('confirmWebPaymentLexgo')
               .call({
             'orderRef': orderRef,
           }).then((result) {
             debugPrint('[PaymentCallback] Payment confirmed: $result');
+            // Token frissítése, hogy a Custom Claims érvénybe lépjen
+            FirebaseAuth.instance.currentUser?.getIdToken(true);
           }).catchError((e) {
             debugPrint('[PaymentCallback] Confirm error (non-critical): $e');
             // Nem kritikus hiba - a webhook már aktiválhatta az előfizetést
