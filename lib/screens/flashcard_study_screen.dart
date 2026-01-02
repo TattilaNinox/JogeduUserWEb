@@ -19,6 +19,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
   int _currentIndex = 0;
   bool _showAnswer = false;
   bool _isProcessing = false; // Rate limiting flag
+  Object? _error;
 
   // Evaluation counters
   int _againCount = 0;
@@ -41,6 +42,10 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
   }
 
   Future<void> _loadDeckData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final doc = await FirebaseFirestore.instance
           .collection('notes')
@@ -121,10 +126,11 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Hiba a pakli betöltése közben: $e'),
-            backgroundColor: Colors.red));
+        setState(() {
+          _isLoading = false;
+          _error = e;
+        });
+        debugPrint('Error loading deck: $e');
       }
     }
   }
@@ -331,6 +337,52 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('Hiba', style: TextStyle(color: Colors.white)),
+          backgroundColor: const Color(0xFF1E3A8A),
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nem sikerült betölteni a tanulási adatokat.',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$_error',
+                  style: const TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadDeckData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Próbáld újra'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E3A8A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Colors.white,

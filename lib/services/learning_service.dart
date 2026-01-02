@@ -133,15 +133,7 @@ class LearningService {
       return dueIndices;
     } catch (e) {
       debugPrint('Error getting due cards: $e');
-      // Hiba esetén visszaadjuk az első 20 kártyát
-      final deckDoc = await _firestore.collection('notes').doc(deckId).get();
-      if (deckDoc.exists) {
-        final deckData = deckDoc.data() as Map<String, dynamic>;
-        final flashcards =
-            List<Map<String, dynamic>>.from(deckData['flashcards'] ?? []);
-        return List.generate(flashcards.length.clamp(0, 20), (i) => i);
-      }
-      return [];
+      rethrow;
     }
   }
 
@@ -157,13 +149,8 @@ class LearningService {
       return await _getBatchLearningData(deckId, cardCount, categoryId)
           .timeout(timeout);
     } catch (e) {
-      debugPrint('Batch query timeout, falling back to default data: $e');
-      // Timeout esetén alapértelmezett adatokkal térünk vissza
-      final defaultData = <int, FlashcardLearningData>{};
-      for (int i = 0; i < cardCount; i++) {
-        defaultData[i] = _getDefaultLearningData();
-      }
-      return defaultData;
+      debugPrint('Batch query timeout: $e');
+      rethrow;
     }
   }
 
@@ -219,12 +206,7 @@ class LearningService {
       return learningDataMap;
     } catch (e) {
       debugPrint('Error getting batch learning data: $e');
-      // Hiba esetén alapértelmezett adatokkal térünk vissza
-      final defaultData = <int, FlashcardLearningData>{};
-      for (int i = 0; i < cardCount; i++) {
-        defaultData[i] = _getDefaultLearningData();
-      }
-      return defaultData;
+      rethrow;
     }
   }
 
