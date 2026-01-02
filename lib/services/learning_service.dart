@@ -293,18 +293,9 @@ class LearningService {
         return FlashcardLearningData.fromMap(doc.data()!);
       }
 
-      // Legacy útvonal ellenőrzése
-      final legacyDoc = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('user_learning_data')
-          .doc(cardId)
-          .get();
-
-      if (legacyDoc.exists) {
-        return FlashcardLearningData.fromMap(legacyDoc.data()!);
-      }
-
+      // Legacy útvonal ellenőrzés eltávolítva - a migráció már megtörtént,
+      // az új adatok a categories/{categoryId}/learning/{cardId} útvonalon tárolódnak.
+      // Ha nincs adat, alapértelmezett NEW státuszt adunk vissza.
       return _getDefaultLearningData();
     } catch (e) {
       debugPrint('Error getting current learning data: $e');
