@@ -1,0 +1,55 @@
+Részletes Kivitelezési Terv: Jegyzet Lista és Keresés Optimalizálása
+
+1. A PROBLÉMA ÖSSZEFOGLALÁSA
+----------------------------
+- Jelenleg a rendszer "Böngészés" logikával működik minden esetben: letölt 4 különböző helyről (jegyzetek, jogesetek, memóriapalota, dialógusok) 50-50 elemet (összesen ~200 db), majd ezeket kliens oldalon szűri és rendezi.
+- Ez az "Initial Load" (első betöltés) során felesleges adatforgalmat generál (150+ felesleges elem).
+- Keresésnél ("Szerződés") ez pontatlan, mert csak a már letöltött (pl. "A" betűs) elemekben keres, így a lista végén lévő találatokat nem mutatja.
+
+2. A MEGOLDÁS: KÉT ÜZEMMÓD BEVEZETÉSE
+-------------------------------------
+A `NoteCardGrid` működését szétválasztjuk két élesen elkülönülő módra:
+
+A) BÖNGÉSZÉS MÓD (Amikor NINCS keresőszó)
+   Cél: A felhasználó gyorsan lássa a legelső elemeket.
+   
+   - Optimalizálás: A lekérdezési limiteket drasztikusan csökkentjük.
+   - Jelenleg: 4 x 50 db = 200 db lekérdezés.
+   - Terv: 4 x 15 db = 60 db lekérdezés.
+   - Működés: Mivel 50 elemet mutatunk a képernyőn, a 60 db (4 kollekcióból) bőven elég az első oldal feltöltéséhez.
+   - Eredmény: 3-szor kevesebb adatforgalom induláskor -> 3x gyorsabb betöltés.
+
+B) KERESÉS MÓD (Amikor VAN keresőszó)
+   Cél: Minden releváns találat megtalálása, bárhol is van az ABC-ben.
+   
+   - Optimalizálás: "Server-side" (Szerver oldali) keresés használata.
+   - Jelenleg: Letölti az első 50-et, és abban keres.
+   - Terv: Olyan lekérdezést küldünk az adatbázisnak, ami kifejezetten a címre szűr.
+     Query: .where('title', '>=', 'KeresettSzó').where('title', '<=', 'KeresettSzó' + '\uf8ff')
+   - Működés: Az adatbázis CSAK a találatokat küldi vissza.
+   - Eredmény: Kevesebb adat, de 100%-os pontosság. Megtalálja a "Z" betűs találatokat is.
+
+3. KONKRÉT VÉGREHAJTÁSI LÉPÉSEK (Kód szinten)
+---------------------------------------------
+
+1. Lépés: `NoteCardGrid` (lib/widgets/note_card_grid.dart) módosítása
+   - A `build` metódusban a query összeállításánál bevezetünk egy `queryLimit` változót, ami dinamikus.
+   - Ha `widget.searchText` üres -> queryLimit = 15 (Böngészés mód).
+   - Ha `widget.searchText` nem üres -> queryLimit = 50 (Keresés mód).
+
+2. Lépés: Keresési Query implementálása
+   - Jelenleg a szűrés így néz ki: `.where((d) => d['title'].contains(text))` (Kliens oldali).
+   - Ezt kicseréljük Firestore szűrőre:
+     `collection('notes').where('title', isGreaterThanOrEqualTo: searchText)...`
+   - Ezt mind a 4 kollekció query-jére (notes, jogesetek, memoriapalota_allomasok, dialogus_fajlok) alkalmazni kell, ha van keresőszó.
+
+3. Lépés: Indexelés ellenőrzése
+   - A szerver oldali kereséshez a Firestore-nak szüksége lehet összetett indexekre (pl. status + title).
+   - Ha a konzol hibát dob ("The query requires an index"), a megjelenő linkre kattintva létre kell hozni a hiányzó indexeket a Firebase konzolon.
+
+4. HATÁSOK ÉS KOCKÁZATOK
+-----------------------
+- Sebesség: Érezhetően gyorsulni fog a lista betöltése (kevesebb adat).
+- Pontosság: A keresés sokkal pontosabb lesz.
+- Költség: A Firestore olvasási költségek csökkennek (kevesebb felesleges dokumentum olvasás).
+- Kockázat: A "Server-side" keresésnél a "részleges egyezés" (pl. "szerz" -> "Szerződés") csak akkor működik jól, ha a szó elejére keresünk (prefix search). A szó közepére keresés ("ződés") Firestore-ban korlátozottabb, vagy drágább megoldást igényel, de a jelenlegi 'prefix' alapú keresés általában elegendő és sokkal gyorsabb.

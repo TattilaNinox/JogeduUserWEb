@@ -8,7 +8,6 @@ import 'dart:js_interop';
 import '../widgets/audio_preview_player.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
-import '../utils/hyphenation.dart'; // Hyphenation import
 
 /// Felhasználói (csak olvasás) nézet szöveges jegyzetekhez.
 ///
@@ -51,7 +50,6 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
 
     final data = snapshot.data();
     String? htmlContent;
-    bool isPreProcessed = false;
 
     if (data != null) {
       final processedPages = data['processed_pages'] as List<dynamic>? ?? [];
@@ -64,7 +62,6 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
           processedPages.length > _currentPageIndex &&
           (processedPages[_currentPageIndex] as String?)?.isNotEmpty == true) {
         htmlContent = processedPages[_currentPageIndex] as String;
-        isPreProcessed = true;
         debugPrint('🔵 [_loadNote] Loaded content from processed_pages');
       } else if (pages.isNotEmpty) {
         htmlContent = pages[_currentPageIndex] as String? ?? '';
@@ -77,17 +74,8 @@ class _NoteReadScreenState extends State<NoteReadScreen> {
     }
 
     if (htmlContent != null && htmlContent.isNotEmpty) {
-      String contentToRender = htmlContent;
-
-      if (!isPreProcessed) {
-        debugPrint('🟢 [_loadNote] Calling hyphenateHtmlHu');
-        contentToRender = await hyphenateHtmlHu(htmlContent);
-      } else {
-        debugPrint('🟢 [_loadNote] Skipping hyphenation (pre-processed)');
-      }
-
       debugPrint('🟢 [_loadNote] Calling _setupIframe');
-      _setupIframe(contentToRender);
+      _setupIframe(htmlContent);
     } else {
       debugPrint('🔴 [_loadNote] No HTML content - NOT calling _setupIframe');
     }

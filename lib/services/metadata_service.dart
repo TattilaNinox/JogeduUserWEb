@@ -446,6 +446,14 @@ class MetadataService {
             if (category != null && category.isNotEmpty) {
               if (!catToTags.containsKey(category)) {
                 catToTags[category] = {};
+                // JAVÍTÁS: Explicit kategória regisztráció, még ha nincs is címke
+                // Így a kategória akkor is megjelenik, ha címke nélküli dokumentumok vannak benne
+                if (!tagCounts.containsKey(category)) {
+                  tagCounts[category] = {};
+                }
+                if (!hierarchicalCounts.containsKey(category)) {
+                  hierarchicalCounts[category] = {};
+                }
               }
               // JAVÍTVA: Csak az első szintű címkét (tags[0]) tároljuk a catToTags-ban
               // Így a CategoryTagsScreen csak az első szintű címkéket jeleníti meg
@@ -520,16 +528,16 @@ class MetadataService {
       final tagCountsExport = <String, Map<String, int>>{};
       final hierarchicalCountsExport = <String, Map<String, int>>{};
 
-      // JAVÍTVA: Csak aktív címkék exportálása (count > 0)
+      // JAVÍTVA: MINDEN kategória exportálása, akkor is ha nincs címkéje
+      // Így a "Római jog" és hasonló kategóriák is megjelennek, ha van bennük dokumentum
       catToTags.forEach((category, tagsSet) {
         final activeTags = tagsSet.where((tag) {
           final count = tagCounts[category]?[tag] ?? 0;
           return count > 0;
         }).toList()
           ..sort();
-        if (activeTags.isNotEmpty) {
-          catToTagsExport[category] = activeTags;
-        }
+        // JAVÍTÁS: A kategória MINDIG bekerül, akár vannak címkék, akár nincsenek
+        catToTagsExport[category] = activeTags;
       });
       tagToCats.forEach((k, v) => tagToCatsExport[k] = v.toList()..sort());
       tagCounts.forEach((k, v) => tagCountsExport[k] = v);

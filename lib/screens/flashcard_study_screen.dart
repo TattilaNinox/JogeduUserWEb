@@ -562,9 +562,13 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
                           textAlign: TextAlign.center,
                         ),
                         // Explanation section (if exists)
-                        if (currentCard['explanation'] != null &&
-                            (currentCard['explanation'] as String)
-                                .isNotEmpty) ...[
+                        // Prioritize processed_explanation over explanation (pre-hyphenated content)
+                        if ((currentCard['processed_explanation'] != null &&
+                                (currentCard['processed_explanation'] as String)
+                                    .isNotEmpty) ||
+                            (currentCard['explanation'] != null &&
+                                (currentCard['explanation'] as String)
+                                    .isNotEmpty)) ...[
                           const SizedBox(height: 16),
                           const Divider(
                             color: Colors.grey,
@@ -591,7 +595,13 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Html(
-                                data: currentCard['explanation'] ?? '',
+                                // Use processed_explanation if available, otherwise fall back to explanation
+                                data: (currentCard['processed_explanation']
+                                                as String?)
+                                            ?.isNotEmpty ==
+                                        true
+                                    ? currentCard['processed_explanation']
+                                    : currentCard['explanation'] ?? '',
                                 style: {
                                   "body": Style(
                                     margin: Margins.zero,
