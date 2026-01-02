@@ -165,6 +165,49 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         ? const ['Published', 'Public', 'Draft']
         : const ['Published', 'Public'];
 
+    // ÚJ: Típus detektálás a metadata alapján
+    // Ha az aktuális tag path csak egy típust tartalmaz, akkor csak azt töltjük be
+    String? detectedType;
+    try {
+      final metadata = await MetadataService.getCategoryTagMapping(science);
+      final tagPathToTypes =
+          metadata['tagPathToTypes'] as Map<String, Map<String, Set<String>>>?;
+      if (tagPathToTypes != null &&
+          tagPathToTypes.containsKey(widget.category)) {
+        final categoryTypes = tagPathToTypes[widget.category]!;
+        final currentPath = widget.tagPath.join('/');
+        if (kDebugMode) {
+          debugPrint(
+              '🔍 TagDrillDown: Looking for path "$currentPath" in tagPathToTypes');
+          debugPrint(
+              '🔍 TagDrillDown: Available paths: ${categoryTypes.keys.toList()}');
+        }
+        if (categoryTypes.containsKey(currentPath)) {
+          final types = categoryTypes[currentPath]!;
+          if (kDebugMode) {
+            debugPrint('🔍 TagDrillDown: Found types for path: $types');
+          }
+          // Ha csak egy típus van ebben a path-ban, akkor arra szűrünk
+          if (types.length == 1) {
+            detectedType = types.first;
+            if (kDebugMode) {
+              debugPrint(
+                  '✅ TagDrillDown: Detected single type "$detectedType" for path: $currentPath');
+            }
+          } else {
+            if (kDebugMode) {
+              debugPrint(
+                  '⚠️ TagDrillDown: Multiple types found, no filtering: $types');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ Error detecting type from metadata: $e');
+      }
+    }
+
     // FONTOS: Kontextus alapú kollekció szűrés
     // Ha a tagPath-ban van "Memóriaútvonal" (bármilyen számozással), akkor csak memoriapalota_allomasok-ot töltünk
     // Ha a tagPath-ban van "Dialogus" vagy a kategória "Dialogus tags", akkor csak dialogus_fajlok-ot töltünk
@@ -182,6 +225,11 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
             .where('science', isEqualTo: science)
             .where('category', isEqualTo: widget.category)
             .where('status', whereIn: statusFilter);
+
+        // ÚJ: Típus szűrő hozzáadása, ha detektáltunk egy egyedi típust
+        if (detectedType != null) {
+          notesQuery = notesQuery.where('type', isEqualTo: detectedType);
+        }
 
         // FONTOS: parentTag szűrőt az orderBy ELŐTT kell hozzáadni!
         if (parentTag != null) {

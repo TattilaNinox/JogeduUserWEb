@@ -315,12 +315,17 @@ class MetadataService {
         final tagToCatsMap = <String, Set<String>>{};
         final tagCountsMap = <String, Map<String, int>>{};
         final hierarchicalCountsMap = <String, Map<String, int>>{};
+        // ÚJ: tagPathToTypes olvasása
+        final tagPathToTypesMap = <String, Map<String, Set<String>>>{};
 
         final rawCatToTags = data['catToTags'] as Map<String, dynamic>? ?? {};
         final rawTagToCats = data['tagToCats'] as Map<String, dynamic>? ?? {};
         final rawTagCounts = data['tagCounts'] as Map<String, dynamic>? ?? {};
         final rawHierarchicalCounts =
             data['hierarchicalCounts'] as Map<String, dynamic>? ?? {};
+        // ÚJ: rawTagPathToTypes olvasása
+        final rawTagPathToTypes =
+            data['tagPathToTypes'] as Map<String, dynamic>? ?? {};
 
         rawCatToTags.forEach((key, value) {
           catToTagsMap[key] = Set<String>.from(value as List? ?? []);
@@ -350,8 +355,21 @@ class MetadataService {
           hierarchicalCountsMap[category.toString()] = counts;
         });
 
+        // ÚJ: tagPathToTypes konverzió
+        rawTagPathToTypes.forEach((category, pathsData) {
+          final pathsMap = <String, Set<String>>{};
+          if (pathsData is Map) {
+            pathsData.forEach((path, types) {
+              pathsMap[path.toString()] =
+                  Set<String>.from(types as List? ?? []);
+            });
+          }
+          tagPathToTypesMap[category.toString()] = pathsMap;
+        });
+
         if (kDebugMode) {
-          debugPrint('✅ MetadataService: Aggregated Structure loaded ($docId)');
+          debugPrint(
+              '\u2705 MetadataService: Aggregated Structure loaded ($docId)');
         }
 
         // Generate catToAllTags by inverting tagToCats
@@ -373,26 +391,30 @@ class MetadataService {
           'tagToCats': tagToCatsMap,
           'tagCounts': tagCountsMap,
           'hierarchicalCounts': hierarchicalCountsMap,
+          'tagPathToTypes': tagPathToTypesMap, // ÚJ: Típusok path-enként
         };
       } else {
         if (kDebugMode) {
           debugPrint(
-              '⚠️ MetadataService: Aggregated Structure ($docId) NOT found. Empty map returned.');
+              '\u26a0\ufe0f MetadataService: Aggregated Structure ($docId) NOT found. Empty map returned.');
         }
         return {
           'catToTags': {},
           'tagToCats': {},
           'tagCounts': {},
           'hierarchicalCounts': {},
+          'tagPathToTypes': {},
         };
       }
     } catch (e) {
-      debugPrint('🔴 MetadataService: Error loading aggregated map: $e');
+      debugPrint(
+          '\ud83d\udd34 MetadataService: Error loading aggregated map: $e');
       return {
         'catToTags': {},
         'tagToCats': {},
         'tagCounts': {},
         'hierarchicalCounts': {},
+        'tagPathToTypes': {},
       };
     }
   }
@@ -413,6 +435,10 @@ class MetadataService {
       // Formátum: hierarchicalCounts['Alkotmányjog']['Alaptörvény'] = 39
       //           hierarchicalCounts['Alkotmányjog']['Alaptörvény/1. Nemzeti hitvallás'] = 5
       final hierarchicalCounts = <String, Map<String, int>>{};
+      // ÚJ: Tag path-hez tartozó típusok
+      // Formátum: tagPathToTypes['Alkotmányjog']['Alaptörvény/8. Tanulókártyák'] = {'deck'}
+      //           tagPathToTypes['Alkotmányjog']['Alaptörvény'] = {'deck', 'text'}
+      final tagPathToTypes = <String, Map<String, Set<String>>>{};
       int docCount = 0;
 
       // Segédfüggvény egy kollekció feldolgozására
@@ -431,6 +457,8 @@ class MetadataService {
           for (var doc in snapshot.docs) {
             final data = doc.data() as Map<String, dynamic>;
             var category = data['category'] as String?;
+            // ÚJ: Típus kiolvasása
+            final docType = data['type'] as String? ?? 'standard';
 
             List<String> tags = [];
             final rawTags = data['tags'];
@@ -453,6 +481,10 @@ class MetadataService {
                 }
                 if (!hierarchicalCounts.containsKey(category)) {
                   hierarchicalCounts[category] = {};
+                }
+                // ÚJ: tagPathToTypes inicializálása
+                if (!tagPathToTypes.containsKey(category)) {
+                  tagPathToTypes[category] = {};
                 }
               }
               // JAVÍTVA: Csak az első szintű címkét (tags[0]) tároljuk a catToTags-ban
@@ -496,6 +528,12 @@ class MetadataService {
 
                   hierarchicalCounts[category]![currentPath] =
                       (hierarchicalCounts[category]![currentPath] ?? 0) + 1;
+
+                  // ÚJ: Típus hozzáadása az útvonalhoz
+                  if (!tagPathToTypes[category]!.containsKey(currentPath)) {
+                    tagPathToTypes[category]![currentPath] = {};
+                  }
+                  tagPathToTypes[category]![currentPath]!.add(docType);
                 }
               }
 
@@ -527,6 +565,8 @@ class MetadataService {
       final tagToCatsExport = <String, List<String>>{};
       final tagCountsExport = <String, Map<String, int>>{};
       final hierarchicalCountsExport = <String, Map<String, int>>{};
+      // ÚJ: tagPathToTypes export - Set<String> -> List<String> konverzió
+      final tagPathToTypesExport = <String, Map<String, List<String>>>{};
 
       // JAVÍTVA: MINDEN kategória exportálása, akkor is ha nincs címkéje
       // Így a "Római jog" és hasonló kategóriák is megjelennek, ha van bennük dokumentum
@@ -542,6 +582,13 @@ class MetadataService {
       tagToCats.forEach((k, v) => tagToCatsExport[k] = v.toList()..sort());
       tagCounts.forEach((k, v) => tagCountsExport[k] = v);
       hierarchicalCounts.forEach((k, v) => hierarchicalCountsExport[k] = v);
+      // ÚJ: tagPathToTypes konverzió
+      tagPathToTypes.forEach((category, pathMap) {
+        tagPathToTypesExport[category] = {};
+        pathMap.forEach((path, types) {
+          tagPathToTypesExport[category]![path] = types.toList()..sort();
+        });
+      });
 
       final docId = '${science.toLowerCase().replaceAll('á', 'a')}_structure';
       await FirebaseConfig.firestore.collection('metadata').doc(docId).set({
@@ -550,6 +597,7 @@ class MetadataService {
         'tagCounts': tagCountsExport, // Első szintű címkék count-ja
         'hierarchicalCounts':
             hierarchicalCountsExport, // ÚJ: Hierarchikus counts
+        'tagPathToTypes': tagPathToTypesExport, // ÚJ: Típusok path-enként
         'updatedAt': FieldValue.serverTimestamp(),
         'docCount': docCount,
       });

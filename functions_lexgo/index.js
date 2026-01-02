@@ -288,6 +288,55 @@ async function clearPremiumClaims(userId) {
 }
 
 // ============================================================================
+// ADMIN ONLY: TESZT FUNKCIÓ CUSTOM CLAIMS BEÁLLÍTÁSÁHOZ
+// ============================================================================
+
+/**
+ * Admin-only: Custom Claims beállítása teszteléshez.
+ * Csak a tattila.ninox@gmail.com email címről hívható.
+ * 
+ * Input: { targetUserId, action: 'set' | 'clear', days?: number }
+ */
+exports.adminSetPremiumClaimsLexgo = onCall(async (request) => {
+  // Admin ellenőrzés
+  const callerEmail = request.auth?.token?.email;
+  if (callerEmail !== 'tattila.ninox@gmail.com') {
+    throw new HttpsError('permission-denied', 'Csak admin használhatja ezt a funkciót');
+  }
+
+  const { targetUserId, action, days } = request.data || {};
+
+  if (!targetUserId) {
+    throw new HttpsError('invalid-argument', 'targetUserId szükséges');
+  }
+
+  if (action === 'set') {
+    const daysToAdd = days || 30;
+    const expiryDate = new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000);
+    await setPremiumClaims(targetUserId, expiryDate);
+
+    return {
+      success: true,
+      action: 'set',
+      targetUserId,
+      premiumUntil: expiryDate.toISOString(),
+      message: `Custom Claims beállítva ${daysToAdd} napra`
+    };
+  } else if (action === 'clear') {
+    await clearPremiumClaims(targetUserId);
+
+    return {
+      success: true,
+      action: 'clear',
+      targetUserId,
+      message: 'Custom Claims törölve'
+    };
+  } else {
+    throw new HttpsError('invalid-argument', 'action: "set" vagy "clear" szükséges');
+  }
+});
+
+// ============================================================================
 // LEXGO PAYMENT CONFIRMATION (kliens hívja sikeres fizetés után)
 // ============================================================================
 

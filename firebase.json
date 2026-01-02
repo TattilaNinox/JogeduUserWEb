@@ -72,6 +72,19 @@
         ]
       },
       {
+        "source": "/audio/**",
+        "headers": [
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          },
+          {
+            "key": "Access-Control-Allow-Methods",
+            "value": "GET, OPTIONS"
+          }
+        ]
+      },
+      {
         "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|ico)",
         "headers": [
           {
