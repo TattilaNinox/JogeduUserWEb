@@ -24,7 +24,7 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
   DeckCollection? _collection;
   List<Map<String, dynamic>> _allCards = [];
   Map<String, Map<String, dynamic>> _learningData = {};
-  Map<String, int>? _stats;
+
   bool _isLoading = true;
   String? _error;
 
@@ -60,11 +60,6 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
         shuffle: false,
       );
 
-      // Statisztikák lekérése
-      final stats = await DeckCollectionService.getCollectionStats(
-        widget.collectionId,
-      );
-
       // Tanulási adatok betöltése
       final learningData = await _loadLearningData(allCards);
 
@@ -72,7 +67,6 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
         setState(() {
           _collection = collection;
           _allCards = allCards;
-          _stats = stats;
           _learningData = learningData;
           _isLoading = false;
         });
@@ -184,24 +178,6 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
       } else {
         content = Column(
           children: [
-            // Statisztikák összefoglaló
-            if (_stats != null)
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(isMobile ? 12 : 16),
-                color: Colors.grey.shade100,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildStatChip('Összes', _allCards.length, Colors.grey),
-                    _buildStatChip(
-                        'Esedékes', _stats!['due'] ?? 0, Colors.orange),
-                    _buildStatChip('Új', _stats!['new'] ?? 0, Colors.blue),
-                    _buildStatChip(
-                        'Tanulásban', _stats!['learning'] ?? 0, Colors.purple),
-                  ],
-                ),
-              ),
             // Kártyák grid
             Expanded(
               child: GridView.builder(
@@ -324,29 +300,6 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
           icon: const Icon(Icons.refresh, color: Color(0xFF1E3A8A)),
           tooltip: 'Frissítés',
           onPressed: _loadCollectionData,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatChip(String label, int count, Color color) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$count',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
-          ),
         ),
       ],
     );
