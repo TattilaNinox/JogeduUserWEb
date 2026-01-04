@@ -18,7 +18,7 @@ class NoteListTile extends StatelessWidget {
   final bool hasAudio;
   final bool hasVideo;
   final int? deckCount;
-  final String? questionBankId;
+  final List<String>? questionBankIds;
   final String? audioUrl;
   final bool isLocked; // Új paraméter a zárt állapot jelzésére
   final bool isLast; // Jelzi, hogy ez az utolsó elem a listában
@@ -36,7 +36,7 @@ class NoteListTile extends StatelessWidget {
     required this.hasAudio,
     required this.hasVideo,
     this.deckCount,
-    this.questionBankId,
+    this.questionBankIds,
     this.audioUrl,
     this.isLocked = false, // Alapértelmezetten nem zárt
     this.isLast = false, // Alapértelmezetten nem utolsó
@@ -189,13 +189,16 @@ class NoteListTile extends StatelessWidget {
 
   Future<void> _openQuiz(BuildContext context, {required bool dualMode}) async {
     try {
-      String? bankId = questionBankId;
-      if (bankId == null || bankId.isEmpty) {
+      List<String>? bankIds = questionBankIds;
+      if (bankIds == null || bankIds.isEmpty) {
         final noteDoc =
             await FirebaseConfig.firestore.collection('notes').doc(id).get();
-        bankId = (noteDoc.data() ?? const {})['questionBankId'] as String?;
+        final data = noteDoc.data() ?? const {};
+        bankIds = (data['questionBankIds'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList();
       }
-      if (bankId == null || bankId.isEmpty) {
+      if (bankIds == null || bankIds.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -226,8 +229,9 @@ class NoteListTile extends StatelessWidget {
         );
       }
 
-      final selected = await QuestionBankService.getQuizSession(
-        bankId,
+      final selected =
+          await QuestionBankService.getQuizSessionFromMultipleBanks(
+        bankIds,
         user.uid,
         sessionSize: 10,
         cacheSize: 50,

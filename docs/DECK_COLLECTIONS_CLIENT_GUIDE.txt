@@ -1,0 +1,163 @@
+# DECK COLLECTIONS - Kliens Fejlesztői Dokumentáció
+# ================================================
+# Verzió: 1.0
+# Dátum: 2025-01-04
+
+## ÖSSZEFOGLALÓ
+
+A Deck Collections egy új Firestore collection, amely lehetővé teszi a
+tanulókártya paklik (decks) csoportosítását gyűjteményekbe. Jelenleg
+CSAK a "Jogász" tudományhoz tartozó paklikra vonatkozik.
+
+## FONTOS: FORDÍTOTT MEGKÖZELÍTÉS
+
+Ez NEM olyan mint a question_banks!
+- question_banks: A kérdések a bank-ban vannak, a quiz hivatkozik rá
+- deck_collections: A paklik MARADNAK a notes-ban, a collection hivatkozik rájuk
+
+```
+deck_collections/{id}              notes/{deckId}
+├── name: "PTK Csomag"             ├── type: "deck"
+├── science: "Jogász"              ├── title: "PTK Kötelmi jog"
+├── category: "PTK"                ├── flashcards: [...]  <-- VÁLTOZATLAN!
+└── deckIds: ["deck1", "deck2"]    └── ...
+         │
+         └──────────────────────────────┘
+              (referencia notes ID-kra)
+```
+
+## FIRESTORE STRUKTÚRA
+
+### Collection: deck_collections
+
+| Mező       | Típus             | Leírás                              |
+|------------|-------------------|-------------------------------------|
+| name       | String            | Gyűjtemény neve                     |
+| science    | String            | Mindig "Jogász"                     |
+| category   | String (nullable) | Kategória (pl. "PTK", "BKK")        |
+| deckIds    | Array<String>     | Notes collection deck ID-k listája  |
+| createdAt  | Timestamp         | Létrehozás időpontja                |
+| modified   | Timestamp         | Utolsó módosítás időpontja          |
+
+### IMPORTANT: A paklik NEM változnak!
+
+A notes collection-ben lévő deck dokumentumok (type: "deck") strukturája
+VÁLTOZATLAN marad. A flashcards tömb továbbra is közvetlenül a deck
+dokumentumban található.
+
+## KLIENS IMPLEMENTÁCIÓ
+
+### 1. Gyűjtemények lekérdezése
+
+```dart
+// Összes Jogász gyűjtemény
+final collectionsSnapshot = await FirebaseFirestore.instance
+    .collection('deck_collections')
+    .where('science', isEqualTo: 'Jogász')
+    .get();
+
+for (final doc in collectionsSnapshot.docs) {
+  final data = doc.data();
+  final name = data['name'];
+  final deckIds = List<String>.from(data['deckIds'] ?? []);
+  print('Gyűjtemény: $name, Paklik száma: ${deckIds.length}');
+}
+```
+
+### 2. Gyűjteményhez tartozó paklik betöltése
+
+```dart
+Future<List<Map<String, dynamic>>> loadDecksFromCollection(
+  String collectionId,
+) async {
+  // 1. Gyűjtemény dokumentum lekérése
+  final collectionDoc = await FirebaseFirestore.instance
+      .collection('deck_collections')
+      .doc(collectionId)
+      .get();
+  
+  if (!collectionDoc.exists) return [];
+  
+  final deckIds = List<String>.from(collectionDoc.data()!['deckIds'] ?? []);
+  
+  // 2. Paklik lekérése (notes collection-ből)
+  final List<Map<String, dynamic>> decks = [];
+  
+  for (final deckId in deckIds) {
+    final deckDoc = await FirebaseFirestore.instance
+        .collection('notes')
+        .doc(deckId)
+        .get();
+    
+    if (deckDoc.exists) {
+      decks.add({
+        'id': deckDoc.id,
+        ...deckDoc.data()!,
+      });
+    }
+  }
+  
+  return decks;
+}
+```
+
+### 3. Kártyák elérése egy paklin belül
+
+```dart
+// A pakli dokumentumból közvetlenül elérhető a flashcards tömb
+final flashcards = deck['flashcards'] as List<dynamic>;
+
+for (final card in flashcards) {
+  final front = card['front'];      // Kártya előoldala
+  final back = card['back'];        // Kártya hátoldala
+  final explanation = card['explanation'];  // Magyarázat (HTML)
+  final processed_explanation = card['processed_explanation'];  // Feldolgozott
+}
+```
+
+## BACKWARD COMPATIBILITY
+
+A deck_collections egy OPCIONÁLIS réteg!
+
+- Standalone paklik: Továbbra is működnek önállóan
+- Régi kliensek: Nem kell módosítani, a notes lekérdezés változatlan
+- Új kliensek: Választhatnak gyűjtemény-alapú vagy egyéni pakli nézetet
+
+## FIRESTORE INDEXES
+
+A következő összetett indexek szükségesek:
+
+1. deck_collections: science (Asc)
+2. deck_collections: science (Asc), category (Asc)
+
+## SECURITY RULES
+
+```javascript
+match /deck_collections/{collectionId} {
+  allow read: if request.auth != null;
+  allow write: if isAdmin();
+}
+```
+
+## UI FLOW JAVASLAT
+
+```
+[Főképernyő]
+    │
+    ├── "Tanulókártyák" menüpont
+    │       │
+    │       ├── [Gyűjtemény nézet] - deck_collections alapján
+    │       │       │
+    │       │       └── [Gyűjtemény részletei] - deckIds alapján paklik listája
+    │       │               │
+    │       │               └── [Pakli tanulás] - flashcards tömb
+    │       │
+    │       └── [Egyéni paklik] - notes collection közvetlen lekérdezés
+    │               │
+    │               └── [Pakli tanulás]
+```
+
+## KÉRDÉSEK / TÁMOGATÁS
+
+Ha kérdésed van a deck_collections implementációval kapcsolatban,
+keresd a backend fejlesztőt.

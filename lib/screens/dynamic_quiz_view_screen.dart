@@ -103,9 +103,13 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
       }
 
       final data = snapshot.data() as Map<String, dynamic>;
-      final questionBankId = data['questionBankId'] as String?;
 
-      if (questionBankId == null || questionBankId.isEmpty) {
+      // Read questionBankIds array (new format)
+      final questionBankIds = (data['questionBankIds'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList();
+
+      if (questionBankIds == null || questionBankIds.isEmpty) {
         setState(() {
           _error = 'Ehhez a kvízhez nincs társítva kérdésbank.';
           _isLoading = false;
@@ -114,7 +118,7 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
       }
 
       _noteSnapshot = snapshot;
-      await _loadQuestions(questionBankId);
+      await _loadQuestions(questionBankIds);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -124,7 +128,7 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
     }
   }
 
-  Future<void> _loadQuestions(String questionBankId) async {
+  Future<void> _loadQuestions(List<String> questionBankIds) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -135,8 +139,9 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
         return;
       }
 
-      final questions = await QuestionBankService.getQuizSession(
-        questionBankId,
+      final questions =
+          await QuestionBankService.getQuizSessionFromMultipleBanks(
+        questionBankIds,
         user.uid,
         sessionSize: 10,
         cacheSize: 50,

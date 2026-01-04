@@ -1,0 +1,197 @@
+================================================================================
+          DUÁLKVÍZ TÖBBSZÖRÖS KÉRDÉSBANK - KLIENS IMPLEMENTÁCIÓS ÚTMUTATÓ
+================================================================================
+
+Verzió: 1.0
+Dátum: 2026-01-04
+Készítette: Admin rendszer
+
+================================================================================
+1. ADATSTRUKTÚRA VÁLTOZÁS
+================================================================================
+
+ÚJ MEZŐ A NOTES DOKUMENTUMBAN:
+------------------------------
+Mező neve:      questionBankIds
+Típus:          Array<String>
+Leírás:         A duálkvízhez rendelt kérdésbank dokumentumok ID-jainak listája
+
+LEGACY MEZŐ (VISSZAFELÉ KOMPATIBILITÁS):
+----------------------------------------
+Mező neve:      questionBankId  
+Típus:          String
+Leírás:         Régi formátum - egyetlen kérdésbank ID
+
+FONTOS: A kliens alkalmazásnak MINDKÉT formátumot támogatnia kell!
+
+================================================================================
+2. FIRESTORE DOKUMENTUM PÉLDÁK
+================================================================================
+
+ÚJ FORMÁTUM (2026-01-04 után létrehozott/szerkesztett dokumentumok):
+--------------------------------------------------------------------
+{
+  "title": "PTK Kötelmi jog kvíz",
+  "type": "dynamic_quiz_dual",
+  "category": "PTK",
+  "science": "Jog",
+  "questionBankIds": [
+    "abc123xyz",
+    "def456uvw", 
+    "ghi789rst"
+  ],
+  "status": "Published",
+  "tags": ["PTK", "Kötelmi jog"],
+  "createdAt": "...",
+  "modified": "..."
+}
+
+RÉGI FORMÁTUM (legacy dokumentumok):
+------------------------------------
+{
+  "title": "Régi kvíz",
+  "type": "dynamic_quiz_dual",
+  "category": "PTK",
+  "science": "Jog",
+  "questionBankId": "single_bank_id",
+  "status": "Published",
+  "tags": ["PTK"],
+  "createdAt": "...",
+  "modified": "..."
+}
+
+================================================================================
+3. KLIENS OLDALI IMPLEMENTÁCIÓ - ADATBETÖLTÉS
+================================================================================
+
+DART/FLUTTER PÉLDAKÓD:
+----------------------
+
+/// Kérdésbank ID-k kinyerése a dokumentumból (mindkét formátum támogatása)
+List<String> getQuestionBankIds(Map<String, dynamic> noteData) {
+  // Új formátum: questionBankIds lista
+  if (noteData['questionBankIds'] != null) {
+    return List<String>.from(noteData['questionBankIds']);
+  }
+  // Legacy formátum: questionBankId string
+  else if (noteData['questionBankId'] != null) {
+    return [noteData['questionBankId'] as String];
+  }
+  // Nincs kérdésbank
+  return [];
+}
+
+================================================================================
+4. KÉRDÉSEK ÖSSZEGYŰJTÉSE TÖBB BANKBÓL
+================================================================================
+
+DART/FLUTTER PÉLDAKÓD:
+----------------------
+
+/// Összes kérdés összegyűjtése a megadott kérdésbankokból
+Future<List<Map<String, dynamic>>> collectQuestionsFromBanks(
+    List<String> bankIds) async {
+  
+  final allQuestions = <Map<String, dynamic>>[];
+  
+  for (final bankId in bankIds) {
+    final bankDoc = await FirebaseFirestore.instance
+        .collection('question_banks')
+        .doc(bankId)
+        .get();
+    
+    if (!bankDoc.exists) continue;
+    
+    final bankData = bankDoc.data()!;
+    final questions = List<Map<String, dynamic>>.from(
+        bankData['questions'] ?? []);
+    
+    allQuestions.addAll(questions);
+  }
+  
+  return allQuestions;
+}
+
+/// Kvíz indítása - kérdések véletlenszerű kiválasztása
+Future<List<Map<String, dynamic>>> startQuiz(
+    Map<String, dynamic> noteData, 
+    {int questionCount = 10}) async {
+  
+  // 1. Kérdésbank ID-k kinyerése (mindkét formátum)
+  final bankIds = getQuestionBankIds(noteData);
+  
+  if (bankIds.isEmpty) {
+    throw Exception('Nincs kérdésbank a kvízhez');
+  }
+  
+  // 2. Összes kérdés összegyűjtése
+  final allQuestions = await collectQuestionsFromBanks(bankIds);
+  
+  if (allQuestions.isEmpty) {
+    throw Exception('A kérdésbankok üresek');
+  }
+  
+  // 3. Véletlenszerű keverés
+  allQuestions.shuffle();
+  
+  // 4. Kívánt számú kérdés kiválasztása
+  return allQuestions.take(questionCount).toList();
+}
+
+================================================================================
+5. MEGJELENÍTÉSI SZEMPONTOK
+================================================================================
+
+A FELHASZNÁLÓ SZÁMÁRA NEM KELL MEGJELENÍTENI:
+- Hogy hány bankból jönnek a kérdések
+- A bankok neveit/azonosítóit
+
+A KVÍZ LOGIKA SZEMPONTJÁBÓL:
+- A kérdések összekeverednek az összes bankból
+- A felhasználó nem tudja, melyik kérdés melyik bankból származik
+- Ez növeli a kvíz változatosságát
+
+================================================================================
+6. KÉRDÉS STRUKTÚRA (nincs változás)
+================================================================================
+
+Minden kérdés a question_banks/{bankId}/questions tömbben:
+
+{
+  "question": "Mi a helyes válasz?",
+  "options": [
+    {"text": "Válasz A", "isCorrect": false},
+    {"text": "Válasz B", "isCorrect": true},
+    {"text": "Válasz C", "isCorrect": true},
+    {"text": "Válasz D", "isCorrect": false}
+  ]
+}
+
+DUÁLKVÍZ SPECIALITÁS:
+- Pontosan 2 helyes válasz van minden kérdésben (isCorrect: true)
+- A felhasználónak mindkettőt meg kell találnia
+
+================================================================================
+7. HIBAKEZELÉS
+================================================================================
+
+JAVASOLT HIBAKEZELÉSI ESETEK:
+1. Üres bankIds lista → "Nincs elérhető kérdés"
+2. Nem létező bankId → Kihagyás (continue), ne dobjon hibát
+3. Üres kérdéslista → "A kvíz nem tartalmaz kérdéseket"
+4. Kevesebb kérdés mint kért → Az összes elérhető kérdés használata
+
+================================================================================
+8. ÖSSZEFOGLALÓ CHECKLIST
+================================================================================
+
+[ ] Új mező támogatása: questionBankIds (Array<String>)
+[ ] Legacy mező támogatása: questionBankId (String)
+[ ] Kérdések összegyűjtése több bankból
+[ ] Kérdések összekeverése
+[ ] Hibakezelés nem létező bankok esetén
+[ ] Tesztelés mindkét formátumú dokumentummal
+
+================================================================================
+KÉRDÉSEK ESETÉN: Fordulj az admin rendszer fejlesztőjéhez
+================================================================================

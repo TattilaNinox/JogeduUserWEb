@@ -140,6 +140,8 @@ class Sidebar extends StatelessWidget {
             ),
             _buildMenuItem(
                 context, 'notes', 'Tags Főoldal', selectedMenu == 'notes'),
+            _buildMenuItem(context, 'deck-collections', 'Paklik',
+                selectedMenu == 'deck-collections'),
             _buildMenuItem(context, 'my-bundles', 'Saját kötegek',
                 selectedMenu == 'my-bundles'),
             FutureBuilder<bool>(
@@ -256,6 +258,9 @@ class Sidebar extends StatelessWidget {
       case 'decks':
         iconData = Icons.style;
         break;
+      case 'deck-collections':
+        iconData = Icons.collections_bookmark;
+        break;
       case 'users':
         iconData = Icons.people;
         break;
@@ -300,6 +305,8 @@ class Sidebar extends StatelessWidget {
           _navigate(context, '/dynamic-quiz-dual/create');
         } else if (routeName == 'my-bundles') {
           _navigate(context, '/my-bundles');
+        } else if (routeName == 'deck-collections') {
+          _navigate(context, '/deck-collections');
         } else if (routeName == 'question_banks') {
           _navigate(context, '/question-banks');
         } else if (routeName == 'categories') {

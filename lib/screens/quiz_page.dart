@@ -6,13 +6,13 @@ import '../widgets/quiz_viewer_dual.dart';
 
 class QuizPage extends StatefulWidget {
   final String noteId;
-  final String questionBankId;
+  final List<String> questionBankIds;
   final String quizType;
 
   const QuizPage({
     super.key,
     required this.noteId,
-    required this.questionBankId,
+    required this.questionBankIds,
     required this.quizType,
   });
 
@@ -50,19 +50,22 @@ class _QuizPageState extends State<QuizPage> {
       }
 
       // Try to get personalized questions first
-      final questions = await QuestionBankService.getPersonalizedQuestions(
-        widget.questionBankId,
+      final questions =
+          await QuestionBankService.getQuizSessionFromMultipleBanks(
+        widget.questionBankIds,
         user.uid,
-        maxQuestions: 10,
+        sessionSize: 10,
+        cacheSize: 50,
       );
 
       if (questions.isEmpty) {
-        // Fallback to random questions
+        // Fallback to direct fetch
         final fallbackQuestions =
-            await QuestionBankService.getPersonalizedQuestions(
-          widget.questionBankId,
+            await QuestionBankService.getQuizSessionFromMultipleBanks(
+          widget.questionBankIds,
           user.uid,
-          maxQuestions: 10,
+          sessionSize: 10,
+          cacheSize: 50,
         );
 
         if (fallbackQuestions.isEmpty) {

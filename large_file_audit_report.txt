@@ -1,0 +1,37 @@
+NAGY FÁJL AUDIT JELENTÉS
+
+Ez a dokumentum a projektben található nagyméretű fájlokat listázza a karbantarthatóság javítása érdekében. A 300 sornál hosszabb `.dart` fájlokat vizsgáltuk.
+
+ÖSSZEFOGLALÓ
+- Kritikus méretű fájlok (>1000 sor): 4 db
+- Nagy méretű fájlok (500-1000 sor): 30 db
+- Közepes méretű fájlok (300-500 sor): 26 db
+
+FIGYELEM: A 1000 sor feletti fájlok általában több felelősségi kört is ellátnak, ezért ezeket javasolt elsőként refaktorálni.
+
+---
+
+1. KRITIKUS FÁJLOK (>1000 sor)
+Ezeket a fájlokat érdemes sürgősen felbontani.
+
+- memoriapalota_allomas_view_screen.dart (2205 sor): Túl sok UI építő metódus.
+- account_screen.dart (1635 sor): Profil, előfizetés, beállítások egyben.
+- user_list_screen.dart (1180 sor): Admin lista és szűrési logika.
+- note_edit_screen.dart (1028 sor): Komplex szerkesztő és mentési logika.
+
+2. NAGY FÁJLOK (500-1000 sor) - KIEMELT PÉLDÁK
+- jogeset_view_screen.dart (947 sor)
+- note_list_screen.dart (945 sor)
+- shipping_address_form.dart (925 sor)
+- quiz_viewer_dual.dart (857 sor)
+- note_table.dart (791 sor)
+- note_read_screen.dart (781 sor)
+- flashcard_study_screen.dart (770 sor)
+- note_create_screen.dart (725 sor)
+
+További érintett fájlok: user_bundle_edit_screen.dart, user_bundle_view_screen.dart, tag_drill_down_screen.dart, note_card_grid.dart, login_screen.dart, interactive_note_create_screen.dart, document_selection_screen.dart, two_factor_auth_screen.dart, enhanced_subscription_status_card.dart, metadata_service.dart, subscription_renewal_button.dart, web_payment_plans.dart, mini_audio_player.dart, web_payment_history.dart, question_bank_edit_screen.dart, deck_edit_screen.dart, study_board_screen.dart.
+
+3. AJÁNLÁSOK
+1. Widgetek Kiszervezése: A hosszú build metódusok darabolása külön widgetekbe.
+2. Logika Leválasztása: Üzleti logika (Firebase, számítások) kiszervezése Service/Controller osztályokba.
+3. Állapotkezelés: Provider/Riverpod/Bloc használata a setState-ek helyett a komplexebb állapothoz.

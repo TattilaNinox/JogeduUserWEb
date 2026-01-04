@@ -249,15 +249,18 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
   void _handleQuizNavigation() {
     final data = _noteSnapshot!.data() as Map<String, dynamic>;
     final type = data['type'] as String? ?? '';
-    final questionBankId = data['questionBankId'] as String?;
+    final questionBankIds = (data['questionBankIds'] as List<dynamic>?)
+        ?.map((e) => e as String)
+        .toList();
 
-    if (questionBankId != null &&
+    if (questionBankIds != null &&
+        questionBankIds.isNotEmpty &&
         (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual')) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => QuizPage(
             noteId: widget.noteId,
-            questionBankId: questionBankId,
+            questionBankIds: questionBankIds,
             quizType: type,
           ),
         ),
@@ -305,7 +308,9 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
     final data = _noteSnapshot!.data() as Map<String, dynamic>;
     final title = data['title'] as String? ?? 'Cím nélkül';
     final type = data['type'] as String? ?? '';
-    final questionBankId = data['questionBankId'] as String?;
+    final questionBankIds = (data['questionBankIds'] as List<dynamic>?)
+        ?.map((e) => e as String)
+        .toList();
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
@@ -403,7 +408,8 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
                       ),
                       const SizedBox(height: 32),
                       ElevatedButton.icon(
-                        onPressed: questionBankId != null
+                        onPressed: questionBankIds != null &&
+                                questionBankIds.isNotEmpty
                             ? _handleQuizNavigation
                             : null,
                         icon: const Icon(Icons.play_arrow),
@@ -416,7 +422,8 @@ class _InteractiveNoteViewScreenState extends State<InteractiveNoteViewScreen> {
                           textStyle: const TextStyle(fontSize: 18),
                         ),
                       ),
-                      if (questionBankId == null) ...[
+                      if (questionBankIds == null ||
+                          questionBankIds.isEmpty) ...[
                         const SizedBox(height: 16),
                         Text(
                           'Hiba: Nincs kérdésbank azonosító',

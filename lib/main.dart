@@ -21,6 +21,9 @@ import 'screens/device_change_screen.dart';
 import 'screens/note_read_screen.dart';
 import 'screens/flashcard_deck_view_screen.dart';
 import 'screens/flashcard_study_screen.dart';
+import 'screens/deck_collection_list_screen.dart';
+import 'screens/deck_collection_view_screen.dart';
+import 'screens/collection_study_screen.dart';
 import 'screens/interactive_note_view_screen.dart';
 import 'screens/dynamic_quiz_view_screen.dart';
 import 'screens/memoriapalota_allomas_view_screen.dart';
@@ -286,6 +289,25 @@ final _router = GoRouter(
     // Szerkesztés útvonal eltávolítva
     // További admin útvonalak eltávolítva
     // 2FA route eltávolítva a felhasználói webből
+    // Deck Collections útvonalak
+    GoRoute(
+      path: '/deck-collections',
+      builder: (context, state) => const DeckCollectionListScreen(),
+    ),
+    GoRoute(
+      path: '/deck-collections/:collectionId',
+      builder: (context, state) {
+        final collectionId = state.pathParameters['collectionId']!;
+        return DeckCollectionViewScreen(collectionId: collectionId);
+      },
+    ),
+    GoRoute(
+      path: '/deck-collections/:collectionId/study',
+      builder: (context, state) {
+        final collectionId = state.pathParameters['collectionId']!;
+        return CollectionStudyScreen(collectionId: collectionId);
+      },
+    ),
     // Flashcard deck megtekintés útvonal (csak olvasás)
     GoRoute(
       path: '/deck/:deckId/view',

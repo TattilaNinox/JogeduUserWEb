@@ -428,13 +428,16 @@ class _NoteTableState extends State<NoteTable> {
 
                     if (noteType == 'dynamic_quiz' ||
                         noteType == 'dynamic_quiz_dual') {
-                      final questionBankId = data['questionBankId'] as String?;
-                      if (questionBankId == null || questionBankId.isEmpty) {
+                      final questionBankIds =
+                          (data['questionBankIds'] as List<dynamic>?)
+                              ?.map((e) => e as String)
+                              .toList();
+                      if (questionBankIds == null || questionBankIds.isEmpty) {
                         _showSnackBar(context,
                             'Hiba: Ehhez a kvízhez nincs társítva kérdésbank.');
                         return;
                       }
-                      _showQuizPreviewDialog(context, questionBankId,
+                      _showQuizPreviewDialog(context, questionBankIds,
                           dualMode: noteType == 'dynamic_quiz_dual');
                     } else if (noteType == 'interactive') {
                       context.go('/interactive-note/${doc.id}?from=$fromParam');
@@ -769,32 +772,40 @@ class _NoteTableState extends State<NoteTable> {
     );
   }
 
-  void _showQuizPreviewDialog(BuildContext context, String bankId,
+  void _showQuizPreviewDialog(BuildContext context, List<String> bankIds,
       {bool dualMode = false}) async {
-    final bankDoc = await FirebaseConfig.firestore
-        .collection('question_banks')
-        .doc(bankId)
-        .get();
-    if (!bankDoc.exists) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Hiba: A kérdésbank nem található.')));
-      }
-      return;
-    }
-    final bank = bankDoc.data()!;
-    final questions = List<Map<String, dynamic>>.from(bank['questions'] ?? []);
-    questions.shuffle();
-    final selectedQuestions =
-        questions.take(10).map((q) => Question.fromMap(q)).toList();
+    // Fetch all banks in parallel
+    final bankFutures = bankIds.map((bankId) async {
+      return await FirebaseConfig.firestore
+          .collection('question_banks')
+          .doc(bankId)
+          .get();
+    });
+    final bankDocs = await Future.wait(bankFutures);
 
-    if (selectedQuestions.isEmpty) {
+    // Collect all questions from all banks
+    final allQuestions = <Map<String, dynamic>>[];
+    for (final bankDoc in bankDocs) {
+      if (bankDoc.exists) {
+        final bank = bankDoc.data()!;
+        final questions =
+            List<Map<String, dynamic>>.from(bank['questions'] ?? []);
+        allQuestions.addAll(questions);
+      }
+    }
+
+    if (allQuestions.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Ez a kérdésbank nem tartalmaz kérdéseket.')));
+            content: Text('A kérdésbankok nem tartalmaznak kérdéseket.')));
       }
       return;
     }
+
+    // Shuffle all questions together
+    allQuestions.shuffle();
+    final selectedQuestions =
+        allQuestions.take(10).map((q) => Question.fromMap(q)).toList();
 
     if (context.mounted) {
       showDialog(

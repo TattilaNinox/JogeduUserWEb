@@ -50,6 +50,183 @@ class QuestionBankService {
     }
   }
 
+  /// Get a session of questions from MULTIPLE banks.
+  /// Collects questions from all specified banks, combines them, and applies
+  /// the same shuffle/personalization logic as single-bank sessions.
+  /// Uses a composite key (hash of bank IDs) for session caching.
+  static Future<List<Question>> getQuizSessionFromMultipleBanks(
+    List<String> bankIds,
+    String userId, {
+    int sessionSize = 10,
+    int cacheSize = 50,
+  }) async {
+    if (bankIds.isEmpty) {
+      debugPrint('QuestionBankService: No bank IDs provided.');
+      return [];
+    }
+
+    // Single bank - use existing optimized method
+    if (bankIds.length == 1) {
+      return getQuizSession(bankIds.first, userId,
+          sessionSize: sessionSize, cacheSize: cacheSize);
+    }
+
+    // Create composite key from sorted bank IDs
+    final sortedIds = List<String>.from(bankIds)..sort();
+    final compositeKey = sortedIds.join('_');
+
+    try {
+      // 1. Try to load existing session with composite key
+      QuizSession? session = await _loadSession(userId, compositeKey);
+
+      // 2. If session is empty or insufficient, generate from multiple banks
+      if (session == null || session.batch.isEmpty) {
+        session = await _generateNewSessionFromMultipleBanks(
+            userId, bankIds, compositeKey, cacheSize, sessionSize);
+      }
+
+      if (session == null || session.batch.isEmpty) {
+        debugPrint(
+            'QuestionBankService: Failed to generate multi-bank session.');
+        return [];
+      }
+
+      // 3. Take questions for this run
+      final takenQuestions = session.batch.take(sessionSize).toList();
+
+      // 4. Update the session (remove taken questions)
+      final remainingQuestions = session.batch.skip(sessionSize).toList();
+      await _updateSessionBatch(userId, compositeKey, remainingQuestions);
+
+      debugPrint(
+          'QuestionBankService: Served ${takenQuestions.length} questions from multi-bank session (${bankIds.length} banks). Remaining: ${remainingQuestions.length}');
+      return takenQuestions;
+    } catch (e) {
+      debugPrint(
+          'QuestionBankService: Error in getQuizSessionFromMultipleBanks: $e');
+      // Fallback to direct fetch from multiple banks
+      return _getPersonalizedQuestionsFromMultipleBanks(
+          bankIds, userId, sessionSize);
+    }
+  }
+
+  /// Generate a new session from multiple question banks
+  static Future<QuizSession?> _generateNewSessionFromMultipleBanks(
+      String userId,
+      List<String> bankIds,
+      String compositeKey,
+      int targetSize,
+      int minRequired) async {
+    try {
+      debugPrint(
+          'QuestionBankService: Generating new multi-bank session for ${bankIds.length} banks');
+
+      // 1. Fetch all banks in parallel (efficient!)
+      final bankFutures = bankIds.map((id) => getQuestionBank(id));
+      final banks = await Future.wait(bankFutures);
+
+      // 2. Collect all questions from all banks
+      final allQuestions = <Question>[];
+      for (final bank in banks) {
+        if (bank != null) {
+          allQuestions.addAll(bank.questions);
+        }
+      }
+
+      if (allQuestions.isEmpty) {
+        debugPrint(
+            'QuestionBankService: No questions found in any of the ${bankIds.length} banks');
+        return null;
+      }
+
+      // 3. Filter out recently served questions
+      final servedQuestions = await _getRecentlyServedQuestions(userId);
+      final servedHashes = servedQuestions.map((sq) => sq.docId).toSet();
+
+      final available =
+          allQuestions.where((q) => !servedHashes.contains(q.hash)).toList();
+
+      // 4. Shuffle (PRIORITY: preserve existing shuffle logic!)
+      available.shuffle();
+
+      // 5. Implement fallback if we ran out of "fresh" questions
+      List<Question> selected;
+      if (available.length < minRequired) {
+        final fullShuffled = List<Question>.from(allQuestions)..shuffle();
+        selected = fullShuffled.take(targetSize).toList();
+      } else {
+        selected = available.take(targetSize).toList();
+      }
+
+      final session = QuizSession(
+          bankId: compositeKey, batch: selected, lastUpdated: DateTime.now());
+
+      // Save entire batch to Firestore
+      await _updateSessionBatch(userId, compositeKey, selected);
+
+      debugPrint(
+          'QuestionBankService: Generated session with ${selected.length} questions from ${bankIds.length} banks');
+      return session;
+    } catch (e) {
+      debugPrint('Error generating new multi-bank session: $e');
+      return null;
+    }
+  }
+
+  /// Fallback: Get personalized questions from multiple banks
+  static Future<List<Question>> _getPersonalizedQuestionsFromMultipleBanks(
+      List<String> bankIds, String userId, int maxQuestions) async {
+    try {
+      // Fetch all banks in parallel
+      final bankFutures = bankIds.map((id) => getQuestionBank(id));
+      final banks = await Future.wait(bankFutures);
+
+      // Collect all questions
+      final allQuestions = <Question>[];
+      for (final bank in banks) {
+        if (bank != null) {
+          allQuestions.addAll(bank.questions);
+        }
+      }
+
+      if (allQuestions.isEmpty) return [];
+
+      // Filter out recently served
+      final servedQuestions = await _getRecentlyServedQuestions(userId);
+      final servedHashes = servedQuestions.map((sq) => sq.docId).toSet();
+
+      final available =
+          allQuestions.where((q) => !servedHashes.contains(q.hash)).toList();
+
+      // Shuffle and select
+      available.shuffle();
+      final selected = available.take(maxQuestions).toList();
+
+      // Fill if needed
+      if (selected.length < maxQuestions) {
+        final remaining = maxQuestions - selected.length;
+        final selectedHashes = selected.map((q) => q.hash).toSet();
+        final additional = allQuestions
+            .where((q) => !selectedHashes.contains(q.hash))
+            .take(remaining)
+            .toList();
+        selected.addAll(additional);
+      }
+
+      // Record as served
+      if (selected.isNotEmpty) {
+        await _recordServedQuestions(userId, selected);
+      }
+
+      debugPrint(
+          'QuestionBankService: Fallback selected ${selected.length} questions from ${bankIds.length} banks');
+      return selected;
+    } catch (e) {
+      debugPrint('QuestionBankService: Error in multi-bank fallback: $e');
+      return [];
+    }
+  }
+
   /// Load session metadata from Firestore
   static Future<QuizSession?> _loadSession(String userId, String bankId) async {
     try {
