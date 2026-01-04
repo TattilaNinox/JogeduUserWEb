@@ -1,0 +1,70 @@
+DUAL KVÍZ FOLYAMATOK AUDIT JELENTÉS
+Dátum: 2026-01-04
+Státusz: Végleges
+Auditot végezte: Antigravity AI
+
+1. VEZETŐI ÖSSZEFOGLALÓ
+--------------------------------------------------
+A rendszerben jelenleg három egymástól eltérő logika működik a kvízek kiszolgálására attól függően, hogy a felhasználó milyen eszközön (mobil vs. desktop) és milyen felületről (Jegyzet lista vs. Interaktív jegyzet) indítja a kvíz kitöltését. A tervezett "intelligens" működés (QuestionBankService) létezik a kódbázisban, de a felhasználók többsége (Jegyzet listából indulva) nem ezt a kódot futtatja.
+
+Jelenlegi működés kockázati szintje: MAGAS (Inkonzisztencia és Sávszélesség pazarlás)
+Skálázhatósági kockázat (7000 user): KÖZEPES
+
+2. A HÁROM PÁRHUZAMOS LOGIKA (INKONZISZTENCIA)
+--------------------------------------------------
+A jelenlegi kódbázisban három különböző útvonal létezik a "dynamic_quiz_dual" típusú kvízek elérésére:
+
+A) MOBIL NÉZET (Jegyzet listából indítva)
+   - Érintett fájl: lib/screens/dynamic_quiz_view_screen.dart
+   - Működés: Letölti a TELJES kérdésbankot a Firestore-ból.
+   - Kérdések száma: Az összes kérdés megjelenik (nincs limit).
+   - Sorrend: Az adatbázis sorrendje (nincs keverés/shuffle).
+   - Logika: Nincs "már kitöltött" szűrés.
+
+B) DESKTOP NÉZET (Jegyzet listából indítva)
+   - Érintett fájl: lib/widgets/note_list_tile.dart (_openQuiz methódus)
+   - Működés: Letölti a TELJES kérdésbankot a Firestore-ból.
+   - Kérdések száma: 10 darab véletlenszerűen kiválasztva.
+   - Sorrend: Véletlenszerű (Shuffle).
+   - Logika: Kliens oldalon válogat, de mindig az egész bankot tölti le feleslegesen.
+
+C) INTERAKTÍV JEGYZETBŐL INDÍTVA (Gombnyomásra)
+   - Érintett fájl: lib/screens/quiz_page.dart -> lib/services/question_bank_service.dart
+   - Működés: Ez az "okos" ág.
+   - Logika: Használja a QuestionBankService-t.
+     1. Személyre szabás: Szűri a felhasználónak az elmúlt 1 órában (TTL) már feltett kérdéseket.
+     2. Véletlenszerűsítés: Kevert sorrend.
+     3. Limit: 10 kérdésre.
+     4. Rögzítés: Elmenti a "served_questions" kollekcióba a feltett kérdéseket.
+
+3. HATÉKONYSÁG ÉS SKÁLÁZHATÓSÁGI VIZSGÁLAT
+--------------------------------------------------
+Feltételek: 7000 felhasználó, 600 kérdésbank.
+
+A) Sávszélesség és Adatforgalom (KRITIKUS)
+   - Probléma: Minden egyes kvíz indításnál (A és B eset) a rendszer letölti a teljes kérdésbank dokumentumot. 
+   - Példa: Ha egy kérdésbank 500 kérdést tartalmaz, és egy kérdés mérete átlagosan 500 byte (szöveg + opciók), akkor egy bank mérete 250 KB.
+   - Hatás: 7000 felhasználó napi 1 kvíz esetén = 7000 * 250 KB = 1.75 GB adatforgalom feleslegesen (ha csak 10 kérdést akarnánk mutatni).
+   - Firestore Limit: A dokumentum maximális mérete 1 MB. Nagyobb kérdésbankoknál ez technikai korlátba ütközhet, és a kvíz nem fog betöltődni.
+
+B) Adatbázis Terhelés
+   - Olvasás: Kvízenként 1 db nagy dokumentum olvasás. Ez Firestore költségben alacsony (1 read), de hálózati késleltetésben magas lehet.
+   - Írás (Csak a C esetben): A "served_questions" írása. 10 kérdés esetén 10 írási művelet (batch) felhasználónként. 7000 felhasználónál ez kezelhető terhelés, de költségvonzata van.
+
+C) Memória használat (Kliens)
+   - A telefonon/böngészőben a teljes kérdésbankot memóriában tartja a rendszer, miközben csak 10 kérdésre lenne szükség (Desktop esetben).
+
+4. SZEMÉLYRE SZABÁS ÉS ALGORITMUS
+--------------------------------------------------
+A felhasználó által elvárt "logika" (ismétlődés gátlása, ütemezés) jelenleg KIZÁRÓLAG a "C" útvonalon (Interactive Screen) érhető el.
+A felhasználók 90%-a (becslés, mivel a lista nézet az elsődleges) sosem találkozik ezzel a logikával, helyette vagy az összes kérdést megkapja sorban (Mobil), vagy random 10-et ismétlődés védelem nélkül (Desktop).
+
+5. JAVASLATOK (Audit alapján)
+--------------------------------------------------
+Bár a feladat tiltja a módosítást, a jelentés része a megoldási irány felvázolása:
+1. Egységesítés: A `NoteListTile`-ból (Mobil és Desktop ág) is a `QuizPage`-re (vagy annak logikájára) kellene irányítani a felhasználót a `DynamicQuizViewScreen` helyett.
+2. Optimalizálás: A `QuestionBankService`-ben a teljes bank letöltése helyett (client-side filtering) érdemes lenne átgondolni az adatstruktúrát, hogy ne kelljen 500 kérdést letölteni 10 megjelenítéséhez (bár NoSQL-ben a random lekérdezés nehézkes, de a sharding vagy kisebb "chunk"-ok segíthetnek).
+
+6. ÖSSZEGZÉS
+--------------------------------------------------
+A rendszer működőképes, de erősen inkonzisztens. A mobil felhasználók élménye (végtelen kérdéslista) drasztikusan eltér a desktop felhasználókétól (10 random kérdés). A "smart" funkciók (időzítés, ismétlés szűrés) le vannak fejlesztve, de "árván" állnak a kódban, a fő belépési pontok nem használják őket.

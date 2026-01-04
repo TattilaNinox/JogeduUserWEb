@@ -65,10 +65,6 @@ flutter:
           weight: 700
 
   assets:
-    - assets/images/login_LOGO.png
-    - assets/images/simplepay_bankcard_logos_top_02_new.png
-    - assets/images/simplepay_bankcard_logos_left_482x40_new.jpg
-    - assets/images/education_background.svg
-    - assets/images/student_studying.svg
+    - assets/images/
     - assets/postal_codes.json
     - assets/hyphenation/

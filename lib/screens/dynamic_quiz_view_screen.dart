@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/question_bank_service.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/quiz_viewer.dart';
 import '../widgets/quiz_viewer_dual.dart';
@@ -124,27 +126,31 @@ class _DynamicQuizViewScreenState extends State<DynamicQuizViewScreen> {
 
   Future<void> _loadQuestions(String questionBankId) async {
     try {
-      final questionsSnapshot = await FirebaseFirestore.instance
-          .collection('question_banks')
-          .doc(questionBankId)
-          .get();
-
-      if (!mounted) return;
-
-      if (!questionsSnapshot.exists) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
         setState(() {
-          _error = 'A kérdésbank nem található.';
+          _error = 'Nincs bejelentkezve felhasználó.';
           _isLoading = false;
         });
         return;
       }
 
-      final data = questionsSnapshot.data() as Map<String, dynamic>;
-      final List<dynamic> raw = (data['questions'] ?? []) as List<dynamic>;
-      final questions = raw
-          .whereType<Map<String, dynamic>>()
-          .map((q) => Question.fromMap(Map<String, dynamic>.from(q)))
-          .toList();
+      final questions = await QuestionBankService.getQuizSession(
+        questionBankId,
+        user.uid,
+        sessionSize: 10,
+        cacheSize: 50,
+      );
+
+      if (!mounted) return;
+
+      if (questions.isEmpty) {
+        setState(() {
+          _error = 'Nem sikerült betölteni kérdéseket a bankból.';
+          _isLoading = false;
+        });
+        return;
+      }
 
       setState(() {
         _questions = questions;

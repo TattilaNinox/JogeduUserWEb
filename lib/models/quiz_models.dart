@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Option {
   final String text;
   final bool isCorrect;
@@ -148,4 +150,34 @@ class QuestionResult {
     required this.correctIndices,
     required this.isCorrect,
   });
+}
+
+class QuizSession {
+  final String bankId;
+  final List<Question> batch;
+  final DateTime lastUpdated;
+
+  const QuizSession({
+    required this.bankId,
+    required this.batch,
+    required this.lastUpdated,
+  });
+
+  factory QuizSession.fromMap(String bankId, Map<String, dynamic> map) {
+    return QuizSession(
+      bankId: bankId,
+      batch: (map['batch'] as List<dynamic>? ?? [])
+          .map((q) => Question.fromMap(q as Map<String, dynamic>))
+          .toList(),
+      lastUpdated:
+          (map['lastUpdated'] as Timestamp? ?? Timestamp.now()).toDate(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'batch': batch.map((q) => q.toMap()).toList(),
+      'lastUpdated': Timestamp.fromDate(lastUpdated),
+    };
+  }
 }

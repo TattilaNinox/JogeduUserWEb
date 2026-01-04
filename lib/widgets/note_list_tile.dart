@@ -4,8 +4,10 @@ import '../core/firebase_config.dart';
 import '../utils/filter_storage.dart';
 import 'quiz_viewer.dart';
 import 'quiz_viewer_dual.dart';
-import '../models/quiz_models.dart';
+
 import 'mini_audio_player.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/question_bank_service.dart';
 import 'jogeset_list_dialog.dart';
 
 class NoteListTile extends StatelessWidget {
@@ -203,34 +205,33 @@ class NoteListTile extends StatelessWidget {
         return;
       }
 
-      final bankDoc = await FirebaseConfig.firestore
-          .collection('question_banks')
-          .doc(bankId)
-          .get();
-      if (!bankDoc.exists) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Hiba: a kérdésbank nem található.')),
-          );
-        }
-        return;
-      }
-      final bank = bankDoc.data()!;
-      final questions =
-          List<Map<String, dynamic>>.from(bank['questions'] ?? []);
-      if (questions.isEmpty) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Ez a kérdésbank nem tartalmaz kérdéseket.')),
+                content: Text('Jelentkezzen be a kvíz indításához!')),
           );
         }
         return;
       }
 
-      questions.shuffle();
-      final selected =
-          questions.take(10).map((q) => Question.fromMap(q)).toList();
+      // LOADING START (Optional UI feedback)
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kvíz előkészítése...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      final selected = await QuestionBankService.getQuizSession(
+        bankId,
+        user.uid,
+        sessionSize: 10,
+        cacheSize: 50,
+      );
 
       if (!context.mounted) return;
       showDialog(
