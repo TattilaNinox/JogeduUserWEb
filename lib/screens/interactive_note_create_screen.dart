@@ -5,7 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:go_router/go_router.dart';
 import '../core/app_messenger.dart';
 import 'package:video_player/video_player.dart';
-import 'dart:io' show File;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:html/parser.dart' show parse;
@@ -158,7 +158,8 @@ class _InteractiveNoteCreateScreenState
             });
         _videoController?.dispose();
         if (!kIsWeb) {
-          _videoController = VideoPlayerController.file(File(file.path));
+          _videoController =
+              VideoPlayerController.networkUrl(Uri.file(file.path));
           await _videoController!.initialize();
           if (!mounted) return;
           setState(() {});

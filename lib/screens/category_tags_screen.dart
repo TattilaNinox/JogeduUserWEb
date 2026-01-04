@@ -1,5 +1,5 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, kDebugMode, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -67,7 +67,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
       tagPath: [tag],
     );
 
-    if (!kIsWeb && Platform.isIOS) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       Navigator.push(context, CupertinoPageRoute(builder: (context) => screen));
     } else {
       Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
