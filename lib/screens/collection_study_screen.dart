@@ -215,7 +215,11 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              context.go('/deck-collections/${widget.collectionId}');
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/deck-collections/${widget.collectionId}');
+              }
             },
             child: const Text('Vissza'),
           ),
@@ -357,7 +361,11 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
-              context.go('/deck-collections/${widget.collectionId}');
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/deck-collections/${widget.collectionId}');
+              }
             },
           ),
         ),
@@ -393,7 +401,11 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            context.go('/deck-collections/${widget.collectionId}');
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/deck-collections/${widget.collectionId}');
+            }
           },
         ),
         actions: [

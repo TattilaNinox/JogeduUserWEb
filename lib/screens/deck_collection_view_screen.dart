@@ -211,7 +211,11 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
           size: isMobile ? 20 : 22,
         ),
         onPressed: () {
-          context.go('/deck-collections');
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/notes');
+          }
         },
       ),
       actions: [
@@ -220,7 +224,7 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
             icon: const Icon(Icons.school, color: Color(0xFF1E3A8A)),
             tooltip: 'Tanulás',
             onPressed: () {
-              context.go('/deck-collections/${widget.collectionId}/study');
+              context.push('/deck-collections/${widget.collectionId}/study');
             },
           ),
         IconButton(
