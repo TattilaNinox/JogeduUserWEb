@@ -436,6 +436,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
       debugPrint(
           'SmartNav: CategoryOnly -> CategoryTagsScreen ($_selectedCategory)');
+      if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -465,6 +466,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       type: _selectedType,
     );
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Szűrési feltételek alkalmazva.')),
     );

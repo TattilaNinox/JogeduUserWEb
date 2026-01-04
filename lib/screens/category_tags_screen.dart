@@ -204,7 +204,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
                       item as QueryDocumentSnapshot<Map<String, dynamic>>;
                   return _buildDirectNoteWidget(doc, isAdmin);
                 }
-              }).toList(),
+              }),
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Center(
@@ -353,7 +353,7 @@ class _CategoryTagsScreenState extends State<CategoryTagsScreen> {
       bool isAdmin) async {
     const science = 'Jogász';
     final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-    final int currentLimit = 100;
+    const int currentLimit = 100;
 
     // Notes kollekció
     final notesQuery = FirebaseConfig.firestore

@@ -338,8 +338,8 @@ class MetadataService {
         rawTagCounts.forEach((category, countsData) {
           final counts = <String, int>{};
           if (countsData is Map) {
-            countsData.forEach((tag, count) {
-              counts[tag.toString()] = count as int? ?? 0;
+            countsData.forEach((tag, cnt) {
+              counts[tag.toString()] = cnt as int? ?? 0;
             });
           }
           tagCountsMap[category.toString()] = counts;
@@ -348,8 +348,8 @@ class MetadataService {
         rawHierarchicalCounts.forEach((category, countsData) {
           final counts = <String, int>{};
           if (countsData is Map) {
-            countsData.forEach((path, count) {
-              counts[path.toString()] = count as int? ?? 0;
+            countsData.forEach((path, pathCount) {
+              counts[path.toString()] = pathCount as int? ?? 0;
             });
           }
           hierarchicalCountsMap[category.toString()] = counts;
@@ -606,7 +606,7 @@ class MetadataService {
         debugPrint(
             '✅ Metadata Aggregation COMPLETED. Processed $docCount docs (Total).');
         debugPrint(
-            '   Hierarchical paths stored: ${hierarchicalCounts.values.fold(0, (sum, map) => sum + map.length)}');
+            '   Hierarchical paths stored: ${hierarchicalCounts.values.fold(0, (total, map) => total + map.length)}');
       }
 
       // Értesítjük a UI-t, hogy frissült a metadata
