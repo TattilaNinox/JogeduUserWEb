@@ -4,6 +4,9 @@ import '../models/deck_collection.dart';
 import '../services/deck_collection_service.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/flippable_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/learning_status_badge.dart';
 
 /// Gyűjtemény nézet - ÖSSZESÍTETT kártya megjelenítés.
 /// A felhasználó egyetlen pakliként látja az összes kártyát.
@@ -20,6 +23,7 @@ class DeckCollectionViewScreen extends StatefulWidget {
 class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
   DeckCollection? _collection;
   List<Map<String, dynamic>> _allCards = [];
+  Map<String, Map<String, dynamic>> _learningData = {};
   Map<String, int>? _stats;
   bool _isLoading = true;
   String? _error;
@@ -61,11 +65,15 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
         widget.collectionId,
       );
 
+      // Tanulási adatok betöltése
+      final learningData = await _loadLearningData(allCards);
+
       if (mounted) {
         setState(() {
           _collection = collection;
           _allCards = allCards;
           _stats = stats;
+          _learningData = learningData;
           _isLoading = false;
         });
       }
@@ -77,6 +85,68 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
         });
       }
     }
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _loadLearningData(
+      List<Map<String, dynamic>> cards) async {
+    final learningData = <String, Map<String, dynamic>>{};
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || cards.isEmpty) return learningData;
+
+    try {
+      // Csoportosítás kategória szerint a hatékony lekérdezéshez
+      final cardsByCategory = <String, List<String>>{};
+      for (final card in cards) {
+        final catId = card['categoryId'] as String? ?? 'default';
+        final cardId = card['cardId'] as String;
+        cardsByCategory.putIfAbsent(catId, () => []).add(cardId);
+      }
+
+      final futures = <Future<void>>[];
+      const chunkSize = 30; // Firestore whereIn limit
+
+      for (final entry in cardsByCategory.entries) {
+        final categoryId = entry.key;
+        final cardIds = entry.value;
+
+        for (var i = 0; i < cardIds.length; i += chunkSize) {
+          final chunk =
+              cardIds.sublist(i, (i + chunkSize).clamp(0, cardIds.length));
+
+          futures.add(FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('categories')
+              .doc(categoryId)
+              .collection('learning')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get()
+              .then((snapshot) {
+            for (final doc in snapshot.docs) {
+              final data = doc.data();
+              final state = data['state'] as String? ?? 'NEW';
+              final lastRating = data['lastRating'] as String? ?? 'Again';
+              final nextReview = data['nextReview'] as Timestamp?;
+              final now = Timestamp.now();
+              final isDue = state == 'NEW' ||
+                  (nextReview != null && nextReview.seconds <= now.seconds);
+
+              learningData[doc.id] = {
+                'state': state,
+                'lastRating': lastRating,
+                'isDue': isDue,
+              };
+            }
+          }));
+        }
+      }
+
+      await Future.wait(futures);
+    } catch (e) {
+      debugPrint('Hiba a tanulási adatok betöltésekor: $e');
+    }
+
+    return learningData;
   }
 
   @override
@@ -154,10 +224,26 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
                   final card = _allCards[index];
                   final front = card['front'] as String? ?? '';
                   final back = card['back'] as String? ?? '';
+                  final cardId = card['cardId'] as String;
+                  final learningInfo = _learningData[cardId];
 
-                  return FlippableCard(
-                    frontText: front,
-                    backText: back,
+                  return Stack(
+                    children: [
+                      FlippableCard(
+                        frontText: front,
+                        backText: back,
+                      ),
+                      if (learningInfo != null)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: LearningStatusBadge(
+                            state: learningInfo['state'] as String,
+                            lastRating: learningInfo['lastRating'] as String,
+                            isDue: learningInfo['isDue'] as bool,
+                          ),
+                        ),
+                    ],
                   );
                 },
               ),
