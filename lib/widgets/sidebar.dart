@@ -140,8 +140,6 @@ class Sidebar extends StatelessWidget {
             ),
             _buildMenuItem(
                 context, 'notes', 'Tags Főoldal', selectedMenu == 'notes'),
-            _buildMenuItem(context, 'deck-collections', 'Paklik',
-                selectedMenu == 'deck-collections'),
             _buildMenuItem(context, 'my-bundles', 'Saját kötegek',
                 selectedMenu == 'my-bundles'),
             FutureBuilder<bool>(

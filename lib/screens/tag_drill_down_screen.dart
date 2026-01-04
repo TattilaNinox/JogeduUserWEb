@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import '../core/firebase_config.dart';
 import '../widgets/note_list_tile.dart';
 import '../utils/string_utils.dart';
@@ -390,6 +391,51 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       }
     }
 
+    // 5. Deck Collections kollekció - pakli gyűjtemények
+    if (!isMemoriaContext) {
+      try {
+        Query<Map<String, dynamic>> collectionQuery = FirebaseConfig.firestore
+            .collection('deck_collections')
+            .where('science', isEqualTo: science)
+            .where('category', isEqualTo: widget.category);
+
+        // FONTOS: parentTag szűrőt az orderBy ELŐTT kell hozzáadni!
+        if (parentTag != null) {
+          collectionQuery =
+              collectionQuery.where('parentTag', isEqualTo: parentTag);
+        } else {
+          collectionQuery = collectionQuery.where('parentTag', isNull: true);
+        }
+
+        // Status szűrés szerver oldalon (Index: science + category + status + parentTag + title)
+        collectionQuery =
+            collectionQuery.where('status', whereIn: statusFilter);
+
+        // orderBy és limit a végén
+        collectionQuery = collectionQuery.orderBy('title').limit(_currentLimit);
+
+        if (_lastDocuments['deck_collections'] != null && !refresh) {
+          collectionQuery = collectionQuery
+              .startAfterDocument(_lastDocuments['deck_collections']!);
+        }
+
+        final collectionSnapshot = await collectionQuery.get();
+
+        final collectionDocs = collectionSnapshot.docs;
+        allDocs.addAll(collectionDocs);
+
+        if (collectionSnapshot.docs.length < _currentLimit) {
+          _lastDocuments['deck_collections'] = null;
+        } else if (collectionDocs.isNotEmpty) {
+          _lastDocuments['deck_collections'] = collectionDocs.last;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error loading deck_collections: $e');
+        }
+      }
+    }
+
     // Rendezés cím szerint
     allDocs.sort((a, b) {
       final dataA = a.data();
@@ -414,10 +460,14 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
     final hasMoreDialogus = widget.category == 'Dialogus tags'
         ? _lastDocuments['dialogus_fajlok'] != null
         : false;
+    final hasMoreCollections = _lastDocuments['deck_collections'] != null;
 
     setState(() {
-      _hasMore =
-          hasMoreNotes || hasMoreJogeset || hasMoreAllomas || hasMoreDialogus;
+      _hasMore = hasMoreNotes ||
+          hasMoreJogeset ||
+          hasMoreAllomas ||
+          hasMoreDialogus ||
+          hasMoreCollections;
       _isLoadingMore = false;
     });
 
@@ -554,6 +604,8 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
               for (var doc in documents) {
                 if (doc.reference.path.contains('jogesetek')) {
                   widgetsList.add(_buildJogesetWidget(doc));
+                } else if (doc.reference.path.contains('deck_collections')) {
+                  widgetsList.add(_buildDeckCollectionWidget(doc));
                 } else {
                   widgetsList.add(_buildNoteWidget(doc));
                 }
@@ -680,6 +732,72 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       jogesetCount: count,
       category: widget.category,
       customFromUrl: '/notes',
+    );
+  }
+
+  Widget _buildDeckCollectionWidget(
+      QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final title = (data['title'] ?? 'Gyűjtemény').toString();
+    final deckIds = List<String>.from(data['deckIds'] ?? []);
+    final deckCount = deckIds.length;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: InkWell(
+        onTap: () {
+          context.push('/deck-collections/${doc.id}');
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.folder_special,
+                  color: Color(0xFF1E3A8A),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$deckCount pakli',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ class DeckCollection {
   final String title;
   final String science;
   final String? category;
+  final String? parentTag;
   final List<String> deckIds;
   final Timestamp createdAt;
   final Timestamp modified;
@@ -16,6 +17,7 @@ class DeckCollection {
     required this.title,
     required this.science,
     this.category,
+    this.parentTag,
     required this.deckIds,
     required this.createdAt,
     required this.modified,
@@ -28,6 +30,7 @@ class DeckCollection {
       title: data['title'] as String? ?? '',
       science: data['science'] as String? ?? 'Jogász',
       category: data['category'] as String?,
+      parentTag: data['parentTag'] as String?,
       deckIds: List<String>.from(data['deckIds'] ?? []),
       createdAt: data['createdAt'] as Timestamp? ?? Timestamp.now(),
       modified: data['modified'] as Timestamp? ?? Timestamp.now(),
@@ -39,6 +42,7 @@ class DeckCollection {
       'title': title,
       'science': science,
       'category': category,
+      'parentTag': parentTag,
       'deckIds': deckIds,
       'createdAt': createdAt,
       'modified': modified,

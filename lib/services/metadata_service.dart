@@ -559,6 +559,7 @@ class MetadataService {
       await processCollection('jogesetek');
       await processCollection('memoriapalota_allomasok');
       await processCollection('dialogus_fajlok');
+      await processCollection('deck_collections');
 
       // 2. Mentés: Aggregált dokumentum írása
       final catToTagsExport = <String, List<String>>{};
