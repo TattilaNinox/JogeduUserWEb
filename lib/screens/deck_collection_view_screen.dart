@@ -223,8 +223,15 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
           IconButton(
             icon: const Icon(Icons.school, color: Color(0xFF1E3A8A)),
             tooltip: 'Tanulás',
-            onPressed: () {
-              context.push('/deck-collections/${widget.collectionId}/study');
+            onPressed: () async {
+              await context
+                  .push('/deck-collections/${widget.collectionId}/study');
+              // Visszatéréskor frissítjük a statisztikákat
+              DeckCollectionService.invalidateCollectionCache(
+                  widget.collectionId);
+              if (mounted) {
+                _loadCollectionData();
+              }
             },
           ),
         IconButton(

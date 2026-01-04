@@ -140,6 +140,7 @@ class DeckCollectionService {
             'front': card['front'] ?? '',
             'back': card['back'] ?? '',
             'explanation': card['explanation'],
+            'processed_explanation': card['processed_explanation'],
             'categoryId': categoryId,
           });
         }
