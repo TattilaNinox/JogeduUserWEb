@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -671,7 +670,7 @@ class _CategorySectionState extends State<_CategorySection> {
         : CategoryTagsScreen(category: widget.category);
 
     // Platform-natív navigáció
-    if (!kIsWeb && Platform.isIOS) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       Navigator.push(
         context,
         CupertinoPageRoute(builder: (context) => screen),

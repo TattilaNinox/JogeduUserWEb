@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,9 +74,9 @@ class DeviceFingerprint {
   static Future<String> getCurrentFingerprint() async {
     if (kIsWeb) {
       return await getWebFingerprint();
-    } else if (Platform.isAndroid) {
+    } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return await getAndroidFingerprint();
-    } else if (Platform.isIOS) {
+    } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       return await getIOSFingerprint();
     } else {
       return 'unknown_${DateTime.now().millisecondsSinceEpoch}';
