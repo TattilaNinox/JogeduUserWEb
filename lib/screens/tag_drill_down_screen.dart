@@ -765,7 +765,7 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
-                  Icons.folder_special,
+                  Icons.style,
                   color: Color(0xFF1E3A8A),
                   size: 24,
                 ),
