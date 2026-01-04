@@ -739,8 +739,6 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
       QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     final title = (data['title'] ?? 'Gyűjtemény').toString();
-    final deckIds = List<String>.from(data['deckIds'] ?? []);
-    final deckCount = deckIds.length;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -755,42 +753,22 @@ class _TagDrillDownScreenState extends State<TagDrillDownScreen> {
         },
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.style,
-                  color: Color(0xFF1E3A8A),
-                  size: 24,
-                ),
+              const Icon(
+                Icons.style,
+                color: Color(0xFF1E3A8A),
+                size: 24,
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$deckCount pakli',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const Icon(Icons.chevron_right, color: Colors.grey),
