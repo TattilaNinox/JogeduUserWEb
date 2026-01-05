@@ -295,6 +295,9 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
         _easyCount = 0;
       });
 
+      // Collection cache invalidálása, hogy a DeckCollectionViewScreen is frissüljön
+      DeckCollectionService.invalidateCollectionCache(widget.collectionId);
+
       // Adatok újratöltése
       await _loadCollectionData();
 
