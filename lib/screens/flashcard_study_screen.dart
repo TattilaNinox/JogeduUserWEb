@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../services/learning_service.dart';
+import '../services/learning_session_service.dart';
+import '../models/flashcard_learning_data.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_html/flutter_html.dart';
 
@@ -35,10 +37,20 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
   List<int> _dueCardIndices = [];
   String? _categoryId;
 
+  // J3: Learning data cache for session batching
+  final Map<String, FlashcardLearningData> _learningDataCache = {};
+
   @override
   void initState() {
     super.initState();
     _loadDeckData();
+  }
+
+  @override
+  void dispose() {
+    // J3: Commit any pending evaluations before disposing
+    LearningSessionService.instance.commitSession();
+    super.dispose();
   }
 
   Future<void> _loadDeckData() async {
@@ -168,12 +180,28 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
         }
       });
 
-      // Háttér mentés
-      await LearningService.updateUserLearningData(
-        cardId,
-        evaluation,
-        _categoryId!,
+      // J3: Get current learning data (from cache or default)
+      final currentData = _learningDataCache[cardId] ??
+          FlashcardLearningData(
+            state: 'NEW',
+            interval: 0,
+            easeFactor: 2.5,
+            repetitions: 0,
+            lastReview: Timestamp.now(),
+            nextReview: Timestamp.now(),
+            lastRating: 'Again',
+          );
+
+      // J3: Record to session service (NO Firestore write yet!)
+      final newData = LearningSessionService.instance.recordEvaluation(
+        cardId: cardId,
+        rating: evaluation,
+        categoryId: _categoryId!,
+        currentData: currentData,
       );
+
+      // Update local cache
+      _learningDataCache[cardId] = newData;
 
       // "Újra" esetén a kártya visszakerül a sor végére
       if (evaluation == 'Again') {
@@ -238,6 +266,9 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
   }
 
   void _showCompletionDialog() {
+    // J3: Commit session before showing dialog
+    LearningSessionService.instance.commitSession();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

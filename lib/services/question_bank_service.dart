@@ -227,6 +227,9 @@ class QuestionBankService {
     }
   }
 
+  /// Session TTL duration (24 hours)
+  static const Duration _sessionTtl = Duration(hours: 24);
+
   /// Load session metadata from Firestore
   static Future<QuizSession?> _loadSession(String userId, String bankId) async {
     try {
@@ -238,7 +241,17 @@ class QuestionBankService {
           .get();
 
       if (doc.exists && doc.data() != null) {
-        return QuizSession.fromMap(bankId, doc.data()!);
+        final data = doc.data()!;
+
+        // Check if session has expired (TTL: 24 hours)
+        final expiresAt = data['expiresAt'] as Timestamp?;
+        if (expiresAt != null && expiresAt.toDate().isBefore(DateTime.now())) {
+          debugPrint(
+              'QuestionBankService: Session expired for $bankId, will regenerate');
+          return null; // Session expired, will trigger regeneration
+        }
+
+        return QuizSession.fromMap(bankId, data);
       }
     } catch (e) {
       debugPrint('Error loading session: $e');
@@ -250,6 +263,7 @@ class QuestionBankService {
   static Future<void> _updateSessionBatch(
       String userId, String bankId, List<Question> remaining) async {
     try {
+      final expiresAt = DateTime.now().add(_sessionTtl);
       await _firestore
           .collection('users')
           .doc(userId)
@@ -258,6 +272,7 @@ class QuestionBankService {
           .set({
         'batch': remaining.map((q) => q.toMap()).toList(),
         'lastUpdated': FieldValue.serverTimestamp(),
+        'expiresAt': Timestamp.fromDate(expiresAt),
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('Error updating session batch: $e');

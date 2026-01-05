@@ -4,8 +4,10 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/deck_collection.dart';
+import '../models/flashcard_learning_data.dart';
 import '../services/deck_collection_service.dart';
 import '../services/learning_service.dart';
+import '../services/learning_session_service.dart';
 
 /// Összevont tanulás képernyő - több pakli kártyái egyként.
 /// UI PONTOSAN MEGEGYEZIK a FlashcardStudyScreen-nel!
@@ -37,10 +39,20 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
   bool get _hasProgress =>
       _againCount + _hardCount + _goodCount + _easyCount > 0;
 
+  // J3: Learning data cache for session batching
+  final Map<String, FlashcardLearningData> _learningDataCache = {};
+
   @override
   void initState() {
     super.initState();
     _loadCollectionData();
+  }
+
+  @override
+  void dispose() {
+    // J3: Commit any pending evaluations before disposing
+    LearningSessionService.instance.commitSession();
+    super.dispose();
   }
 
   Future<void> _loadCollectionData() async {
@@ -202,12 +214,28 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
         }
       });
 
-      // Háttér mentés
-      await LearningService.updateUserLearningData(
-        cardId,
-        evaluation,
-        categoryId,
+      // J3: Get current learning data (from cache or default)
+      final currentData = _learningDataCache[cardId] ??
+          FlashcardLearningData(
+            state: 'NEW',
+            interval: 0,
+            easeFactor: 2.5,
+            repetitions: 0,
+            lastReview: Timestamp.now(),
+            nextReview: Timestamp.now(),
+            lastRating: 'Again',
+          );
+
+      // J3: Record to session service (NO Firestore write yet!)
+      final newData = LearningSessionService.instance.recordEvaluation(
+        cardId: cardId,
+        rating: evaluation,
+        categoryId: categoryId,
+        currentData: currentData,
       );
+
+      // Update local cache
+      _learningDataCache[cardId] = newData;
 
       if (evaluation == 'Again') {
         if (_currentIndex < _dueCards.length - 1) {
@@ -266,6 +294,9 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
   }
 
   void _showCompletionDialog() {
+    // J3: Commit session before showing dialog
+    LearningSessionService.instance.commitSession();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
