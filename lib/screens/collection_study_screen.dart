@@ -41,6 +41,14 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
     _loadCollectionData();
   }
 
+  @override
+  void dispose() {
+    // FONTOS: Kilépéskor flush-oljuk a batch writer-t,
+    // hogy a függő tanulási adatok mentésre kerüljenek
+    LearningService.batchWriter.flush();
+    super.dispose();
+  }
+
   Future<void> _loadCollectionData() async {
     setState(() {
       _isLoading = true;
