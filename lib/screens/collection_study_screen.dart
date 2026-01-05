@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/deck_collection.dart';
 import '../services/deck_collection_service.dart';
 import '../services/learning_service.dart';
@@ -81,10 +83,79 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
       // Összekeverés
       dueCards.shuffle();
 
+      // SZÁMLÁLÓK BETÖLTÉSE a learning dokumentumokból (mint FlashcardStudyScreen)
+      int again = 0;
+      int hard = 0;
+      int good = 0;
+      int easy = 0;
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && allCards.isNotEmpty) {
+        // Csoportosítás kategória szerint
+        final cardsByCategory = <String, List<String>>{};
+        for (final card in allCards) {
+          final catId = card['categoryId'] as String? ?? 'default';
+          final cardId = card['cardId'] as String;
+          cardsByCategory.putIfAbsent(catId, () => []).add(cardId);
+        }
+
+        // Parallel lekérdezések a tanulási adatokhoz
+        final futures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+        const chunkSize = 30;
+
+        for (final entry in cardsByCategory.entries) {
+          final categoryId = entry.key;
+          final cardIds = entry.value;
+
+          for (var i = 0; i < cardIds.length; i += chunkSize) {
+            final chunk =
+                cardIds.sublist(i, (i + chunkSize).clamp(0, cardIds.length));
+            futures.add(
+              FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .collection('categories')
+                  .doc(categoryId)
+                  .collection('learning')
+                  .where(FieldPath.documentId, whereIn: chunk)
+                  .get(),
+            );
+          }
+        }
+
+        // Eredmények feldolgozása
+        final results = await Future.wait(futures);
+        for (final snapshot in results) {
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final lastRating = data['lastRating'] as String? ?? 'Again';
+
+            switch (lastRating) {
+              case 'Again':
+                again++;
+                break;
+              case 'Hard':
+                hard++;
+                break;
+              case 'Good':
+                good++;
+                break;
+              case 'Easy':
+                easy++;
+                break;
+            }
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
           _collection = collection;
           _dueCards = dueCards;
+          _againCount = again;
+          _hardCount = hard;
+          _goodCount = good;
+          _easyCount = easy;
           _isLoading = false;
         });
       }
