@@ -264,10 +264,6 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
 
   /// Collection összes paklijának tanulási előzményeit törli
   Future<void> _resetCollectionProgress() async {
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
       // Összes pakli betöltése a gyűjteményből
       final allCards = await DeckCollectionService.loadAllCardsFromCollection(
@@ -287,33 +283,18 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
         await LearningService.resetDeckProgress(entry.key, entry.value);
       }
 
-      // Számlálók nullázása
-      setState(() {
-        _againCount = 0;
-        _hardCount = 0;
-        _goodCount = 0;
-        _easyCount = 0;
-      });
-
-      // Collection cache invalidálása, hogy a DeckCollectionViewScreen is frissüljön
-      DeckCollectionService.invalidateCollectionCache(widget.collectionId);
-
-      // Adatok újratöltése
-      await _loadCollectionData();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Tanulási előzmények törölve!'),
+            content: Text('A gyűjtemény tanulási adatai törölve.'),
             backgroundColor: Colors.green,
           ),
         );
+        // Navigálás vissza a collection view-ra (mint a FlashcardStudyScreen)
+        context.go('/deck-collections/${widget.collectionId}');
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hiba a törlés közben: $e'),

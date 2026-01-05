@@ -114,7 +114,7 @@ class _DeckCollectionViewScreenState extends State<DeckCollectionViewScreen> {
               .doc(categoryId)
               .collection('learning')
               .where(FieldPath.documentId, whereIn: chunk)
-              .get()
+              .get(const GetOptions(source: Source.server))
               .then((snapshot) {
             for (final doc in snapshot.docs) {
               final data = doc.data();
