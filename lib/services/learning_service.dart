@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/flashcard_learning_data.dart';
-import '../core/learning_algorithm.dart';
+import 'learning_batch_writer.dart';
 
 class LearningService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -13,7 +13,17 @@ class LearningService {
   static final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheValidity = Duration(minutes: 15);
 
+  /// Batch writer instance a tanulási adatok optimalizált mentéséhez
+  static final LearningBatchWriter _batchWriter = LearningBatchWriter();
+
+  /// Batch writer elérése (pl. flush híváshoz screen dispose-kor)
+  static LearningBatchWriter get batchWriter => _batchWriter;
+
   /// Egy kártya tanulási adatainak frissítése értékelés alapján
+  ///
+  /// OPTIMALIZÁLVA (J1+J2):
+  /// - A tanulási adat mentése batch-ben történik (debounce + session végén)
+  /// - A statisztikák on-demand számolódnak a learning dokumentumokból
   static Future<void> updateUserLearningData(
     String cardId, // deckId#index formátum
     String rating, // "Again" | "Hard" | "Good" | "Easy"
@@ -34,29 +44,20 @@ class LearningService {
       debugPrint(
           'LearningService: Current data - state: ${currentData.state}, interval: ${currentData.interval}, easeFactor: ${currentData.easeFactor}');
 
-      // Új állapot kalkulálása az új LearningAlgorithm osztállyal
-      final newData = LearningAlgorithm.calculateNextState(currentData, rating);
-      debugPrint(
-          'LearningService: New data - state: ${newData.state}, interval: ${newData.interval}, easeFactor: ${newData.easeFactor}');
-
-      // Mentés az új útvonalra (users/{uid}/categories/{categoryId}/learning/{cardId})
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('categories')
-          .doc(categoryId)
-          .collection('learning')
-          .doc(cardId)
-          .set(newData.toMap());
+      // BATCH WRITE: Tanulási adat queue-ba helyezése (nem azonnal ír!)
+      await _batchWriter.queueUpdate(
+        cardId: cardId,
+        categoryId: categoryId,
+        currentData: currentData,
+        rating: rating,
+      );
 
       debugPrint(
-          'LearningService: Successfully saved learning data to Firestore');
+          'LearningService: Queued learning data update (pending: ${_batchWriter.pendingCount})');
 
-      // Deck és kategória statisztikák frissítése
-      final cardIndex = cardId.split('#')[1]; // String index formátumban
-      await _updateDeckSnapshot(
-          cardId.split('#')[0], cardIndex, rating, currentData.lastRating);
-      await _updateCategoryStats(categoryId, rating, currentData.lastRating);
+      // J2 OPTIMALIZÁCIÓ: NEM frissítjük a deck_stats/category_stats dokumentumokat
+      // A statisztikák on-demand számolódnak a FlashcardStudyScreen-ben
+      // a learning dokumentumok lastRating mezője alapján.
 
       // Cache invalidálása
       _invalidateDeckCache(cardId.split('#')[0]);
@@ -317,165 +318,9 @@ class LearningService {
     );
   }
 
-  /// Deck snapshot frissítése
-  static Future<void> _updateDeckSnapshot(
-    String deckId,
-    String cardIndex,
-    String newRating,
-    String oldRating,
-  ) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return;
-
-      final docRef = _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('deck_stats')
-          .doc(deckId);
-
-      await _firestore.runTransaction((transaction) async {
-        final doc = await transaction.get(docRef);
-        final current = doc.exists
-            ? DeckStats.fromMap(doc.data()!)
-            : DeckStats(
-                again: 0,
-                hard: 0,
-                good: 0,
-                easy: 0,
-                ratings: {},
-                updatedAt: Timestamp.now(),
-              );
-
-        // Előző rating kivonása
-        final updatedRatings = Map<String, String>.from(current.ratings);
-        if (oldRating != 'Again' && updatedRatings.containsKey(cardIndex)) {
-          updatedRatings.remove(cardIndex);
-        }
-
-        // Új rating hozzáadása (string index formátumban)
-        if (newRating != 'Again') {
-          updatedRatings[cardIndex] = newRating;
-        }
-
-        // Számlálók frissítése - előző rating levonása, új hozzáadása
-        int again = current.again;
-        int hard = current.hard;
-        int good = current.good;
-        int easy = current.easy;
-
-        // Előző rating kivonása
-        switch (oldRating) {
-          case 'Again':
-            again = (again - 1).clamp(0, double.infinity).toInt();
-            break;
-          case 'Hard':
-            hard = (hard - 1).clamp(0, double.infinity).toInt();
-            break;
-          case 'Good':
-            good = (good - 1).clamp(0, double.infinity).toInt();
-            break;
-          case 'Easy':
-            easy = (easy - 1).clamp(0, double.infinity).toInt();
-            break;
-        }
-
-        // Új rating hozzáadása
-        switch (newRating) {
-          case 'Again':
-            again++;
-            break;
-          case 'Hard':
-            hard++;
-            break;
-          case 'Good':
-            good++;
-            break;
-          case 'Easy':
-            easy++;
-            break;
-        }
-
-        final updatedStats = DeckStats(
-          again: again,
-          hard: hard,
-          good: good,
-          easy: easy,
-          ratings: updatedRatings,
-          updatedAt: Timestamp.now(),
-        );
-
-        transaction.set(docRef, updatedStats.toMap());
-      });
-    } catch (e) {
-      debugPrint('Error updating deck snapshot: $e');
-    }
-  }
-
-  /// Kategória statisztikák frissítése
-  static Future<void> _updateCategoryStats(
-    String categoryId,
-    String newRating,
-    String oldRating,
-  ) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return;
-
-      // Csak akkor frissítjük, ha változás történt
-      if (newRating == oldRating) return;
-
-      final docRef = _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('category_stats')
-          .doc(categoryId);
-
-      await _firestore.runTransaction((transaction) async {
-        final doc = await transaction.get(docRef);
-        final current = doc.exists
-            ? CategoryStats.fromMap(doc.data()!)
-            : CategoryStats(
-                againCount: 0,
-                hardCount: 0,
-                updatedAt: Timestamp.now(),
-              );
-
-        int againCount = current.againCount;
-        int hardCount = current.hardCount;
-
-        // Előző rating kivonása
-        switch (oldRating) {
-          case 'Again':
-            againCount = (againCount - 1).clamp(0, double.infinity).toInt();
-            break;
-          case 'Hard':
-            hardCount = (hardCount - 1).clamp(0, double.infinity).toInt();
-            break;
-        }
-
-        // Új rating hozzáadása
-        switch (newRating) {
-          case 'Again':
-            againCount++;
-            break;
-          case 'Hard':
-            hardCount++;
-            break;
-        }
-
-        final updatedStats = CategoryStats(
-          againCount: againCount,
-          hardCount: hardCount,
-          updatedAt: Timestamp.now(),
-        );
-
-        transaction.set(docRef, updatedStats.toMap());
-      });
-    } catch (e) {
-      debugPrint('Error updating category stats: $e');
-    }
-  }
+  // J2 OPTIMALIZÁCIÓ: Az _updateDeckSnapshot és _updateCategoryStats metódusok
+  // eltávolítva. A statisztikák on-demand számolódnak a FlashcardStudyScreen-ben
+  // a learning dokumentumok lastRating mezője alapján.
 
   /// Deck cache invalidálása
   static void _invalidateDeckCache(String deckId) {
