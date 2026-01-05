@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/flashcard_learning_data.dart';
-import 'learning_batch_writer.dart';
+import '../core/learning_algorithm.dart';
 
 class LearningService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -13,17 +13,9 @@ class LearningService {
   static final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheValidity = Duration(minutes: 15);
 
-  /// Batch writer instance a tanulási adatok optimalizált mentéséhez
-  static final LearningBatchWriter _batchWriter = LearningBatchWriter();
-
-  /// Batch writer elérése (pl. flush híváshoz screen dispose-kor)
-  static LearningBatchWriter get batchWriter => _batchWriter;
-
   /// Egy kártya tanulási adatainak frissítése értékelés alapján
   ///
-  /// OPTIMALIZÁLVA (J1+J2):
-  /// - A tanulási adat mentése batch-ben történik (debounce + session végén)
-  /// - A statisztikák on-demand számolódnak a learning dokumentumokból
+  /// J2 OPTIMALIZÁCIÓ: Stats frissítések eltávolítva (on-demand számolás).
   static Future<void> updateUserLearningData(
     String cardId, // deckId#index formátum
     String rating, // "Again" | "Hard" | "Good" | "Easy"
@@ -44,20 +36,23 @@ class LearningService {
       debugPrint(
           'LearningService: Current data - state: ${currentData.state}, interval: ${currentData.interval}, easeFactor: ${currentData.easeFactor}');
 
-      // BATCH WRITE: Tanulási adat queue-ba helyezése (nem azonnal ír!)
-      await _batchWriter.queueUpdate(
-        cardId: cardId,
-        categoryId: categoryId,
-        currentData: currentData,
-        rating: rating,
-      );
+      // Új állapot kalkulálása az SM-2 algoritmussal
+      final newData = LearningAlgorithm.calculateNextState(currentData, rating);
+      debugPrint(
+          'LearningService: New data - state: ${newData.state}, interval: ${newData.interval}, easeFactor: ${newData.easeFactor}');
+
+      // AZONNAL mentés a Firestore-ba (egyszerű és megbízható)
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('categories')
+          .doc(categoryId)
+          .collection('learning')
+          .doc(cardId)
+          .set(newData.toMap());
 
       debugPrint(
-          'LearningService: Queued learning data update (pending: ${_batchWriter.pendingCount})');
-
-      // J2 OPTIMALIZÁCIÓ: NEM frissítjük a deck_stats/category_stats dokumentumokat
-      // A statisztikák on-demand számolódnak a FlashcardStudyScreen-ben
-      // a learning dokumentumok lastRating mezője alapján.
+          'LearningService: Successfully saved learning data to Firestore');
 
       // Cache invalidálása
       _invalidateDeckCache(cardId.split('#')[0]);
