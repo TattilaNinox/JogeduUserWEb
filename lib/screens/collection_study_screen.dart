@@ -243,7 +243,7 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Újrakezdés'),
         content: const Text(
-          'Biztosan újra szeretnéd kezdeni a tanulást?',
+          'Biztosan törölni szeretnéd az összes tanulási előzményt ebben a gyűjteményben?',
         ),
         actions: [
           TextButton(
@@ -251,15 +251,74 @@ class _CollectionStudyScreenState extends State<CollectionStudyScreen> {
             child: const Text('Mégse'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              _loadCollectionData();
+              await _resetCollectionProgress();
             },
-            child: const Text('Újrakezdés'),
+            child: const Text('Törlés'),
           ),
         ],
       ),
     );
+  }
+
+  /// Collection összes paklijának tanulási előzményeit törli
+  Future<void> _resetCollectionProgress() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Összes pakli betöltése a gyűjteményből
+      final allCards = await DeckCollectionService.loadAllCardsFromCollection(
+        widget.collectionId,
+        shuffle: false,
+      );
+
+      // Egyedi deckId-k és kártya számok gyűjtése
+      final deckStats = <String, int>{};
+      for (final card in allCards) {
+        final deckId = card['deckId'] as String;
+        deckStats[deckId] = (deckStats[deckId] ?? 0) + 1;
+      }
+
+      // Minden pakli tanulási előzményének törlése
+      for (final entry in deckStats.entries) {
+        await LearningService.resetDeckProgress(entry.key, entry.value);
+      }
+
+      // Számlálók nullázása
+      setState(() {
+        _againCount = 0;
+        _hardCount = 0;
+        _goodCount = 0;
+        _easyCount = 0;
+      });
+
+      // Adatok újratöltése
+      await _loadCollectionData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tanulási előzmények törölve!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hiba a törlés közben: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
