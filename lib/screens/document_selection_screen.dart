@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../core/firebase_config.dart';
 import '../widgets/filters.dart';
+import '../services/user_bundle_service.dart';
 
 /// Dokumentum kiválasztó képernyő (teljes képernyős, mobil-barát).
 ///
@@ -54,35 +55,46 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
     }
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        return;
-      }
+      // Új architektúra: subcollection-ből töltjük be az elemeket
+      final result = await UserBundleService.getItems(
+        widget.bundleId,
+        limit: 1000, // Nagy limit a meglévő elemek betöltéséhez
+        typeFilter: _getTypeFilterForDocumentType(),
+      );
 
-      final doc = await FirebaseConfig.firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('bundles')
-          .doc(widget.bundleId)
-          .get();
-
-      if (doc.exists && mounted) {
-        final data = doc.data()!;
-        List<String> ids = [];
-        if (widget.documentType == 'notes') {
-          ids = List<String>.from(data['noteIds'] ?? []);
-        } else if (widget.documentType == 'allomasok') {
-          ids = List<String>.from(data['allomasIds'] ?? []);
-        } else if (widget.documentType == 'dialogus') {
-          ids = List<String>.from(data['dialogusIds'] ?? []);
-        }
-
+      if (mounted) {
         setState(() {
-          _selectedIds.addAll(ids);
+          _selectedIds.addAll(result.items.map((item) => item.originalId));
         });
       }
     } catch (e) {
       debugPrint('Hiba a meglévő elemek betöltésekor: $e');
+    }
+  }
+
+  String? _getTypeFilterForDocumentType() {
+    switch (widget.documentType) {
+      case 'allomasok':
+        return 'allomas';
+      case 'dialogus':
+        return 'dialogus';
+      case 'jogeset':
+        return 'jogeset';
+      default:
+        return null; // notes - nem szűrünk típusra, mert többféle lehet
+    }
+  }
+
+  String _getCollectionName() {
+    switch (widget.documentType) {
+      case 'allomasok':
+        return 'memoriapalota_allomasok';
+      case 'dialogus':
+        return 'dialogus_fajlok';
+      case 'jogeset':
+        return 'jogesetek';
+      default:
+        return 'notes';
     }
   }
 
@@ -119,81 +131,47 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
   }
 
   Future<void> _addSelectedDocuments() async {
-    // Engedjük az üres listát is, hogy lehessen mindent eltávolítani
+    if (_selectedIds.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Válassz legalább egy elemet!')),
+        );
+      }
+      return;
+    }
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        return;
-      }
-
       String bundleId = widget.bundleId;
-      final batch = FirebaseConfig.firestore.batch();
+      final collectionName = _getCollectionName();
 
+      // Ha 'create', először létrehozzuk a köteget
       if (bundleId == 'create') {
-        final newBundleRef = FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .doc();
-
-        batch.set(newBundleRef, {
-          'name': 'Új köteg',
-          'description': '',
-          'noteIds':
-              widget.documentType == 'notes' ? _selectedIds.toList() : [],
-          'allomasIds':
-              widget.documentType == 'allomasok' ? _selectedIds.toList() : [],
-          'dialogusIds':
-              widget.documentType == 'dialogus' ? _selectedIds.toList() : [],
-          'jogesetIds':
-              widget.documentType == 'jogeset' ? _selectedIds.toList() : [],
-          'createdAt': FieldValue.serverTimestamp(),
-          'modified': FieldValue.serverTimestamp(),
-        });
-        bundleId = newBundleRef.id;
-      } else {
-        final bundleRef = FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .doc(bundleId);
-
-        final doc = await bundleRef.get();
-        if (!doc.exists) return;
-
-        final data = doc.data()!;
-        final noteIds = List<String>.from(data['noteIds'] ?? []);
-        final allomasIds = List<String>.from(data['allomasIds'] ?? []);
-        final dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
-        final jogesetIds = List<String>.from(data['jogesetIds'] ?? []);
-
-        // Itt nem hozzáadunk, hanem felülírjuk az adott típust a kijelöltekkel,
-        // így az eltávolítás is működni fog a választó képernyőn.
-        if (widget.documentType == 'notes') {
-          noteIds.clear();
-          noteIds.addAll(_selectedIds);
-        } else if (widget.documentType == 'allomasok') {
-          allomasIds.clear();
-          allomasIds.addAll(_selectedIds);
-        } else if (widget.documentType == 'dialogus') {
-          dialogusIds.clear();
-          dialogusIds.addAll(_selectedIds);
-        } else if (widget.documentType == 'jogeset') {
-          jogesetIds.clear();
-          jogesetIds.addAll(_selectedIds);
-        }
-
-        batch.update(bundleRef, {
-          'noteIds': noteIds,
-          'allomasIds': allomasIds,
-          'dialogusIds': dialogusIds,
-          'jogesetIds': jogesetIds,
-          'modified': FieldValue.serverTimestamp(),
-        });
+        bundleId = await UserBundleService.createBundle(
+          name: 'Új köteg',
+          description: '',
+        );
       }
 
-      await batch.commit();
+      // Betöltjük a már meglévő elemeket
+      final existingResult = await UserBundleService.getItems(
+        bundleId,
+        limit: 1000,
+      );
+      final existingOriginalIds =
+          existingResult.items.map((i) => i.originalId).toSet();
+
+      // Csak az új elemeket adjuk hozzá
+      int addedCount = 0;
+      for (final originalId in _selectedIds) {
+        if (!existingOriginalIds.contains(originalId)) {
+          await UserBundleService.addItemToBundle(
+            bundleId: bundleId,
+            originalId: originalId,
+            originalCollection: collectionName,
+          );
+          addedCount++;
+        }
+      }
 
       if (mounted) {
         String typeLabel = 'dokumentum';
@@ -203,8 +181,7 @@ class _DocumentSelectionScreenState extends State<DocumentSelectionScreen> {
         if (widget.documentType == 'jogeset') typeLabel = 'jogeset';
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('${_selectedIds.length} $typeLabel hozzáadva!')),
+          SnackBar(content: Text('$addedCount $typeLabel hozzáadva!')),
         );
         context.go('/my-bundles/edit/$bundleId');
       }

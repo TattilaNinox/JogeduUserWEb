@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import '../core/firebase_config.dart';
+import '../models/user_bundle.dart';
+import '../models/user_bundle_item.dart';
+import '../services/user_bundle_service.dart';
 
-/// Köteg szerkesztő képernyő.
+/// Köteg szerkesztő képernyő (Új architektúra: Subcollection alapú).
 ///
 /// Új köteg létrehozása vagy meglévő szerkesztése.
-/// Három típus szerinti csoportosított szekció:
-/// - Jegyzetek (notes)
-/// - Memória útvonalak (memoriapalota_allomasok)
-/// - Dialógusok (dialogus_fajlok)
 class UserBundleEditScreen extends StatefulWidget {
   final String? bundleId;
 
@@ -24,50 +21,56 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _scrollController = ScrollController();
 
-  List<String> _noteIds = [];
-  List<String> _allomasIds = [];
-  List<String> _dialogusIds = [];
-  List<String> _jogesetIds = [];
-
+  UserBundle? _bundle;
+  final List<UserBundleItem> _items = [];
+  DocumentSnapshot? _lastDocument;
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _loadBundle();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(UserBundleEditScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Ha a bundleId megváltozott, újratöltjük az adatokat
     if (oldWidget.bundleId != widget.bundleId) {
       _loadBundle();
     }
   }
 
+  void _scrollListener() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreItems();
+    }
+  }
+
   Future<void> _loadBundle() async {
     if (widget.bundleId != null) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final doc = await FirebaseConfig.firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('bundles')
-          .doc(widget.bundleId)
-          .get();
-
-      if (doc.exists) {
-        final data = doc.data()!;
-        _nameController.text = data['name'] ?? '';
-        _descriptionController.text = data['description'] ?? '';
-        _noteIds = List<String>.from(data['noteIds'] ?? []);
-        _allomasIds = List<String>.from(data['allomasIds'] ?? []);
-        _dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
-        _jogesetIds = List<String>.from(data['jogesetIds'] ?? []);
+      final bundle = await UserBundleService.getBundle(widget.bundleId!);
+      if (bundle != null) {
+        _nameController.text = bundle.name;
+        _descriptionController.text = bundle.description;
+        setState(() {
+          _bundle = bundle;
+        });
+        await _loadItems();
       }
     }
 
@@ -76,70 +79,75 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     });
   }
 
+  Future<void> _loadItems() async {
+    if (widget.bundleId == null) return;
+
+    setState(() {
+      _items.clear();
+      _lastDocument = null;
+      _hasMore = true;
+    });
+    await _loadMoreItems();
+  }
+
+  Future<void> _loadMoreItems() async {
+    if (widget.bundleId == null || _isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final result = await UserBundleService.getItems(
+        widget.bundleId!,
+        lastDocument: _lastDocument,
+        limit: 50,
+      );
+
+      setState(() {
+        _items.addAll(result.items);
+        _lastDocument = result.lastDoc;
+        _hasMore = result.items.length == 50;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingMore = false);
+      debugPrint('Hiba az elemek betöltésekor: $e');
+    }
+  }
+
   Future<void> _saveBundle() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final totalDocs = _noteIds.length +
-        _allomasIds.length +
-        _dialogusIds.length +
-        _jogesetIds.length;
-    if (totalDocs == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Legalább egy dokumentumot hozzá kell adni!'),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-    });
+    setState(() => _isSaving = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Nincs bejelentkezett felhasználó');
-
-      final bundleData = {
-        'name': _nameController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'noteIds': _noteIds,
-        'allomasIds': _allomasIds,
-        'dialogusIds': _dialogusIds,
-        'jogesetIds': _jogesetIds,
-        'modified': FieldValue.serverTimestamp(),
-      };
-
       if (widget.bundleId == null) {
         // Új köteg létrehozása
-        bundleData['created'] =
-            FieldValue.serverTimestamp(); // Megtartjuk a létrehozás idejét is
-        await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .add(bundleData);
+        final bundleId = await UserBundleService.createBundle(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Köteg sikeresen létrehozva!')),
+          );
+          context.go('/my-bundles/edit/$bundleId');
+        }
       } else {
         // Meglévő köteg frissítése
-        await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .doc(widget.bundleId)
-            .update(bundleData);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.bundleId == null
-                  ? 'Köteg sikeresen létrehozva!'
-                  : 'Köteg sikeresen frissítve!',
-            ),
-          ),
+        final updatedBundle = _bundle!.copyWith(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          modifiedAt: DateTime.now(),
         );
-        context.go('/my-bundles');
+        await UserBundleService.updateBundle(updatedBundle);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Köteg sikeresen frissítve!')),
+          );
+          context.go('/my-bundles');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -149,9 +157,7 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -181,20 +187,10 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     );
 
     if (confirmed == true && mounted) {
-      setState(() {
-        _isSaving = true;
-      });
+      setState(() => _isSaving = true);
 
       try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) return;
-
-        await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .doc(widget.bundleId)
-            .delete();
+        await UserBundleService.deleteBundle(widget.bundleId!);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -207,55 +203,39 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Hiba a törlés során: $e')),
           );
-          setState(() {
-            _isSaving = false;
-          });
+          setState(() => _isSaving = false);
         }
       }
     }
   }
 
   void _addDocuments(String type) {
-    // Teljes képernyős navigáció minden platformon (mobil + desktop)
     final bundleId = widget.bundleId ?? 'create';
     context.go('/my-bundles/edit/$bundleId/add-$type');
   }
 
-  Future<void> _removeDocument(String id, String type) async {
-    setState(() {
-      if (type == 'notes') {
-        _noteIds.remove(id);
-      } else if (type == 'allomasok') {
-        _allomasIds.remove(id);
-      } else if (type == 'dialogus') {
-        _dialogusIds.remove(id);
-      } else if (type == 'jogeset') {
-        _jogesetIds.remove(id);
-      }
-    });
+  Future<void> _removeItem(UserBundleItem item) async {
+    if (widget.bundleId == null) return;
 
-    // Ha szerkesztés módban vagyunk, azonnal mentsük a törlést a Firestore-ba is,
-    // különben a DocumentSelectionScreen-ről visszatérve (ami az adatbázisból tölt)
-    // újra megjelennének a törölt elemek.
-    if (widget.bundleId != null) {
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) return;
+    try {
+      await UserBundleService.removeItemFromBundle(
+        bundleId: widget.bundleId!,
+        itemId: item.id,
+        itemType: item.type,
+      );
 
-        await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .doc(widget.bundleId)
-            .update({
-          'noteIds': _noteIds,
-          'allomasIds': _allomasIds,
-          'dialogusIds': _dialogusIds,
-          'jogesetIds': _jogesetIds,
-          'modified': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        debugPrint('Hiba az elem törlésekor: $e');
+      setState(() {
+        _items.remove(item);
+        // Frissítjük a bundle számlálóit
+        if (_bundle != null) {
+          _bundle = _bundle!.decrementCounter(item.type);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hiba az elem törlésekor: $e')),
+        );
       }
     }
   }
@@ -268,6 +248,8 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
+
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
       appBar: AppBar(
@@ -288,220 +270,233 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Alapadatok
-              Card(
-                margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  side: BorderSide(
-                    color: Colors.grey.shade200,
-                    width: 1,
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            // Alapadatok
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.edit_note,
+                                color: Theme.of(context).primaryColor),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Alapadatok',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: InputDecoration(
+                            labelText: 'Köteg neve',
+                            hintText: 'Pl. Polgári jog vizsga',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'A név megadása kötelező';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _descriptionController,
+                          decoration: InputDecoration(
+                            labelText: 'Leírás (opcionális)',
+                            hintText: 'Rövid leírás a kötegről',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                          maxLines: 3,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .primaryColor
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: Icon(
-                              Icons.edit_note,
-                              color: Theme.of(context).primaryColor,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Alapadatok',
-                            style: TextStyle(
+              ),
+            ),
+
+            // Dokumentum szekciók
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    _buildDocumentSection(
+                      title: 'Tanulókártyák és kvíz kérdések',
+                      icon: Icons.school,
+                      count: _bundle?.noteCount ?? 0,
+                      type: 'notes',
+                      isMobile: isMobile,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDocumentSection(
+                      title: 'Memória útvonalak',
+                      icon: Icons.route,
+                      count: _bundle?.allomasCount ?? 0,
+                      type: 'allomasok',
+                      isMobile: isMobile,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDocumentSection(
+                      title: 'Dialógusok',
+                      icon: Icons.headset,
+                      count: _bundle?.dialogusCount ?? 0,
+                      type: 'dialogus',
+                      isMobile: isMobile,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDocumentSection(
+                      title: 'Jogesetek',
+                      icon: Icons.gavel,
+                      count: _bundle?.jogesetCount ?? 0,
+                      type: 'jogeset',
+                      isMobile: isMobile,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Elemek listája
+            if (_items.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.all(16.0),
+                sliver: SliverToBoxAdapter(
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            'Elemek a kötegben (${_items.length})',
+                            style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: InputDecoration(
-                          labelText: 'Köteg neve',
-                          hintText: 'Pl. Polgári jog vizsga',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'A név megadása kötelező';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _descriptionController,
-                        decoration: InputDecoration(
-                          labelText: 'Leírás (opcionális)',
-                          hintText: 'Rövid leírás a kötegről',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(2),
+                        const Divider(height: 1),
+                        ..._items.map((item) => _buildItemTile(item)),
+                        if (_hasMore && _isLoadingMore)
+                          const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Center(child: CircularProgressIndicator()),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                        ),
-                        maxLines: 3,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // Jegyzetek szekció
-              _buildDocumentSection(
-                title: 'Tanulókártyák és kvíz kérdések',
-                icon: Icons.school,
-                count: _noteIds.length,
-                type: 'notes',
-                ids: _noteIds,
-              ),
-              const SizedBox(height: 12),
-
-              // Állomások szekció
-              _buildDocumentSection(
-                title: 'Memória útvonalak',
-                icon: Icons.route,
-                count: _allomasIds.length,
-                type: 'allomasok',
-                ids: _allomasIds,
-              ),
-              const SizedBox(height: 12),
-
-              // Dialógusok szekció
-              _buildDocumentSection(
-                title: 'Dialógusok',
-                icon: Icons.headset,
-                count: _dialogusIds.length,
-                type: 'dialogus',
-                ids: _dialogusIds,
-              ),
-              const SizedBox(height: 12),
-
-              // Jogesetek szekció
-              _buildDocumentSection(
-                title: 'Jogesetek',
-                icon: Icons.gavel,
-                count: _jogesetIds.length,
-                type: 'jogeset',
-                ids: _jogesetIds,
-              ),
-              const SizedBox(height: 24),
-
-              // Mentés gombok - reszponzív elrendezés
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isSmallScreen = constraints.maxWidth < 600;
-
-                  if (isSmallScreen) {
-                    // Mobil: függőleges elrendezés, teljes szélesség
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ElevatedButton(
-                          onPressed: _isSaving ? null : _saveBundle,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(2),
+            // Mentés gomb
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: isMobile
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton(
+                            onPressed: _isSaving ? null : _saveBundle,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 48),
                             ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  )
+                                : Text(widget.bundleId == null
+                                    ? 'Létrehozás'
+                                    : 'Mentés'),
                           ),
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
-                                  ),
-                                )
-                              : Text(widget.bundleId == null
-                                  ? 'Létrehozás'
-                                  : 'Mentés'),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: _isSaving
-                              ? null
-                              : () => context.go('/my-bundles'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(2),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: _isSaving
+                                ? null
+                                : () => context.go('/my-bundles'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 48),
                             ),
+                            child: const Text('Mégse'),
                           ),
-                          child: const Text('Mégse'),
-                        ),
-                      ],
-                    );
-                  } else {
-                    // Desktop: vízszintes elrendezés
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: _isSaving
-                              ? null
-                              : () => context.go('/my-bundles'),
-                          child: const Text('Mégse'),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: _isSaving ? null : _saveBundle,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            foregroundColor: Colors.white,
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: _isSaving
+                                ? null
+                                : () => context.go('/my-bundles'),
+                            child: const Text('Mégse'),
                           ),
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
-                                  ),
-                                )
-                              : Text(widget.bundleId == null
-                                  ? 'Létrehozás'
-                                  : 'Mentés'),
-                        ),
-                      ],
-                    );
-                  }
-                },
+                          const SizedBox(width: 16),
+                          ElevatedButton(
+                            onPressed: _isSaving ? null : _saveBundle,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  )
+                                : Text(widget.bundleId == null
+                                    ? 'Létrehozás'
+                                    : 'Mentés'),
+                          ),
+                        ],
+                      ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -512,251 +507,69 @@ class _UserBundleEditScreenState extends State<UserBundleEditScreen> {
     required IconData icon,
     required int count,
     required String type,
-    required List<String> ids,
+    required bool isMobile,
   }) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(2),
-        side: BorderSide(
-          color: Colors.grey.shade200,
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Theme.of(context).primaryColor,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '$count elem',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isMobile)
-                  ElevatedButton(
-                    onPressed: () => _addDocuments(type),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(36, 36),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    child: const Icon(Icons.add, size: 20),
-                  )
-                else
-                  ElevatedButton.icon(
-                    onPressed: () => _addDocuments(type),
-                    icon: const Icon(Icons.add, size: 16),
-                    label:
-                        const Text('Hozzáadás', style: TextStyle(fontSize: 13)),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-
-            // Dokumentumok listája
-            if (ids.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 8),
-              ...ids.map((id) => _buildDocumentListTile(id, icon, type)),
-            ] else ...[
-              const SizedBox(height: 12),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: Column(
-                    children: [
-                      Icon(
-                        icon,
-                        size: 32,
-                        color: Colors.grey.shade300,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Még nincs hozzáadva',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDocumentListTile(
-      String id, IconData defaultIcon, String sectionType) {
-    // Kollekció név meghatározása
-    String collectionName;
-    if (sectionType == 'notes') {
-      collectionName = 'notes';
-    } else if (sectionType == 'allomasok') {
-      collectionName = 'memoriapalota_allomasok';
-    } else if (sectionType == 'dialogus') {
-      collectionName = 'dialogus_fajlok';
-    } else {
-      collectionName = 'jogesetek';
-    }
-
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseConfig.firestore.collection(collectionName).doc(id).get(),
-      builder: (context, snapshot) {
-        String title = id; // Alapértelmezett: ID
-        IconData itemIcon = defaultIcon;
-
-        if (snapshot.hasData && snapshot.data!.exists) {
-          final data = snapshot.data!.data() as Map<String, dynamic>?;
-          if (data != null) {
-            // Több mezőt is ellenőrzünk a cím megtalálásához
-            title = data['title'] ??
-                data['name'] ??
-                data['utvonalNev'] ??
-                data['cim'] ??
-                (sectionType == 'jogeset' ? data['documentId'] : null) ??
-                id;
-
-            // Ikon meghatározása típus alapján (csak jegyzetek esetén)
-            if (sectionType == 'notes') {
-              final type = data['type'] as String?;
-              switch (type) {
-                case 'deck':
-                  itemIcon = Icons.style;
-                  break;
-                case 'interactive':
-                  itemIcon = Icons.touch_app;
-                  break;
-                case 'dynamic_quiz':
-                case 'dynamic_quiz_dual':
-                  itemIcon = Icons.quiz;
-                  break;
-                case 'jogeset':
-                  itemIcon = Icons.gavel;
-                  break;
-                default:
-                  itemIcon = Icons.description;
-              }
-            } else if (sectionType == 'allomasok') {
-              itemIcon = Icons.train;
-            } else if (sectionType == 'dialogus') {
-              itemIcon = Icons.mic;
-            } else if (sectionType == 'jogeset') {
-              itemIcon = Icons.gavel;
-            }
-          }
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(2),
-            border: Border.all(
-              color: Colors.grey.shade200,
-              width: 1,
-            ),
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: Icon(
-                  itemIcon,
-                  size: 16,
-                  color: Theme.of(context).primaryColor,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.close,
-                  size: 18,
-                  color: Colors.grey.shade600,
-                ),
-                onPressed: () => _removeDocument(id, sectionType),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 32,
-                  minHeight: 32,
-                ),
-              ),
-            ],
+          child: Icon(icon, color: Theme.of(context).primaryColor, size: 20),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+        subtitle: Text('$count elem'),
+        trailing: ElevatedButton.icon(
+          onPressed: () => _addDocuments(type),
+          icon: const Icon(Icons.add, size: 16),
+          label: Text(isMobile ? '' : 'Hozzáadás'),
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 8 : 12, vertical: 8),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
+  Widget _buildItemTile(UserBundleItem item) {
+    final iconData = _getIconForType(item.type);
+
+    return ListTile(
+      leading: Icon(iconData, color: Theme.of(context).primaryColor),
+      title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: item.science != null ? Text(item.science!) : null,
+      trailing: IconButton(
+        icon: Icon(Icons.close, color: Colors.grey.shade600, size: 18),
+        onPressed: () => _removeItem(item),
+      ),
+    );
+  }
+
+  IconData _getIconForType(String type) {
+    switch (type) {
+      case 'deck':
+        return Icons.style;
+      case 'dynamic_quiz':
+      case 'dynamic_quiz_dual':
+        return Icons.quiz;
+      case 'interactive':
+        return Icons.touch_app;
+      case 'jogeset':
+        return Icons.gavel;
+      case 'dialogus':
+        return Icons.mic;
+      case 'allomas':
+        return Icons.route;
+      default:
+        return Icons.description;
+    }
   }
 }

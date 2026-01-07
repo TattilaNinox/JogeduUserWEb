@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import '../core/firebase_config.dart';
+import '../models/user_bundle.dart';
+import '../models/user_bundle_item.dart';
+import '../services/user_bundle_service.dart';
 import '../utils/filter_storage.dart';
 import '../widgets/mini_audio_player.dart';
+import '../core/firebase_config.dart';
 
 /// Köteg megtekintő képernyő.
 ///
-/// Egyszerű lista nézetben jeleníti meg a köteg tartalmát,
-/// típusonként csoportosítva expandable szekciókban.
+/// Infinite Scroll paginációval tölti be az elemeket a subcollection-ből.
+/// Támogatja a szűrést és a lazy cleanup-ot.
 class UserBundleViewScreen extends StatefulWidget {
   final String bundleId;
 
@@ -20,186 +22,152 @@ class UserBundleViewScreen extends StatefulWidget {
 }
 
 class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
-  Map<String, dynamic>? _bundleData;
-  bool _isLoading = true;
+  final _scrollController = ScrollController();
 
-  // Szűréshez és rendezéshez szükséges állapot
-  Map<String, String> _docTypes = {}; // id -> type
-  Map<String, String> _docTitles = {}; // id -> title
-  Set<String> _availableTypes = {};
+  UserBundle? _bundle;
+  final List<UserBundleItem> _items = [];
+  DocumentSnapshot? _lastDocument;
+  bool _isLoadingBundle = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+
+  // Szűrés
   String _selectedType = 'all';
+  final Set<String> _availableTypes = {};
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _loadBundle();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreItems();
+    }
+  }
+
   Future<void> _loadBundle() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseConfig.firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('bundles')
-        .doc(widget.bundleId)
-        .get();
-
-    if (doc.exists) {
-      final data = doc.data()!;
-      final noteIds = List<String>.from(data['noteIds'] ?? []);
-      final allomasIds = List<String>.from(data['allomasIds'] ?? []);
-      final dialogusIds = List<String>.from(data['dialogusIds'] ?? []);
-      final jogesetIds = List<String>.from(data['jogesetIds'] ?? []);
-
-      Map<String, String> docTypes = {};
-      Map<String, String> docTitles = {};
-      Set<String> availableTypes = {};
-
-      Future<void> processIds(
-          List<String> ids, String collection, String defaultType) async {
-        if (ids.isEmpty) return;
-
-        // Firestore whereIn limit is 30
-        for (var i = 0; i < ids.length; i += 30) {
-          final chunk =
-              ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
-          final snapshots = await FirebaseConfig.firestore
-              .collection(collection)
-              .where(FieldPath.documentId, whereIn: chunk)
-              .get();
-
-          for (var d in snapshots.docs) {
-            final data = d.data();
-            final id = d.id;
-            final title = (data['title'] ??
-                    data['name'] ??
-                    (collection == 'jogesetek' ? data['documentId'] : null) ??
-                    id)
-                .toString();
-            final type = collection == 'notes'
-                ? (data['type'] as String? ?? 'standard')
-                : defaultType;
-            docTypes[id] = type;
-            docTitles[id] = title;
-            availableTypes.add(type);
-          }
-        }
-      }
-
-      // Elindítjuk a lekérdezéseket párhuzamosan a gyorsabb betöltésért
-      await Future.wait([
-        processIds(noteIds, 'notes', 'standard'),
-        processIds(allomasIds, 'memoriapalota_allomasok', 'mp'),
-        processIds(dialogusIds, 'dialogus_fajlok', 'dialogue'),
-        processIds(jogesetIds, 'jogesetek', 'jogeset'),
-      ]);
-
-      if (mounted) {
+    try {
+      final bundle = await UserBundleService.getBundle(widget.bundleId);
+      if (bundle == null) {
         setState(() {
-          _bundleData = data;
-          _docTypes = docTypes;
-          _docTitles = docTitles;
-          _availableTypes = availableTypes;
-          _isLoading = false;
+          _error = 'Köteg nem található';
+          _isLoadingBundle = false;
         });
+        return;
       }
-    } else {
+
+      setState(() {
+        _bundle = bundle;
+        _isLoadingBundle = false;
+      });
+
+      await _loadInitialItems();
+    } catch (e) {
+      setState(() {
+        _error = 'Hiba: $e';
+        _isLoadingBundle = false;
+      });
+    }
+  }
+
+  Future<void> _loadInitialItems() async {
+    setState(() {
+      _items.clear();
+      _lastDocument = null;
+      _hasMore = true;
+    });
+    await _loadMoreItems();
+  }
+
+  Future<void> _loadMoreItems() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final result = await UserBundleService.getItems(
+        widget.bundleId,
+        lastDocument: _lastDocument,
+        limit: 20,
+        typeFilter: _selectedType == 'all' ? null : _selectedType,
+      );
+
+      setState(() {
+        _items.addAll(result.items);
+        _lastDocument = result.lastDoc;
+        _hasMore = result.items.length == 20;
+        _isLoadingMore = false;
+
+        // Elérhető típusok gyűjtése
+        for (final item in result.items) {
+          _availableTypes.add(item.type);
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingMore = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Köteg nem található')),
+          SnackBar(content: Text('Hiba a betöltés során: $e')),
         );
-        context.go('/my-bundles');
       }
     }
   }
 
+  void _onTypeFilterChanged(String? newType) {
+    if (newType == null || newType == _selectedType) return;
+    setState(() {
+      _selectedType = newType;
+    });
+    _loadInitialItems();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    if (_isLoadingBundle) {
       return Scaffold(
         appBar: AppBar(title: const Text('Betöltés...')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_bundleData == null) {
+    if (_error != null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Hiba')),
-        body: const Center(child: Text('Köteg nem található')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+              const SizedBox(height: 16),
+              Text(_error!, style: const TextStyle(fontSize: 16)),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.go('/my-bundles'),
+                child: const Text('Vissza'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
-    final String name = _bundleData!['name'] ?? 'Névtelen köteg';
-    final String description = _bundleData!['description'] ?? '';
-    final List<String> allNoteIds =
-        List<String>.from(_bundleData!['noteIds'] ?? []);
-    final List<String> allAllomasIds =
-        List<String>.from(_bundleData!['allomasIds'] ?? []);
-    final List<String> allDialogusIds =
-        List<String>.from(_bundleData!['dialogusIds'] ?? []);
-    final List<String> allJogesetIds =
-        List<String>.from(_bundleData!['jogesetIds'] ?? []);
-
-    // Típusok leképezése magyar névre és ikonra
-    final Map<String, Map<String, dynamic>> typeConfig = {
-      'all': {'label': 'Összes típus', 'icon': Icons.filter_list},
-      'standard': {'label': 'Szöveg Tags', 'icon': Icons.description},
-      'text': {'label': 'Szöveg Tags', 'icon': Icons.description},
-      'deck': {'label': 'Tanulókártya', 'icon': Icons.style},
-      'dynamic_quiz': {'label': 'Kvíz', 'icon': Icons.quiz},
-      'dynamic_quiz_dual': {'label': 'Páros kvíz', 'icon': Icons.quiz_outlined},
-      'interactive': {'label': 'Interaktív', 'icon': Icons.touch_app},
-      'jogeset': {'label': 'Jogeset', 'icon': Icons.gavel},
-      'mp': {'label': 'Memória útvonal', 'icon': Icons.directions_bus},
-      'dialogue': {'label': 'Dialógus', 'icon': Icons.mic},
-    };
-
-    // Összesített és szűrt lista összeállítása
-    final List<Map<String, dynamic>> allItems = [];
-
-    void addFilteredItems(
-        List<String> ids, String collection, Color defaultColor) {
-      for (String id in ids) {
-        final docType = _docTypes[id];
-        if (docType == null) continue; // Nem töltődött be / nem létezik
-
-        bool matches = false;
-        if (_selectedType == 'all') {
-          matches = true;
-        } else if (_selectedType == 'standard' || _selectedType == 'text') {
-          matches = (docType == 'standard' || docType == 'text');
-        } else {
-          matches = (docType == _selectedType);
-        }
-
-        if (matches) {
-          allItems.add({
-            'id': id,
-            'collection': collection,
-            'defaultColor': defaultColor,
-            'title': _docTitles[id] ?? id,
-          });
-        }
-      }
-    }
-
-    addFilteredItems(allNoteIds, 'notes', Colors.blue.shade700);
-    addFilteredItems(
-        allAllomasIds, 'memoriapalota_allomasok', Colors.orange.shade700);
-    addFilteredItems(allDialogusIds, 'dialogus_fajlok', Colors.green.shade700);
-    addFilteredItems(allJogesetIds, 'jogesetek', const Color(0xFF1E3A8A));
-
-    // ABC sorrendbe rendezés cím alapján
-    allItems.sort((a, b) => (a['title'] as String)
-        .toLowerCase()
-        .compareTo((b['title'] as String).toLowerCase()));
-
-    final bool isEmpty = allItems.isEmpty;
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final bundle = _bundle!;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -211,14 +179,10 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           onPressed: () => context.go('/my-bundles'),
         ),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              icon: Icon(Icons.edit_outlined, size: isMobile ? 22 : 24),
-              onPressed: () =>
-                  context.go('/my-bundles/edit/${widget.bundleId}'),
-              tooltip: 'Szerkesztés',
-            ),
+          IconButton(
+            icon: Icon(Icons.edit_outlined, size: isMobile ? 22 : 24),
+            onPressed: () => context.go('/my-bundles/edit/${widget.bundleId}'),
+            tooltip: 'Szerkesztés',
           ),
         ],
         bottom: PreferredSize(
@@ -226,235 +190,110 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
           child: Divider(height: 1, color: Colors.grey.shade200),
         ),
       ),
-      body: ListView(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12.0 : 20.0,
-          vertical: isMobile ? 16.0 : 24.0,
-        ),
-        children: [
-          // Köteg címe
-          Padding(
-            padding: EdgeInsets.only(bottom: isMobile ? 16.0 : 24.0),
-            child: Text(
-              name,
-              textAlign: isMobile ? TextAlign.center : TextAlign.start,
-              style: TextStyle(
-                fontSize: isMobile ? 19 : 26,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF2C3E50),
-                letterSpacing: -0.5,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // Header szekció
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Köteg neve
+                  Text(
+                    bundle.name,
+                    style: TextStyle(
+                      fontSize: isMobile ? 22 : 28,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF2C3E50),
+                    ),
+                  ),
+                  if (bundle.description.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      bundle.description,
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 15,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  // Statisztika
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      _buildStatChip(
+                          Icons.folder, 'Összes', bundle.totalCount, isMobile),
+                      if (bundle.noteCount > 0)
+                        _buildStatChip(Icons.description, 'Jegyzet',
+                            bundle.noteCount, isMobile),
+                      if (bundle.jogesetCount > 0)
+                        _buildStatChip(Icons.gavel, 'Jogeset',
+                            bundle.jogesetCount, isMobile),
+                      if (bundle.dialogusCount > 0)
+                        _buildStatChip(Icons.mic, 'Dialógus',
+                            bundle.dialogusCount, isMobile),
+                      if (bundle.allomasCount > 0)
+                        _buildStatChip(Icons.route, 'Útvonal',
+                            bundle.allomasCount, isMobile),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
 
-          // Leírás
-          if (description.isNotEmpty) ...[
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: EdgeInsets.all(isMobile ? 12.0 : 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline,
-                          size: isMobile ? 16 : 18,
-                          color: Colors.blue.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Leírás',
-                        style: TextStyle(
-                          fontSize: isMobile ? 13 : 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: isMobile ? 8 : 12),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: isMobile ? 14 : 15,
-                      height: 1.4,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: isMobile ? 16 : 24),
-          ],
-
-          // Típusszűrő - Prémium UI
-          if (_availableTypes.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.only(bottom: isMobile ? 16.0 : 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-                    child: Text(
-                      'Tartalom szűrése',
-                      style: TextStyle(
-                        fontSize: isMobile ? 12 : 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade500,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: isMobile ? 48 : 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedType,
-                        isExpanded: true,
-                        icon: Icon(Icons.unfold_more,
-                            size: 20, color: Colors.grey.shade600),
-                        borderRadius: BorderRadius.circular(12),
-                        dropdownColor: Colors.white,
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedType = newValue;
-                            });
-                          }
-                        },
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: 'all',
-                            child: Row(
-                              children: [
-                                Icon(Icons.grid_view_rounded,
-                                    size: isMobile ? 16 : 18,
-                                    color: Colors.blue.shade700),
-                                const SizedBox(width: 12),
-                                Text('Összes típus',
-                                    style: TextStyle(
-                                        fontSize: isMobile ? 13 : 14)),
-                              ],
-                            ),
-                          ),
-                          ..._availableTypes.map((type) {
-                            final config = typeConfig[type] ??
-                                {'label': type, 'icon': Icons.help_outline};
-                            return DropdownMenuItem<String>(
-                              value: type,
-                              child: Row(
-                                children: [
-                                  Icon(config['icon'] as IconData,
-                                      size: isMobile ? 16 : 18,
-                                      color: Colors.blue.shade700),
-                                  const SizedBox(width: 12),
-                                  Text(config['label'] as String,
-                                      style: TextStyle(
-                                          fontSize: isMobile ? 13 : 14)),
-                                ],
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Lista szakasz
-          if (!isEmpty) ...[
-            if (_selectedType != 'all')
-              Padding(
-                padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
-                child: Text(
-                  '${typeConfig[_selectedType]?['label'] ?? _selectedType} (${allItems.length})',
-                  style: TextStyle(
-                    fontSize: isMobile ? 14 : 15,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2C3E50),
-                  ),
-                ),
-              ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: allItems.map((item) {
-                  return _buildDocumentTile(
-                    id: item['id'],
-                    collection: item['collection'],
-                    defaultColor: item['defaultColor'],
-                    isMobile: isMobile,
-                    cachedTitle:
-                        item['title'], // Átadjuk az előre betöltött címet
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-
-          // Ha nincs egyetlen dokumentum sem (vagy a szűrés után üres)
-          if (isEmpty)
-            Center(
+          // Szűrő (ha van több típus)
+          if (_availableTypes.length > 1)
+            SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(32.0),
+                padding:
+                    EdgeInsets.symmetric(horizontal: isMobile ? 16.0 : 24.0),
+                child: _buildTypeFilter(isMobile),
+              ),
+            ),
+
+          // Lista elemek
+          if (_items.isEmpty && !_isLoadingMore)
+            SliverFillRemaining(
+              child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      _selectedType == 'all'
-                          ? Icons.folder_open
-                          : Icons.filter_list_off,
-                      size: 64,
-                      color: Colors.grey.shade300,
-                    ),
+                    Icon(Icons.folder_open,
+                        size: 64, color: Colors.grey.shade300),
                     const SizedBox(height: 16),
                     Text(
                       _selectedType == 'all'
                           ? 'Ez a köteg még üres'
-                          : 'Nincs ilyen típusú elem a kötegben',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          : 'Nincs ilyen típusú elem',
+                      style:
+                          TextStyle(fontSize: 16, color: Colors.grey.shade500),
                     ),
                   ],
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    if (index < _items.length) {
+                      return _buildItemTile(_items[index], isMobile);
+                    } else if (_hasMore) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    return null;
+                  },
+                  childCount: _items.length + (_hasMore ? 1 : 0),
                 ),
               ),
             ),
@@ -463,280 +302,262 @@ class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
     );
   }
 
-  Widget _buildDocumentTile({
-    required String id,
-    required String collection,
-    required Color defaultColor,
-    required bool isMobile,
-    String? cachedTitle,
-  }) {
-    // Ha van cache-elt cím, nem kell FutureBuilder az adatokhoz,
-    // hacsak nem kell audioUrl vagy típus-specifikus ikon.
-    // De jelenleg a típus is és cím is pre-loaded a rendezéshez,
-    // kivéve az audioUrl-t a dialógushoz.
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseConfig.firestore.collection(collection).doc(id).get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 20,
-              vertical: isMobile ? 10 : 16,
+  Widget _buildStatChip(IconData icon, String label, int count, bool isMobile) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 10 : 12,
+        vertical: isMobile ? 6 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: isMobile ? 14 : 16, color: Colors.blue.shade700),
+          const SizedBox(width: 6),
+          Text(
+            '$label: $count',
+            style: TextStyle(
+              fontSize: isMobile ? 12 : 13,
+              fontWeight: FontWeight.w500,
             ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: isMobile ? 32 : 40,
-                  height: isMobile ? 32 : 40,
-                  child: Center(
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.grey.shade300,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Container(
-                  width: isMobile ? 100 : 140,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (snapshot.hasData && snapshot.data!.exists || cachedTitle != null) {
-          final data = snapshot.data?.data() as Map<String, dynamic>?;
-          String? jogesetDocId;
-          if (collection == 'jogesetek') {
-            jogesetDocId = data?['documentId'] as String?;
-          }
-
-          final String title = cachedTitle ??
-              data?['title'] as String? ??
-              data?['name'] as String? ??
-              jogesetDocId ??
-              'Névtelen';
-          final type = _docTypes[id] ?? data?['type'] as String? ?? 'standard';
-          IconData icon = Icons.description;
-          String? audioUrl;
-
-          if (collection == 'dialogus_fajlok') {
-            audioUrl = data?['audioUrl'] as String?;
-            icon = Icons.mic;
-          } else if (collection == 'memoriapalota_allomasok') {
-            icon = Icons.directions_bus;
-          } else if (collection == 'jogesetek') {
-            icon = Icons.gavel;
-          } else {
-            switch (type) {
-              case 'deck':
-                icon = Icons.style;
-                break;
-              case 'dynamic_quiz':
-                icon = Icons.quiz;
-                break;
-              case 'dynamic_quiz_dual':
-                icon = Icons.quiz_outlined;
-                break;
-              case 'interactive':
-                icon = Icons.touch_app;
-                break;
-              case 'jogeset':
-                icon = Icons.gavel;
-                break;
-              default:
-                icon = Icons.description;
-            }
-          }
-
-          final bool isDialogue = collection == 'dialogus_fajlok';
-
-          return InkWell(
-            onTap:
-                !isDialogue ? () => _navigateToDocument(id, collection) : null,
-            child: Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 16 : 20,
-                    vertical: isMobile ? 10 : 16,
-                  ),
-                  child: isDialogue
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(isMobile ? 8 : 10),
-                                  decoration: BoxDecoration(
-                                    color: defaultColor.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(
-                                        isMobile ? 10 : 12),
-                                  ),
-                                  child: Icon(
-                                    icon,
-                                    color: defaultColor,
-                                    size: isMobile ? 18 : 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    title,
-                                    style: TextStyle(
-                                      fontSize: isMobile ? 12 : 15,
-                                      fontWeight: FontWeight.w500,
-                                      color: const Color(0xFF2C3E50),
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (audioUrl?.isNotEmpty ?? false) ...[
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: MiniAudioPlayer(
-                                  audioUrl: audioUrl!,
-                                  compact: false,
-                                  large: true,
-                                ),
-                              ),
-                            ],
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(isMobile ? 8 : 10),
-                              decoration: BoxDecoration(
-                                color: defaultColor.withValues(alpha: 0.08),
-                                borderRadius:
-                                    BorderRadius.circular(isMobile ? 10 : 12),
-                              ),
-                              child: Icon(
-                                icon,
-                                color: defaultColor,
-                                size: isMobile ? 18 : 20,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                title,
-                                style: TextStyle(
-                                  fontSize: isMobile ? 12 : 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF2C3E50),
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                            Icon(Icons.arrow_forward_ios,
-                                color: Colors.grey.shade300, size: 12),
-                          ],
-                        ),
-                ),
-                Divider(
-                    height: 1,
-                    indent: isMobile ? 56 : 68,
-                    color: Colors.grey.shade50),
-              ],
-            ),
-          );
-        } else {
-          return Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade300, size: 20),
-                const SizedBox(width: 12),
-                const Text(
-                  'Dokumentum nem található',
-                  style: TextStyle(color: Colors.red, fontSize: 14),
-                ),
-              ],
-            ),
-          );
-        }
-      },
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _navigateToDocument(String id, String collection) async {
-    try {
-      // Megnyitás előtt lekérjük a dokumentum metaadatait a helyes navigációhoz
-      final doc =
-          await FirebaseConfig.firestore.collection(collection).doc(id).get();
+  Widget _buildTypeFilter(bool isMobile) {
+    final typeLabels = {
+      'all': 'Összes',
+      'text': 'Szöveg',
+      'deck': 'Tanulókártya',
+      'dynamic_quiz': 'Kvíz',
+      'dynamic_quiz_dual': 'Páros kvíz',
+      'interactive': 'Interaktív',
+      'jogeset': 'Jogeset',
+      'dialogus': 'Dialógus',
+      'allomas': 'Memória útvonal',
+    };
 
-      if (!doc.exists) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Dokumentum nem található')),
-          );
-        }
-        return;
-      }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedType,
+          isExpanded: true,
+          items: [
+            const DropdownMenuItem(value: 'all', child: Text('Összes típus')),
+            ..._availableTypes.map((type) => DropdownMenuItem(
+                  value: type,
+                  child: Text(typeLabels[type] ?? type),
+                )),
+          ],
+          onChanged: _onTypeFilterChanged,
+        ),
+      ),
+    );
+  }
 
-      final data = doc.data() as Map<String, dynamic>;
-      final science = data['science'] as String?;
-      final category = data['category'] as String?;
-      final tags = data['tags'] as List<dynamic>?;
-      final tag =
-          tags != null && tags.isNotEmpty ? tags.first.toString() : null;
+  Widget _buildItemTile(UserBundleItem item, bool isMobile) {
+    final iconData = _getIconForType(item.type);
+    final color = _getColorForType(item.type);
+    final isDialogue = item.type == 'dialogus';
 
-      // FilterStorage inicializálása, hogy a Jegyzethallgató/Olvasó tudja, hova kell visszalépni
-      // és milyen környezetben kell betöltenie a tartalmat
-      FilterStorage.science = science;
-      FilterStorage.category = category;
-      FilterStorage.tag = tag;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: InkWell(
+        onTap: isDialogue ? null : () => _navigateToItem(item),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.all(isMobile ? 12 : 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child:
+                        Icon(iconData, color: color, size: isMobile ? 18 : 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (item.science != null || item.category != null)
+                          Text(
+                            [item.science, item.category]
+                                .whereType<String>()
+                                .join(' • '),
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (!isDialogue)
+                    Icon(Icons.chevron_right,
+                        color: Colors.grey.shade400, size: 20),
+                ],
+              ),
+              // Dialógus: audio player
+              if (isDialogue) ...[
+                const SizedBox(height: 12),
+                FutureBuilder<String?>(
+                  future: _getAudioUrl(item),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data != null) {
+                      return MiniAudioPlayer(
+                          audioUrl: snapshot.data!,
+                          compact: false,
+                          large: true);
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-      if (!mounted) return;
-      if (collection == 'notes') {
-        final type = data['type'] as String? ?? 'standard';
+  IconData _getIconForType(String type) {
+    switch (type) {
+      case 'deck':
+        return Icons.style;
+      case 'dynamic_quiz':
+      case 'dynamic_quiz_dual':
+        return Icons.quiz;
+      case 'interactive':
+        return Icons.touch_app;
+      case 'jogeset':
+        return Icons.gavel;
+      case 'dialogus':
+        return Icons.mic;
+      case 'allomas':
+        return Icons.route;
+      default:
+        return Icons.description;
+    }
+  }
 
-        if (type == 'dynamic_quiz' || type == 'dynamic_quiz_dual') {
-          // Kvíz esetén követjük a NoteListTile logikáját
-          // Itt egyszerűség kedvéért a mobil útvonalat használjuk mindenhol a kötegben,
-          // vagy ha nagyon precízek akarunk lenni, átvesszük a NoteListTile elágazását.
-          context.go('/quiz/$id?from=bundle&bundleId=${widget.bundleId}');
-        } else if (type == 'deck') {
-          // Tanulókártya: kötelezően a VIEW (előoldal), nem a STUDY
-          context.go('/deck/$id/view?from=bundle&bundleId=${widget.bundleId}');
-        } else if (type == 'interactive') {
-          context.go(
-              '/interactive-note/$id?from=bundle&bundleId=${widget.bundleId}');
-        } else if (type == 'jogeset') {
-          context.go('/jogeset/$id?from=bundle&bundleId=${widget.bundleId}');
-        } else {
-          context.go('/note/$id?from=bundle&bundleId=${widget.bundleId}');
-        }
-      } else if (collection == 'memoriapalota_allomasok') {
-        context.go(
-            '/memoriapalota-allomas/$id?from=bundle&bundleId=${widget.bundleId}');
-      } else if (collection == 'jogesetek') {
-        context.go('/jogeset/$id?from=bundle&bundleId=${widget.bundleId}');
-      } else if (collection == 'dialogus_fajlok') {
-        // Dialógus fájlok esetén nincs navigáció, helyben lejátszhatóak
-        return;
-      }
-    } catch (e) {
+  Color _getColorForType(String type) {
+    switch (type) {
+      case 'deck':
+        return Colors.purple.shade700;
+      case 'dynamic_quiz':
+      case 'dynamic_quiz_dual':
+        return Colors.orange.shade700;
+      case 'interactive':
+        return Colors.teal.shade700;
+      case 'jogeset':
+        return const Color(0xFF1E3A8A);
+      case 'dialogus':
+        return Colors.green.shade700;
+      case 'allomas':
+        return Colors.amber.shade700;
+      default:
+        return Colors.blue.shade700;
+    }
+  }
+
+  Future<String?> _getAudioUrl(UserBundleItem item) async {
+    if (item.originalCollection != 'dialogus_fajlok') return null;
+    final doc = await FirebaseConfig.firestore
+        .collection(item.originalCollection)
+        .doc(item.originalId)
+        .get();
+    return doc.data()?['audioUrl'] as String?;
+  }
+
+  Future<void> _navigateToItem(UserBundleItem item) async {
+    // Ellenőrizzük, hogy az eredeti dokumentum létezik-e
+    final exists = await UserBundleService.checkOriginalExists(item);
+
+    if (!exists) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hiba a megnyitás során: $e')),
+          const SnackBar(
+              content:
+                  Text('Ez az elem már nem elérhető. Eltávolítva a kötegből.')),
         );
+        // Lazy cleanup
+        await UserBundleService.cleanupInvalidItem(
+          bundleId: widget.bundleId,
+          item: item,
+        );
+        setState(() {
+          _items.remove(item);
+        });
+        // Frissítjük a bundle-t is
+        final updatedBundle =
+            await UserBundleService.getBundle(widget.bundleId);
+        if (updatedBundle != null) {
+          setState(() => _bundle = updatedBundle);
+        }
       }
+      return;
+    }
+
+    // FilterStorage beállítása a visszanavigáláshoz
+    FilterStorage.science = item.science;
+    FilterStorage.category = item.category;
+    FilterStorage.tag = item.tags.isNotEmpty ? item.tags.first : null;
+
+    if (!mounted) return;
+
+    final from = 'bundle&bundleId=${widget.bundleId}';
+
+    switch (item.type) {
+      case 'dynamic_quiz':
+      case 'dynamic_quiz_dual':
+        context.go('/quiz/${item.originalId}?from=$from');
+        break;
+      case 'deck':
+        context.go('/deck/${item.originalId}/view?from=$from');
+        break;
+      case 'interactive':
+        context.go('/interactive-note/${item.originalId}?from=$from');
+        break;
+      case 'jogeset':
+        context.go('/jogeset/${item.originalId}?from=$from');
+        break;
+      case 'allomas':
+        context.go('/memoriapalota-allomas/${item.originalId}?from=$from');
+        break;
+      default:
+        context.go('/note/${item.originalId}?from=$from');
     }
   }
 }

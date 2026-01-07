@@ -1,0 +1,254 @@
+# User Bundle Optimalizációs és Refaktorálási Terv 🚀
+## (SUBCOLLECTION + INFINITE SCROLL + TELJES SPECIFIKÁCIÓ)
+
+## 🎯 Célkitűzés
+A felhasználói kötegek kezelésének átalakítása a maximális skálázhatóság (7000+ felhasználó, 1200+ jegyzet), szerveroldali szűrés és hatékony adathozzáférés (Pagination) támogatása érdekében.
+
+---
+
+## 🛠 Új Architektúra: Subcollection + Infinite Scroll
+
+Az elemeket (`UserBundleItem`) al-kollekcióban tároljuk, és 'Infinite Scroll' technikával töltjük be 20-asával.
+
+---
+
+## 📦 1. Adatmodellek
+
+### 1.1 UserBundle (Szülő dokumentum)
+**Firestore útvonal:** `users/{uid}/bundles/{bundleId}`
+
+```dart
+class UserBundle {
+  final String id;
+  final String name;
+  final String description;
+  final DateTime createdAt;
+  final DateTime modifiedAt;
+  
+  // Aggregált számlálók (típusonként)
+  final int totalCount;
+  final int noteCount;
+  final int jogesetCount;
+  final int dialogusCount;
+  final int allomasCount;
+  
+  // Firestore konverziók
+  factory UserBundle.fromFirestore(DocumentSnapshot doc);
+  Map<String, dynamic> toFirestore();
+}
+```
+
+### 1.2 UserBundleItem (Al-kollekció dokumentum)
+**Firestore útvonal:** `users/{uid}/bundles/{bundleId}/items/{itemId}`
+
+```dart
+class UserBundleItem {
+  final String id;           // Subcollection doc ID
+  final String originalId;   // Eredeti jegyzet/jogeset ID
+  final String originalCollection; // 'notes', 'jogesetek', 'dialogus_fajlok', 'memoriapalota_allomasok'
+  
+  // Denormalizált metaadatok (listázáshoz, szűréshez)
+  final String title;
+  final String type;         // 'text', 'deck', 'interactive', 'dynamic_quiz', 'jogeset', 'dialogus', 'allomas'
+  final String? science;     // Pl. 'Polgári jog'
+  final String? category;    // Pl. 'Tulajdonjog'
+  final List<String> tags;   // Címkék
+  final String? status;      // 'active', 'draft', stb.
+  
+  // Rendezéshez
+  final DateTime addedAt;    // Köteghez adás időpontja
+  
+  // Firestore konverziók
+  factory UserBundleItem.fromFirestore(DocumentSnapshot doc);
+  Map<String, dynamic> toFirestore();
+}
+```
+
+---
+
+## ⚙️ 2. Service Réteg (`UserBundleService`)
+
+```dart
+class UserBundleService {
+  // --- BUNDLE CRUD ---
+  Stream<List<UserBundle>> getUserBundles(String userId);
+  Future<UserBundle?> getBundle(String userId, String bundleId);
+  Future<String> createBundle(String userId, UserBundle bundle);
+  Future<void> updateBundle(String userId, UserBundle bundle);
+  Future<void> deleteBundle(String userId, String bundleId);
+  
+  // --- ITEM CRUD (Subcollection) ---
+  Future<List<UserBundleItem>> getItems(
+    String userId,
+    String bundleId, {
+    DocumentSnapshot? lastDocument,
+    int limit = 20,
+    String? scienceFilter,
+    String? typeFilter,
+    String? tagFilter, // array-contains
+  });
+  
+  Future<void> addItemToBundle(
+    String userId,
+    String bundleId,
+    String originalId,
+    String originalCollection,
+  ); // Lekéri a metaadatokat, létrehozza az itemet, növeli a számlálót (Transaction)
+  
+  Future<void> removeItemFromBundle(
+    String userId,
+    String bundleId,
+    String itemId,
+    String itemType,
+  ); // Törli az itemet, csökkenti a számlálót (Transaction)
+  
+  // --- LAZY CLEANUP ---
+  Future<void> cleanupInvalidItem(
+    String userId,
+    String bundleId,
+    UserBundleItem item,
+  ); // Ha az eredeti elem már nem létezik
+}
+```
+
+---
+
+## 🗂️ 3. Firestore Indexek
+
+A hatékony szerveroldali szűréshez összetett indexekre van szükség.
+
+**Fájl:** `firestore.indexes.json` (hozzáadandó)
+
+```json
+{
+  "indexes": [
+    {
+      "collectionGroup": "items",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "science", "order": "ASCENDING" },
+        { "fieldPath": "addedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "items",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "addedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "items",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tags", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "addedAt", "order": "DESCENDING" }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 🧹 4. Lazy Cleanup (Törölt Elemek Kezelése)
+
+**Probléma:** Ha egy jegyzet (az eredeti `notes` kollekcióban) törlődik, a kötegben a hivatkozás és a metaadat megmarad.
+
+**Megoldás (Lazy / Lusta takarítás):**
+1. A felhasználó a kötegben látja az elemet (az eltárolt címmel).
+2. Kattint rá, hogy megnyissa.
+3. A rendszer megpróbálja lekérni az eredeti dokumentumot az `originalCollection`-ből.
+4. Ha a dokumentum **nem létezik** (404):
+   - Megjelenít egy üzenetet: "Ez az elem már nem elérhető."
+   - Automatikusan meghívja a `cleanupInvalidItem` metódust.
+   - Ez törli az itemet a subcollection-ből és csökkenti a számlálót.
+5. A lista frissül.
+
+**Előny:** Nincs szükség költséges háttérfolyamatokra (Cloud Functions) a szinkronizáláshoz.
+
+
+---
+
+## 📺 5. Infinite Scroll Implementáció (UI)
+
+
+A `UserBundleViewScreen`-ben:
+
+```dart
+class _UserBundleViewScreenState extends State<UserBundleViewScreen> {
+  final _scrollController = ScrollController();
+  final List<UserBundleItem> _items = [];
+  DocumentSnapshot? _lastDocument;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_scrollListener);
+    _loadInitialItems();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreItems();
+    }
+  }
+
+  Future<void> _loadInitialItems() async {
+    final result = await UserBundleService.getItems(...);
+    setState(() {
+      _items.addAll(result.items);
+      _lastDocument = result.lastDoc;
+      _hasMore = result.items.length == 20;
+    });
+  }
+
+  Future<void> _loadMoreItems() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    
+    final result = await UserBundleService.getItems(
+      ..., lastDocument: _lastDocument,
+    );
+    
+    setState(() {
+      _items.addAll(result.items);
+      _lastDocument = result.lastDoc;
+      _hasMore = result.items.length == 20;
+      _isLoadingMore = false;
+    });
+  }
+  
+  // ...
+}
+```
+
+---
+
+## 📋 6. Implementációs Sorrend
+
+1. **Modellek:** `lib/models/user_bundle.dart`, `lib/models/user_bundle_item.dart`
+2. **Service:** `lib/services/user_bundle_service.dart`
+3. **Indexek:** `firestore.indexes.json` frissítése
+4. **UI Átírás:**
+   - `UserBundleViewScreen` (Infinite Scroll)
+   - `UserBundleEditScreen` (Service használat)
+   - `UserBundleListScreen` (Stream)
+   - `DocumentSelectionScreen` (Item hozzáadás a service-en keresztül)
+5. **Tesztelés:** Új kötegek létrehozása és elemek hozzáadása
+
+---
+
+## 💰 7. Költség és Teljesítmény Összefoglaló
+
+| Művelet | Régi (N+1) | Új (Subcollection) | Megtakarítás |
+|---------|------------|---------------------|--------------|
+| 100 elemes köteg megnyitás | 101 olvasás | 21 olvasás | ~80% |
+| Szűrés 5 találatra | 101 olvasás | 5 olvasás | ~95% |
+| Elem hozzáadása | 1 írás | 2 írás (item + counter) | - |
+
+A megoldás rendkívül költséghatékony és felhasználóbarát (gyors betöltés, szerveroldali szűrés).

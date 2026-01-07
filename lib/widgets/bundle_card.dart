@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../core/firebase_config.dart';
+import '../services/user_bundle_service.dart';
 
 /// Köteg kártya widget a grid nézethez.
 ///
@@ -17,7 +15,7 @@ class BundleCard extends StatelessWidget {
   final int allomasCount;
   final int dialogusCount;
   final int jogesetCount;
-  final Timestamp? createdAt;
+  final int totalCount;
 
   const BundleCard({
     super.key,
@@ -28,12 +26,11 @@ class BundleCard extends StatelessWidget {
     required this.allomasCount,
     required this.dialogusCount,
     required this.jogesetCount,
-    this.createdAt,
+    required this.totalCount,
   });
 
   @override
   Widget build(BuildContext context) {
-    final totalCount = noteCount + allomasCount + dialogusCount + jogesetCount;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
@@ -215,15 +212,7 @@ class BundleCard extends StatelessWidget {
 
     if (confirmed == true && context.mounted) {
       try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) return;
-
-        await FirebaseConfig.firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bundles')
-            .doc(id)
-            .delete();
+        await UserBundleService.deleteBundle(id);
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
