@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_html/flutter_html.dart';
 import '../core/firebase_config.dart';
 import '../models/jogeset_models.dart';
 import '../services/jogeset_service.dart';
 import '../widgets/breadcrumb_navigation.dart';
 import '../utils/filter_storage.dart';
+import '../widgets/jogeset/jogeset_section_widgets.dart';
 
 /// Jogeset megjelenítő képernyő léptetéses navigációval.
 ///
@@ -492,14 +492,14 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     final pages = <Widget>[];
 
     // Oldal 1: Fikció
-    pages.add(_buildMobilePage(
+    pages.add(JogesetSectionWidgets.buildMobilePage(
       title: 'Fikció:',
       content: currentJogeset.tenyek,
       isMobile: isMobile,
     ));
 
     // Oldal 2: Jogi kérdés
-    pages.add(_buildMobilePageHighlighted(
+    pages.add(JogesetSectionWidgets.buildMobilePageHighlighted(
       title: 'Kérdés',
       content: currentJogeset.kerdes,
       color: Colors.blue.shade50,
@@ -508,7 +508,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     ));
 
     // Oldal 3: Következtetés
-    pages.add(_buildMobilePageHighlighted(
+    pages.add(JogesetSectionWidgets.buildMobilePageHighlighted(
       title: 'Következtetés',
       content: currentJogeset.megoldas,
       color: Colors.green.shade50,
@@ -519,7 +519,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
     // Oldal 4: Eredeti jogszabály (ha van)
     if (currentJogeset.eredetiJogszabalySzoveg != null &&
         currentJogeset.eredetiJogszabalySzoveg!.isNotEmpty) {
-      pages.add(_buildMobilePage(
+      pages.add(JogesetSectionWidgets.buildMobilePage(
         title: 'Eredeti jogszabály szöveg',
         content: currentJogeset.eredetiJogszabalySzoveg!,
         isMobile: isMobile,
@@ -681,7 +681,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             const SizedBox(height: 24),
 
             // Fikció
-            _buildSection(
+            JogesetSectionWidgets.buildSection(
               title: 'Fikció:',
               content: currentJogeset.tenyek,
               isMobile: isMobile,
@@ -690,7 +690,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             const SizedBox(height: 24),
 
             // Kérdés (kiemelt)
-            _buildHighlightedSection(
+            JogesetSectionWidgets.buildHighlightedSection(
               title: 'Kérdés',
               content: currentJogeset.kerdes,
               color: Colors.blue.shade50,
@@ -722,7 +722,7 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             // Következtetés (kiemelt, feltételesen látható)
             if (_isMegoldasVisible) ...[
               const SizedBox(height: 24),
-              _buildHighlightedSection(
+              JogesetSectionWidgets.buildHighlightedSection(
                 title: 'Következtetés',
                 content: currentJogeset.megoldas,
                 color: Colors.green.shade50,
@@ -758,168 +758,6 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  /// Mobilnézeti oldal widget
-  Widget _buildMobilePage({
-    required String title,
-    required String content,
-    required bool isMobile,
-    bool isItalic = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 12, // 14-2
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF202122),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Html(
-          data:
-              '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
-          style: {
-            "div": Style(
-              fontSize: FontSize(10.5), // 10 + 0.5
-              color: const Color(0xFF444444),
-              lineHeight: const LineHeight(1.6),
-              padding: HtmlPaddings.zero,
-              margin: Margins.zero,
-              fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-            ),
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Mobilnézeti kiemelt oldal widget
-  Widget _buildMobilePageHighlighted({
-    required String title,
-    required String content,
-    required Color color,
-    required Color borderColor,
-    required bool isMobile,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: color,
-        border: isMobile ? null : Border.all(color: borderColor, width: 2.0),
-        borderRadius: BorderRadius.circular(12.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12.0, // 14-2
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF202122),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Html(
-            data:
-                '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
-            style: {
-              "div": Style(
-                fontSize: FontSize(10.0),
-                color: const Color(0xFF444444),
-                lineHeight: const LineHeight(1.6),
-                padding: HtmlPaddings.zero,
-                margin: Margins.zero,
-              ),
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Szekció widget
-  Widget _buildSection({
-    required String title,
-    required String content,
-    required bool isMobile,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: isMobile ? 12.0 : 18.0,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF202122),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Html(
-          data:
-              '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
-          style: {
-            "div": Style(
-              fontSize: FontSize(isMobile ? 10.5 : 16.0),
-              color: const Color(0xFF444444),
-              lineHeight: const LineHeight(1.6),
-              padding: HtmlPaddings.zero,
-              margin: Margins.zero,
-            ),
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Kiemelt szekció widget
-  Widget _buildHighlightedSection({
-    required String title,
-    required String content,
-    required Color color,
-    required Color borderColor,
-    required bool isMobile,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 16.0 : 20.0),
-      decoration: BoxDecoration(
-        color: color,
-        border: isMobile ? null : Border.all(color: borderColor, width: 2.0),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: isMobile ? 12.0 : 18.0,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF202122),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Html(
-            data:
-                '<div style="text-align: justify;">${_escapeHtml(content)}</div>',
-            style: {
-              "div": Style(
-                fontSize: FontSize(isMobile ? 10.5 : 16.0),
-                color: const Color(0xFF444444),
-                lineHeight: const LineHeight(1.6),
-                padding: HtmlPaddings.zero,
-                margin: Margins.zero,
-              ),
-            },
-          ),
-        ],
       ),
     );
   }
@@ -1000,15 +838,5 @@ class _JogesetViewScreenState extends State<JogesetViewScreen> {
         ),
       ],
     );
-  }
-
-  /// HTML escape helper metódus
-  String _escapeHtml(String text) {
-    return text
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
   }
 }

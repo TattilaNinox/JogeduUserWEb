@@ -1,0 +1,163 @@
+# Nagy Fájlok Refaktorálási Terve
+
+A kódbázis auditja alapján azonosítottam azokat a fájlokat, amelyek túl nagyok és szétdarabolásra szorulnak a hosszú távú karbantarthatóság érdekében.
+
+## Célok
+
+- **Karbantarthatóság javítása**: Kisebb, fókuszáltabb fájlok könnyebben érthetők és módosíthatók
+- **Tesztelhetőség növelése**: Különálló komponensek izoláltan tesztelhetők
+- **Újrafelhasználhatóság**: Közös logika kiemelése több helyen is használható
+
+---
+
+## 1. Fázis: Kritikus Fájlok (>1000 sor)
+
+### 1.1 `memoriapalota_allomas_view_screen.dart` (2423 sor) - **LEGMAGASABB PRIORITÁS**
+
+Ez a fájl extrém nagy, 36+ metódussal. Az alábbi logikai csoportokra bontható:
+
+#### Javasolt új fájlok:
+
+| Új fájl | Tartalomleírás | Becsült méret |
+|---------|----------------|---------------|
+| `lib/services/image_upload_service.dart` | Képfeltöltés, tömörítés, Storage kezelés (`_compressImage`, `_uploadImageToStorage`, `_processAndUploadImage`, `_compressImageInIsolate`) | ~300 sor |
+| `lib/widgets/memoriapalota/station_content_viewer.dart` | Iframe beállítás és tartalom megjelenítés (`_setupIframe`, `_displayCurrentAllomas`) | ~500 sor |
+| `lib/widgets/memoriapalota/station_image_picker.dart` | Képválasztó dialógok és logika (`_showImagePickerDialog`, `_pickImageFromFile`, `_pickImageFromCamera`) | ~350 sor |
+| `lib/widgets/memoriapalota/station_navigation_bar.dart` | Navigációs gombok mobil és desktop nézethez (`_buildMobileBottomBar`, `_buildDesktopBottomBar`, `_buildMobilePagerTopBar`) | ~200 sor |
+| `lib/screens/memoriapalota_allomas_view_screen.dart` | **Fő screen** - csak állapotkezelés és összerakás | ~400 sor |
+
+---
+
+### 1.2 `account_screen.dart` (1718 sor)
+
+A felhasználói fiók képernyő túl sok felelősséget tartalmaz: fiókadatok, fizetési callback-ek, dialógok.
+
+#### Javasolt új fájlok:
+
+| Új fájl | Tartalomleírás | Becsült méret |
+|---------|----------------|---------------|
+| `lib/widgets/account/payment_result_dialogs.dart` | Fizetési eredmény dialógok (`_showPaymentSuccessDialog`, `_showPaymentFailedDialog`, `_showPaymentTimeoutDialog`, `_showPaymentCancelledDialog`) | ~450 sor |
+| `lib/widgets/account/account_deletion_section.dart` | Fiók törlés megerősítő dialóg és logika (`_confirmAndDelete`) | ~150 sor |
+| `lib/widgets/account/account_content_builder.dart` | Fő tartalom építő widget (`_buildAccountContent` kisebb al-widgetekre bontva) | ~500 sor |
+| `lib/screens/account_screen.dart` | **Fő screen** - állapotkezelés, payment callback routing | ~300 sor |
+
+---
+
+### 1.3 `user_list_screen.dart` (1260 sor)
+
+Admin felhasználó lista, statisztikákkal és tömeges műveletekkel.
+
+#### Javasolt új fájlok:
+
+| Új fájl | Tartalomleírás | Becsült méret |
+|---------|----------------|---------------|
+| `lib/widgets/admin/user_stats_section.dart` | Statisztikai kártyák (`_buildStatsSection`, `_buildStatCard`) | ~200 sor |
+| `lib/widgets/admin/user_list_tile.dart` | Egyedi felhasználó tile (`_buildUserTile`) | ~200 sor |
+| `lib/widgets/admin/user_action_handler.dart` | Felhasználói műveletek kezelése (`_handleUserAction`, `_handleBulkAction`) | ~400 sor |
+| `lib/screens/user_list_screen.dart` | **Fő screen** - lista és szűrés | ~300 sor |
+
+---
+
+### 1.4 `note_edit_screen.dart` (1091 sor)
+
+Jegyzet szerkesztő képernyő.
+
+#### Javasolt új fájlok:
+
+| Új fájl | Tartalomleírás | Becsült méret |
+|---------|----------------|---------------|
+| `lib/widgets/note_editor/note_editor_toolbar.dart` | Szerkesztő toolbar és akciók | ~150 sor |
+| `lib/widgets/note_editor/note_metadata_form.dart` | Dropdown-ok és form mezők (`_buildTypeDropdown`, `_buildCategoryDropdown`, `_buildScienceDropdown`, `_buildTagsSection`) | ~250 sor |
+| `lib/widgets/note_editor/note_file_upload.dart` | Fájlfeltöltés szekció (`_buildFileUploadSection`, `_pickMp3File`, `_pickPdfFile`) | ~200 sor |
+| `lib/widgets/note_editor/note_preview_panel.dart` | Előnézet és nyomtatás (`_buildEditorAndPreview`, `_printPreview`) | ~250 sor |
+| `lib/screens/note_edit_screen.dart` | **Fő screen** - állapotkezelés | ~300 sor |
+
+---
+
+### 1.5 `note_list_screen.dart` (1014 sor)
+
+#### Javasolt új fájlok:
+
+| Új fájl | Tartalomleírás | Becsült méret |
+|---------|----------------|---------------|
+| `lib/widgets/note_list/note_filter_handlers.dart` | Szűrő callback-ek és logika (`_onSearchChanged`, `_onCategoryChanged`, stb.) | ~200 sor |
+| `lib/widgets/note_list/note_map_mode.dart` | Térkép nézet (`_buildMapMode`, `_buildMapFolder`) | ~150 sor |
+| `lib/screens/note_list_screen.dart` | **Fő screen** | ~400 sor |
+
+---
+
+### 1.6 `jogeset_view_screen.dart` (1014 sor)
+
+#### Javasolt új fájlok:
+
+| Új fájl | Tartalomleírás | Becsült méret |
+|---------|----------------|---------------|
+| `lib/widgets/jogeset/jogeset_content_section.dart` | Szekció építő widgetek (`_buildSection`, `_buildHighlightedSection`, `_buildMobilePage`) | ~250 sor |
+| `lib/widgets/jogeset/jogeset_navigation_list.dart` | Navigációs lista (`_buildJogesetNavigationList`) | ~100 sor |
+| `lib/screens/jogeset_view_screen.dart` | **Fő screen** | ~500 sor |
+
+---
+
+## 2. Fázis: Közös Komponensek Kiemelése
+
+### 2.1 `shipping_address_form.dart` (998 sor) és `shipping_address_dialog.dart` (813 sor)
+
+> [!IMPORTANT]
+> Ezek a fájlok nagyon hasonló logikát tartalmaznak (irányítószám lookup, város választó, form validation). Közös komponensekre bontással jelentős kódismétlés csökkenthető.
+
+#### Javasolt közös komponensek:
+
+| Új fájl | Tartalomleírás | Felhasználók |
+|---------|----------------|--------------|
+| `lib/widgets/address/postal_code_lookup.dart` | Irányítószám keresés és város választó | `ShippingAddressForm`, `ShippingAddressDialog` |
+| `lib/widgets/address/address_form_fields.dart` | Közös form mezők (név, cím, irányítószám, város) | Mindkettő |
+| `lib/services/postal_code_service.dart` | Irányítószám adatbázis betöltés és keresés | Mindkettő |
+
+---
+
+## 3. Implementációs Sorrend
+
+A refaktorálást fokozatosan, biztonságosan kell végrehajtani:
+
+1. **Először**: Közös service-ek kiemelése (pl. `ImageUploadService`, `PostalCodeService`)
+2. **Másodszor**: Önálló widgetek kiemelése (pl. navigációs sávok, dialógok)
+3. **Harmadszor**: A fő screen-ek egyszerűsítése
+
+Minden lépés után:
+- Flutter analyze futtatása
+- Manuális tesztelés a böngészőben
+
+---
+
+## 4. Ellenőrzési Terv
+
+### 4.1 Automatikus ellenőrzés
+
+```bash
+# Flutter statikus elemzés
+flutter analyze
+```
+
+### 4.2 Manuális ellenőrzés
+
+Mivel a refaktorálás nem változtatja a funkcionális viselkedést, a manuális tesztelés a legmegbízhatóbb:
+
+1. **`memoriapalota_allomas_view_screen`**: Nyisd meg a memóriapalota állomás nézetet, navigálj előre-hátra, tölts fel képet
+2. **`account_screen`**: Nyisd meg a fiók képernyőt, ellenőrizd a megjelenést
+3. **`user_list_screen`**: Admin felületről ellenőrizd a felhasználó listát és statisztikákat
+4. **`note_edit_screen`**: Nyiss meg egy jegyzetet szerkesztésre, ellenőrizd a formot
+5. **`note_list_screen`**: Ellenőrizd a jegyzetlista szűrőket és megjelenítést
+
+---
+
+## Felhasználói Döntés Szükséges
+
+> [!WARNING]
+> Ez egy jelentős refaktorálási munka, amely több napot vehet igénybe. Kérlek, válaszd ki, melyik fájllal kezdjük:
+
+1. **`memoriapalota_allomas_view_screen.dart`** - A legnagyobb, legkomplexebb
+2. **`account_screen.dart`** - Felhasználói fiók, fontos üzleti logika
+3. **`shipping_address_form.dart` + `shipping_address_dialog.dart`** - Közös komponensek kiemelése, gyors eredmény
+4. **Másik fájl** - Kérlek, pontosítsd
+
+Szeretnéd, hogy kezdjek el egy konkrét fájllal, vagy előbb részletesebb tervet készítsek valamelyikhez?
