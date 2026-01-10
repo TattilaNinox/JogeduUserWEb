@@ -13,3 +13,17 @@ Ellenőrzi a version.json-t (ha nincs, másolja)
 Feltölti a Firebase Preview Channel-re
 Megjeleníti a generált privát preview URL-t
 A dokumentációt is frissítettem, tartalmazza mindkét scriptet. Most már külön kezelheted a build és a deploy folyamatokat.
+
+Az baj hogy a másik felhasználó kliens webalkalmazás mobil nézetében túl nagy folyókás a szöveg megjelenítése, ezért beépítettünk oda egy Hyphenator csomaggal eg folyamataot ami nagyon szépen megjelíti a szöveget a mobil nézetben, de a betöltéskor akadozik mert A hyphenateHtmlHu (a log alapján) valószínűleg egy számításigényes művelet: végig kell mennie a teljes szövegen, elemezni a szavakat, és beilleszteni a láthatatlan elválasztójeleket.
+
+Mivel ez a Main UI Thread-en (a fő szálon) történik, a Flutter "megáll", amíg a számítás kész nincs. Ezért akad meg a töltésjelző animációja is (ez az ún. "UI jank"). Van e arra szerinted lehetőség, hogy előre elmentsük a szöveget a mobilnézet számára: Ha ez egy jegyzetalkalmazás, akkor a szöveg tartalma ritkábban változik, mint ahányszor megnyitják (Read-heavy application).
+
+Miért számolnán ki az elválasztást minden egyes megnyitáskor? Ez pazarlás.
+
+A javasolt logika:
+
+létrehoznánk a szöveg mentésekor egy folyamatot, amikor lefuttatnánk a hyphenateHtmlHu függvényt.
+
+Az adatbázisba menti el a feldolgozott (elválasztott) szöveget is (pl. egy processed_content mezőbe).
+
+Megnyitáskor: Csak betölti a mobilnézet be a kész, már feldolgozott szöveget a DB-ből.

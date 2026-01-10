@@ -14,6 +14,7 @@ import '../widgets/shipping_address_form.dart';
 import '../widgets/account/payment_result_dialogs.dart';
 import '../widgets/account/account_deletion_dialog.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import '../services/app_config_service.dart';
 
 /// Egyszerű fiókadatok képernyő, előfizetési státusszal.
 class AccountScreen extends StatefulWidget {
@@ -484,6 +485,113 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
 
               const SizedBox(height: 20),
+
+              // Admin eszközök - Regisztráció vezérlő
+              // Csak admin felhasználóknak látható
+              if (isAdmin) ...[
+                Container(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    border: Border.all(
+                      color: const Color(0xFF4CAF50),
+                      width: 1,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.app_registration,
+                              color: Color(0xFF4CAF50),
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Admin - Regisztráció engedélyezése',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 15,
+                                  color: Color(0xFF202122),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        StreamBuilder<bool>(
+                          stream:
+                              AppConfigService().isRegistrationEnabledStream(),
+                          builder: (context, snapshot) {
+                            final isEnabled = snapshot.data ?? true;
+                            return Row(
+                              children: [
+                                Switch(
+                                  value: isEnabled,
+                                  activeColor: const Color(0xFF4CAF50),
+                                  onChanged: (value) async {
+                                    await AppConfigService()
+                                        .setRegistrationEnabled(
+                                      value,
+                                      user.email ?? 'unknown',
+                                    );
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            value
+                                                ? 'Regisztráció engedélyezve'
+                                                : 'Regisztráció letiltva',
+                                          ),
+                                          backgroundColor: value
+                                              ? const Color(0xFF4CAF50)
+                                              : Colors.orange,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    isEnabled
+                                        ? 'Új felhasználók regisztrálhatnak'
+                                        : 'Regisztráció letiltva',
+                                    style: TextStyle(
+                                      color: isEnabled
+                                          ? const Color(0xFF4CAF50)
+                                          : Colors.orange,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Ha ki van kapcsolva, új felhasználók nem tudnak regisztrálni. A meglévő felhasználók zavartalanul használhatják az alkalmazást.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Admin eszközök - Előfizetés lejárat vezérlő
               // Admin felhasználóknak és lomeduteszt@gmail.com felhasználónak látható

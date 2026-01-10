@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../utils/password_validation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/registration_state_service.dart';
+import '../services/app_config_service.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -23,6 +24,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _termsAccepted = false;
   String? _errorMessage;
   bool _isLoading = false;
+  bool _isCheckingRegistration = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRegistrationEnabled();
+  }
+
+  Future<void> _checkRegistrationEnabled() async {
+    final isEnabled = await AppConfigService().isRegistrationEnabled();
+    if (!isEnabled && mounted) {
+      // Regisztráció tiltva - átirányítás a login oldalra
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A regisztráció jelenleg nem elérhető.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      context.go('/login');
+      return;
+    }
+    if (mounted) {
+      setState(() => _isCheckingRegistration = false);
+    }
+  }
 
   bool _isValidEmail(String email) {
     // Javított regex: raw string + helyes egy backslash-es escape a regexben
@@ -187,6 +213,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Várakozás a regisztrációs állapot ellenőrzésére
+    if (_isCheckingRegistration) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F5F5),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(

@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../core/session_guard.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/app_config_service.dart';
 
 /// A bejelentkezési képernyőt megvalósító widget.
 ///
@@ -599,9 +600,21 @@ class LoginScreenState extends State<LoginScreen>
                                           context.go('/forgot-password'),
                                       child: const Text('Elfelejtett jelszó?'),
                                     ),
-                                    TextButton(
-                                      onPressed: () => context.go('/register'),
-                                      child: const Text('Regisztráció'),
+                                    StreamBuilder<bool>(
+                                      stream: AppConfigService()
+                                          .isRegistrationEnabledStream(),
+                                      builder: (context, snapshot) {
+                                        // Ha nincs adat még vagy regisztráció tiltott, ne mutassuk
+                                        if (!snapshot.hasData ||
+                                            snapshot.data == false) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return TextButton(
+                                          onPressed: () =>
+                                              context.go('/register'),
+                                          child: const Text('Regisztráció'),
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),

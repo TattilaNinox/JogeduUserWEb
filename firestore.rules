@@ -234,8 +234,16 @@ service cloud.firestore {
           
           // Törlés: csak a saját képet lehet törölni
           allow delete: if request.auth != null && request.auth.uid == userId;
-        }
       }
+    }
+
+    // ────────── App Konfiguráció (regisztráció engedélyezése stb.) ──────────
+    match /app_config/{configId} {
+      // Olvasás: bárki olvashatja (kliens ellenőrizheti a regisztráció állapotát)
+      allow read: if true;
+      
+      // Írás: csak admin
+      allow write: if isAdmin();
     }
   }
 }
